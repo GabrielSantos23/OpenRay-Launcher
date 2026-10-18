@@ -39,7 +39,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 
 ### Consequences
 
-- **Global hotkey.** The skeleton uses `RegisterHotKey` (tauri-plugin-global-shortcut). The reference uses a WH_KEYBOARD_LL hook, which can take keys that `RegisterHotKey` cannot get while another app hooks them. A hook may replace it later, inside the Windows integration module.
+- **Global hotkey.** A WH_KEYBOARD_LL hook, matching the reference. `RegisterHotKey` was used in the first skeleton and replaced in milestone 1.
 - **Third-party extension isolation is deferred.** Built-ins run in-process in the web layer.
 
 ## Module boundaries
@@ -47,7 +47,8 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Module | Location | Owns |
 |---|---|---|
 | Lifecycle | `src-tauri/src/lib.rs` | Single instance, tray, startup hidden, quit |
-| Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Show/hide/toggle, placement, DWM styling, hide on blur |
+| Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
+| Global hotkey | `src-tauri/src/hotkey.rs` | Parse `settings.json` hotkey, WH_KEYBOARD_LL hook thread, dispatcher thread |
 | Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, ShellExecute, DWM attributes |
 | Settings and persistence | `src-tauri/src/store.rs` | `settings.json` (hotkey), `frecency.json` in `%APPDATA%\dev.openray.app` |
 | Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |

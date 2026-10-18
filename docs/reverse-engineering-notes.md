@@ -74,11 +74,29 @@ Measured with `EnumWindows`, `GetWindowRect`, `GetWindowLongPtr` and `DwmGetWind
   - Command `resetPosition`, "Reset Raycast Window Position", exists, so the position is user-movable and remembered.
   - Setting `windowPresentationMode`, "Window Position", picks the monitor.
 
+### Show and hide sequence (measured)
+
+Measured on 2026-10-18 for an injected Alt+Space.
+
+- **Method:** a probe polled every 1 ms for the foreground window, the launcher's ex-style, and one screen pixel inside the launcher. The script is `showprobe.ps1` in the session scratchpad. It ran outside REA, so it has no REA evidence ID.
+
+| t after key | Show | Hide |
+|---|---|---|
+| ~6 ms | ex-style `0x080800A0` → `0x00080000` (TRANSPARENT, NOACTIVATE and TOOLWINDOW removed) | — |
+| ~21 ms | Launcher painted and foreground | — |
+| ~30 ms | — | ex-style back to `0x080800A0`; foreground returns to the app that was active before |
+| ~47 ms | `WS_EX_TOPMOST` added | — |
+
+- **No DWM animations.** The window is never shown or hidden with `ShowWindow`, so DWM plays no fade. A `ShowWindow`-based hide in Openray's first skeleton faded for about 150 ms.
+- **Fresh content on reopen.** The window stays mapped, so the WebView keeps rendering while invisible and can reset before the next show. This matches the `HideWindowTransparentlyForOcclusionBypass` symbol.
+- **Open question.** Which API grants foreground (`AttachThreadInput` or the UIAccess helper) is still open in `unk_ce5e…`.
+
 ### Global hotkey
 
 - `Raycast.dll` imports `SetWindowsHookEx` and has the type `LowLevelKeyboardEvent`. `RegisterHotKey` was **not found** in its strings.
 - The hotkey is therefore a WH_KEYBOARD_LL hook, which is how it can take Alt+Space and Win-key combinations.
-- An injected `keybd_event` Alt+Space was received by RaycastMini. The real Raycast responded to a later physical press. The live state was observed but the cause was not proven.
+- **Injected input.** Raycast reacts to injected `keybd_event` input; the LLKHF_INJECTED events in the 2026-10-18 probe toggled it.
+- **Competing hooks.** When two apps hook the same chord, the most recently installed hook sees it first. With Openray's hook installed after Raycast's, the first Alt+Space went to Openray. Later presses reached Raycast, which suggests Raycast re-registers its hook. That is not confirmed.
 - The setting `globalHotkey` is titled "Raycast Hotkey", in `backend/index.mjs` settings metadata. It is serialized for Windows as `XRayHotkeyWindows`.
 - The default value is not readable, because settings are encrypted (see below). The owner's configured value is Alt+Space.
 

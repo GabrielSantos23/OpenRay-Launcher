@@ -16,13 +16,20 @@ public static class SmokeWin {
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h, int a, out RECT r, int size);
   [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern long GetWindowLongPtr(IntPtr h, int i);
+  [DllImport("user32.dll")] public static extern bool GetLayeredWindowAttributes(IntPtr h, out uint key, out byte alpha, out uint flags);
   public struct RECT { public int L, T, R, B; }
+  static bool Shown(IntPtr h) {
+    uint key, flags; byte alpha;
+    bool clickThrough = (GetWindowLongPtr(h, -20) & 0x20) != 0;
+    return IsWindowVisible(h) && !clickThrough && GetLayeredWindowAttributes(h, out key, out alpha, out flags) && alpha == 255;
+  }
   public static string Find(int pid) {
     string found = null;
     EnumWindows((h, l) => {
       int p; GetWindowThreadProcessId(h, out p);
       var t = new StringBuilder(64); GetWindowText(h, t, 64);
-      if (p == pid && IsWindowVisible(h) && t.ToString() == "Openray") {
+      if (p == pid && t.ToString() == "Openray" && Shown(h)) {
         RECT r; DwmGetWindowAttribute(h, 9, out r, 16);
         found = String.Format("{0}x{1}@{2}", r.R - r.L, r.B - r.T, GetDpiForWindow(h));
         return false;

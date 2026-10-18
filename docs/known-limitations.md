@@ -2,15 +2,15 @@
 
 ## Reference version
 
-- `AGENTS.md` names Raycast 2.4.0.0, but the machine has **2.8.2.0**, and every finding comes from 2.8.2.0.
+- The task brief named Raycast 2.4.0.0, but the machine has **2.8.2.0**. Every finding comes from 2.8.2.0, and `AGENTS.md` now says so.
 
 ## Global hotkey
 
-- **Mechanism.** Openray uses `RegisterHotKey` through `tauri-plugin-global-shortcut`. The reference uses a WH_KEYBOARD_LL hook.
-  - While Raycast or RaycastMini runs, their hooks take **Alt+Space** first, so Openray's default hotkey never fires.
-  - To test next to them, change `hotkey` in `%APPDATA%\dev.openray.app\settings.json`.
-- **Unavailable hotkey.** If registration fails, the app still runs and shows the failure in the tray tooltip. There is no settings UI yet.
-- **Changes need a restart.** Hotkey changes apply after restarting the app.
+- **Mechanism.** Openray uses a WH_KEYBOARD_LL hook (`src-tauri/src/hotkey.rs`), like the reference.
+  - The hook only decides and returns; a dispatcher thread does the work. Doing work inside the hook made Windows drop it after the first press.
+  - For Alt and Win chords, an unassigned key (0xE8) is injected so that releasing the modifier does not open the menu bar or Start menu.
+- **Shared hotkey.** If another running app hooks the same chord (Raycast, RaycastMini on Alt+Space), the most recently installed hook wins. Raycast appears to re-hook, so the two alternate. Use a different hotkey or quit the other launcher. On the dev machine, Raycast was moved to Ctrl+Alt+Space so that Openray keeps Alt+Space.
+- **Settings.** The hotkey is set by `hotkey` in `%APPDATA%\dev.openray.app\settings.json`. An invalid value shows in the tray tooltip. There is no settings UI, and changes need a restart.
 
 ## Applications
 
@@ -24,8 +24,8 @@
 ## Launcher
 
 - **Position.** The default position rule is approximate: centered horizontally, with the top at 35.3% of the work area (`unk_341f…`). There is no drag-to-move or remembered position.
-- **Hiding.** Hiding uses `ShowWindow(SW_HIDE)`. The reference keeps the window mapped and makes it transparent and click-through.
-- **Show and hide.** There is no show or hide animation, and show latency was not measured.
+- **Shown ex-style.** It keeps `WS_EX_TOOLWINDOW` (so it never appears in Alt+Tab) and Tauri's `WS_EX_ACCEPTFILES`. The reference drops TOOLWINDOW while shown.
+- **Show and hide.** Show latency was measured only on a debug build at 96 DPI.
 - **Missing UI.** There is no action panel (Ctrl+K), no Favorites section, no fallback commands and no compact mode.
 - **Theme.** Only the dark theme exists, and only at the measured 100% DPI.
 - **Escape.** Escape always hides the launcher. The reference has an `escapeKeyBehavior` setting whose default is unknown.

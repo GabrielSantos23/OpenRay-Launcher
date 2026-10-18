@@ -46,15 +46,17 @@ export default function App() {
 
   useEffect(() => {
     refresh();
-    const unlisten = listen("launcher-shown", () => {
-      setQuery("");
-      setSelected(0);
-      setError(null);
-      inputRef.current?.focus();
-      refresh();
-    });
+    const unlisteners = [
+      listen("launcher-hidden", () => {
+        setQuery("");
+        setSelected(0);
+        setError(null);
+        refresh();
+      }),
+      listen("launcher-shown", () => inputRef.current?.focus()),
+    ];
     return () => {
-      unlisten.then((off) => off());
+      unlisteners.forEach((p) => p.then((off) => off()));
     };
   }, [refresh]);
 
@@ -76,7 +78,7 @@ export default function App() {
     invoke<number>("frecency_visit", { key: command.key })
       .then((score) => setFrecency((f) => ({ ...f, [command.key]: score })))
       .catch((e) => console.error("frecency_visit failed", e));
-    await invoke("hide_launcher");
+    await invoke("hide_launcher", { restoreFocus: true });
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -91,7 +93,7 @@ export default function App() {
       if (current) run(current);
     } else if (event.key === "Escape") {
       event.preventDefault();
-      invoke("hide_launcher");
+      invoke("hide_launcher", { restoreFocus: true });
     }
   }
 

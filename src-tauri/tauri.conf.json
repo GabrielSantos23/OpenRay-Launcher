@@ -14,8 +14,8 @@
       {
         "label": "launcher",
         "title": "Openray",
-        "width": 748,
-        "height": 473,
+        "width": 750,
+        "height": 475,
         "resizable": false,
         "maximizable": false,
         "minimizable": false,
@@ -24,7 +24,7 @@
         "skipTaskbar": true,
         "visible": false,
         "focus": false,
-        "shadow": true,
+        "shadow": false,
         "center": true,
         "backgroundColor": "#1f1f1f"
       }

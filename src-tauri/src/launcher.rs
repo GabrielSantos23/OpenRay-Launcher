@@ -1,27 +1,68 @@
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow};
+use windows::Win32::Foundation::{COLORREF, HWND};
+use windows::Win32::Graphics::Dwm::{
+    DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_TRANSITIONS_FORCEDISABLED, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+};
+use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+use windows::Win32::UI::WindowsAndMessaging::{
+    BringWindowToTop, GetAncestor, GetForegroundWindow, GetShellWindow, GetWindowLongPtrW, GetWindowThreadProcessId, IsWindow,
+    SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE,
+    GWL_STYLE, HWND_NOTOPMOST, HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, SW_SHOWNOACTIVATE, WS_CAPTION, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
+    WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
+};
 
 pub const LABEL: &str = "launcher";
 const TOP_FRACTION: f64 = 0.353;
+const WIDTH: f64 = 750.0;
+const HEIGHT: f64 = 475.0;
+
+static SHOWN: AtomicBool = AtomicBool::new(false);
+static PREVIOUS_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
 
 fn window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(LABEL)
 }
 
-pub fn style(window: &WebviewWindow) {
-    #[cfg(windows)]
-    {
-        use windows::Win32::Foundation::HWND;
-        use windows::Win32::Graphics::Dwm::{
-            DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
-        };
-        let Ok(handle) = window.hwnd() else { return };
-        let hwnd = HWND(handle.0 as _);
-        let corner = DWMWCP_ROUND;
-        let border: u32 = 0x003B_3B3B;
-        unsafe {
-            let _ = DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner as *const _ as _, std::mem::size_of_val(&corner) as u32);
-            let _ = DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &border as *const _ as _, std::mem::size_of_val(&border) as u32);
-        }
+fn hwnd(window: &WebviewWindow) -> Option<HWND> {
+    window.hwnd().ok().map(|h| HWND(h.0 as _))
+}
+
+fn set_dwm<T>(hwnd: HWND, attribute: windows::Win32::Graphics::Dwm::DWMWINDOWATTRIBUTE, value: T) {
+    unsafe {
+        let _ = DwmSetWindowAttribute(hwnd, attribute, &value as *const T as _, std::mem::size_of::<T>() as u32);
+    }
+}
+
+fn set_hidden_styles(hwnd: HWND, hidden: bool) {
+    unsafe {
+        let ex = (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32 & !WS_EX_APPWINDOW.0) | WS_EX_LAYERED.0 | WS_EX_TOOLWINDOW.0;
+        let toggled = WS_EX_TRANSPARENT.0 | WS_EX_NOACTIVATE.0;
+        let ex = if hidden { ex | toggled } else { ex & !toggled };
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex as isize);
+        let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), if hidden { 0 } else { 255 }, LWA_ALPHA);
+        let z = if hidden { HWND_NOTOPMOST } else { HWND_TOPMOST };
+        let _ = SetWindowPos(hwnd, Some(z), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+}
+
+pub fn init(window: &WebviewWindow) {
+    let Some(hwnd) = hwnd(window) else { return };
+    let scale = window.scale_factor().unwrap_or(1.0);
+    unsafe {
+        let frame = (WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX).0;
+        let style = (GetWindowLongPtrW(hwnd, GWL_STYLE) as u32 & !frame) | WS_POPUP.0;
+        SetWindowLongPtrW(hwnd, GWL_STYLE, style as isize);
+        let (width, height) = ((WIDTH * scale).round() as i32, (HEIGHT * scale).round() as i32);
+        let _ = SetWindowPos(hwnd, None, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+    set_dwm(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND);
+    set_dwm(hwnd, DWMWA_BORDER_COLOR, 0x003B_3B3Bu32);
+    set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
+    set_hidden_styles(hwnd, true);
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
 }
 
@@ -39,13 +80,7 @@ fn place(app: &AppHandle, window: &WebviewWindow) {
     let _ = window.set_position(PhysicalPosition::new(x, y.min(max_y).max(area.position.y)));
 }
 
-#[cfg(windows)]
-fn force_foreground(window: &WebviewWindow) {
-    use windows::Win32::Foundation::HWND;
-    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
-    use windows::Win32::UI::WindowsAndMessaging::{BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow};
-    let Ok(handle) = window.hwnd() else { return };
-    let hwnd = HWND(handle.0 as _);
+fn force_foreground(hwnd: HWND) {
     unsafe {
         let current = GetCurrentThreadId();
         let foreground = GetWindowThreadProcessId(GetForegroundWindow(), None);
@@ -61,45 +96,53 @@ fn force_foreground(window: &WebviewWindow) {
     }
 }
 
-#[cfg(windows)]
 pub fn owns_foreground(window: &WebviewWindow) -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GetForegroundWindow, GA_ROOT};
-    let Ok(handle) = window.hwnd() else { return false };
-    unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT).0 == handle.0 as _ }
+    let Some(hwnd) = hwnd(window) else { return false };
+    unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) == hwnd }
 }
 
-#[cfg(not(windows))]
-pub fn owns_foreground(window: &WebviewWindow) -> bool {
-    window.is_focused().unwrap_or(false)
+pub fn is_shown() -> bool {
+    SHOWN.load(Ordering::SeqCst)
 }
 
 pub fn show(app: &AppHandle) {
     let Some(window) = window(app) else { return };
-    place(app, &window);
-    let _ = window.show();
-    #[cfg(windows)]
-    {
-        let target = window.clone();
-        let _ = app.run_on_main_thread(move || {
-            force_foreground(&target);
-            let _ = target.set_focus();
-        });
+    let Some(hwnd) = hwnd(&window) else { return };
+    if !is_shown() {
+        let previous = unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) };
+        if previous != hwnd {
+            PREVIOUS_FOREGROUND.store(previous.0 as isize, Ordering::SeqCst);
+        }
+        place(app, &window);
     }
-    #[cfg(not(windows))]
+    SHOWN.store(true, Ordering::SeqCst);
+    set_hidden_styles(hwnd, false);
+    force_foreground(hwnd);
     let _ = window.set_focus();
     let _ = app.emit_to(LABEL, "launcher-shown", ());
 }
 
-pub fn hide(app: &AppHandle) {
-    if let Some(window) = window(app) {
-        let _ = window.hide();
+pub fn hide(app: &AppHandle, restore_focus: bool) {
+    let Some(window) = window(app) else { return };
+    let Some(hwnd) = hwnd(&window) else { return };
+    if !SHOWN.swap(false, Ordering::SeqCst) {
+        return;
+    }
+    set_hidden_styles(hwnd, true);
+    let _ = app.emit_to(LABEL, "launcher-hidden", ());
+    if restore_focus && owns_foreground(&window) {
+        let previous = HWND(PREVIOUS_FOREGROUND.load(Ordering::SeqCst) as _);
+        unsafe {
+            let target = if !previous.is_invalid() && IsWindow(Some(previous)).as_bool() { previous } else { GetShellWindow() };
+            let _ = SetForegroundWindow(target);
+        }
     }
 }
 
 pub fn toggle(app: &AppHandle) {
-    match window(app).map(|w| w.is_visible().unwrap_or(false)) {
-        Some(true) => hide(app),
-        Some(false) => show(app),
-        None => {}
+    if is_shown() {
+        hide(app, true);
+    } else {
+        show(app);
     }
 }

@@ -1,4 +1,5 @@
 mod apps;
+mod hotkey;
 mod launcher;
 mod store;
 
@@ -7,7 +8,6 @@ use store::Store;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, State, WindowEvent};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 #[tauri::command]
 fn list_apps() -> Vec<apps::InstalledApp> {
@@ -30,8 +30,8 @@ fn frecency_all(store: State<Store>) -> HashMap<String, f64> {
 }
 
 #[tauri::command]
-fn hide_launcher(app: AppHandle) {
-    launcher::hide(&app)
+fn hide_launcher(app: AppHandle, restore_focus: bool) {
+    launcher::hide(&app, restore_focus)
 }
 
 #[tauri::command]
@@ -67,21 +67,25 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| launcher::show(app)))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let store = Store::load(app.path().app_data_dir()?);
             let hotkey = store.settings.hotkey.clone();
             app.manage(store);
 
             if let Some(window) = app.get_webview_window(launcher::LABEL) {
-                launcher::style(&window);
+                launcher::init(&window);
             }
             setup_tray(app)?;
 
-            let registered = app.global_shortcut().on_shortcut(hotkey.as_str(), |app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    launcher::toggle(app);
-                }
+            let handle = app.handle().clone();
+            let registered = hotkey::parse(&hotkey).and_then(|parsed| {
+                hotkey::install(
+                    parsed,
+                    Box::new(move || {
+                        let app = handle.clone();
+                        let _ = handle.run_on_main_thread(move || launcher::toggle(&app));
+                    }),
+                )
             });
             if let Err(e) = registered {
                 eprintln!("openray: could not register hotkey {hotkey}: {e}");
@@ -99,9 +103,9 @@ pub fn run() {
             if window.label() != launcher::LABEL || !matches!(event, WindowEvent::Focused(false)) {
                 return;
             }
-            if let Some(launcher) = window.app_handle().get_webview_window(launcher::LABEL) {
-                if !launcher::owns_foreground(&launcher) {
-                    let _ = launcher.hide();
+            if let Some(webview) = window.app_handle().get_webview_window(launcher::LABEL) {
+                if launcher::is_shown() && !launcher::owns_foreground(&webview) {
+                    launcher::hide(window.app_handle(), false);
                 }
             }
         })

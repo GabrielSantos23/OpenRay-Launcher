@@ -13,23 +13,24 @@ Tokens are measured from Raycast for Windows 2.8.2.0 on a 1920×1080 display at 
 
 | Token | Value | Source | Openray |
 |---|---|---|---|
-| Outer size (incl. 1 px border) | 750 × 475 | H: `GetWindowRect` on `HwndWrapper[Raycast;Main;…]`; C: `--main-window-width: 750·spx` | Client 748×473 plus a DWM 1 px border = 750×475 frame (smoke test) |
+| Outer size (incl. 1 px border) | 750 × 475 | H: `GetWindowRect` on `HwndWrapper[Raycast;Main;…]`; C: `--main-window-width: 750·spx` | Popup window (no caption or frame), client 750×475; the DWM 1 px border overlays the outermost pixel, as in the reference (smoke test) |
 | Border | 1 px `#3B3B3B` | M | `DWMWA_BORDER_COLOR` 0x3B3B3B |
 | Corner | DWMWCP_ROUND | H: `DWMWA_WINDOW_CORNER_PREFERENCE`=2 | Same |
 | Background | `#1F1F1F` opaque composite | M | `--color-bg` |
 | Position | (627,381) observed; rule unknown | H, `unk_341f…` | ≈ horizontally centered; top at 35.3% of work-area height (gives y=381 on 1080 px) |
-| Scale at >100% DPI | unknown | — | ≈ logical pixels × DPI scale (Tauri default) |
+| Scale at >100% DPI | unknown | — | ≈ 750×475 × DPI scale (`launcher::init`) |
+| Hidden state | Mapped, layered alpha 0, click-through, no-activate, not topmost | H (show/hide probe) | Same, via `SetLayeredWindowAttributes` + ex-style; `DWMWA_TRANSITIONS_FORCEDISABLED` |
 
 ## Layout (y offsets from the outer top edge)
 
 | Element | Reference | Source | Openray |
 |---|---|---|---|
-| Search header | 64 px content, plus a 1 px separator at y=65 | M; C: `--main-window-header-height: 64·spx` | `--spacing-header: 65px` (64 + separator, border-box) |
+| Search header | 64 px content, plus a 1 px separator at y=65 | M; C: `--main-window-header-height: 64·spx` | `--spacing-header: 66px` (hidden border row + 64 + separator, border-box) |
 | Section header | 32 px (y 66–97) | M | `h-8`; text bottom padding 5 px ≈ |
-| Row | 38 px, 8 px from the outer edge on each side, radius ≈ 8 px | M | `--spacing-row: 38px`, `--spacing-inset: 7px` (client starts inside the border), `--radius-row: 8px` ≈ |
+| Row | 38 px, 8 px from the outer edge on each side, radius ≈ 8 px | M | `--spacing-row: 38px`, `--spacing-inset: 8px`, `--radius-row: 8px` ≈ |
 | Row icon | 22 px, 8 px from the row's left edge; title 12 px after the icon | M; C: `--icon-22` | Same |
-| Footer | 40 px content, separator above at y=433 | M (C says 42·spx; measured 40) | `--spacing-footer: 41px` (40 + separator) |
-| Search glyph | x=16 from the outer edge | M | `--spacing-search-inset: 15px` |
+| Footer | 40 px content, separator above at y=433 | M (C says 42·spx; measured 40) | `--spacing-footer: 42px` (separator + 40 + hidden border row) |
+| Search glyph | x=16 from the outer edge | M | `--spacing-search-inset: 16px` |
 
 ## Color
 

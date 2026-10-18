@@ -55,14 +55,16 @@ pub fn scan(roots: &[PathBuf]) -> Vec<InstalledApp> {
     by_name.into_values().collect()
 }
 
-#[cfg(windows)]
 pub fn launch(path: &str) -> Result<(), String> {
     use windows::core::{w, HSTRING, PCWSTR};
     use windows::Win32::UI::Shell::ShellExecuteW;
-    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY, SW_SHOWNORMAL};
 
     if !Path::new(path).exists() {
         return Err(format!("{path} no longer exists"));
+    }
+    unsafe {
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
     }
     let result = unsafe { ShellExecuteW(None, w!("open"), &HSTRING::from(path), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL) };
     if result.0 as isize > 32 {
