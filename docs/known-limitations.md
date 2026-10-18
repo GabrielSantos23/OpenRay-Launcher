@@ -14,12 +14,12 @@
 
 ## Applications
 
-- **Sources.** Only Start Menu shortcuts are indexed (`.lnk`, `.url`, `.appref-ms` under `%ProgramData%` and `%APPDATA%` Start Menu\Programs).
-  - Packaged MSIX/Store apps are missing, including Windows 11 Notepad, Calculator and Settings.
-  - Game launchers and Control Panel items are also missing.
+- **Sources.** Start Menu shortcuts (`.lnk`, `.url`, `.appref-ms` under `%ProgramData%` and `%APPDATA%` Start Menu\Programs) and packaged apps from the shell AppsFolder are indexed.
+  - Game launchers and Control Panel items are missing.
+  - Packaged apps launch through `shell:AppsFolder`, not `IApplicationActivationManager` as in the reference.
 - **Uninstaller filter.** Shortcuts whose name starts with "Uninstall" are skipped. The reference's own filter rule is unconfirmed.
-- **Icons.** There are no app icons yet. Rows show a letter tile.
-- **Rescans.** The index is re-scanned every time the launcher opens. There is no file watcher and no cache.
+- **Icons.** Icons come from the shell at 22 px × device pixel ratio. They are not cached on disk, so each one is extracted again after a restart. A letter tile shows when extraction fails.
+- **Rescans.** The index is re-scanned every time the launcher hides (about 0.4 s in a debug build, off the UI thread). There is no file watcher and no cache.
 
 ## Launcher
 

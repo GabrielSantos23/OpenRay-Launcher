@@ -49,7 +49,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Lifecycle | `src-tauri/src/lib.rs` | Single instance, tray, startup hidden, quit |
 | Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
 | Global hotkey | `src-tauri/src/hotkey.rs` | Parse `settings.json` hotkey, WH_KEYBOARD_LL hook thread, dispatcher thread |
-| Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, ShellExecute, DWM attributes |
+| Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, AppsFolder (MSIX) scan, shell icons served on `appicon://`, ShellExecute, DWM attributes |
 | Settings and persistence | `src-tauri/src/store.rs` | `settings.json` (hotkey), `frecency.json` in `%APPDATA%\dev.openray.app` |
 | Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
@@ -81,6 +81,7 @@ interface Command {
   id: string;
   title: string;
   subtitle?: string;
+  icon?: string;
   keywords?: string[];
   kind: string;
   run: () => Promise<void> | void;

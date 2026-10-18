@@ -10,6 +10,111 @@ pub struct InstalledApp {
 }
 
 const EXTENSIONS: [&str; 3] = ["lnk", "url", "appref-ms"];
+const APPS_FOLDER: &str = r"shell:AppsFolder\";
+
+fn with_com<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> T {
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
+    std::thread::spawn(move || unsafe {
+        let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
+        let result = work();
+        if initialized {
+            CoUninitialize();
+        }
+        result
+    })
+    .join()
+    .expect("COM worker thread panicked")
+}
+
+pub fn packaged_apps() -> Vec<InstalledApp> {
+    with_com(|| unsafe {
+        use windows::Win32::System::Com::CoTaskMemFree;
+        use windows::Win32::UI::Shell::{
+            BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem, SHGetKnownFolderItem, KF_FLAG_DEFAULT, SIGDN,
+            SIGDN_NORMALDISPLAY, SIGDN_PARENTRELATIVEPARSING,
+        };
+        let display = |item: &IShellItem, kind: SIGDN| {
+            item.GetDisplayName(kind).ok().map(|text| {
+                let value = text.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(text.0 as _));
+                value
+            })
+        };
+        let mut apps = Vec::new();
+        let Ok(folder) = SHGetKnownFolderItem::<IShellItem>(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, None) else { return apps };
+        let Ok(items) = folder.BindToHandler::<_, IEnumShellItems>(None, &BHID_EnumItems) else { return apps };
+        loop {
+            let mut batch = [None];
+            let mut fetched = 0;
+            if items.Next(&mut batch, Some(&mut fetched)).is_err() || fetched == 0 {
+                break;
+            }
+            let Some(item) = batch[0].take() else { break };
+            if let (Some(name), Some(id)) = (display(&item, SIGDN_NORMALDISPLAY), display(&item, SIGDN_PARENTRELATIVEPARSING)) {
+                if id.contains('!') {
+                    apps.push(InstalledApp { name, path: format!("{APPS_FOLDER}{id}") });
+                }
+            }
+        }
+        apps
+    })
+}
+
+pub fn icon_png(path: String, size: i32) -> Result<Vec<u8>, String> {
+    with_com(move || unsafe {
+        use windows::core::HSTRING;
+        use windows::Win32::Foundation::SIZE;
+        use windows::Win32::Graphics::Gdi::{
+            DeleteObject, GetDC, GetDIBits, ReleaseDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
+        };
+        use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_ICONONLY};
+
+        let factory: IShellItemImageFactory = SHCreateItemFromParsingName(&HSTRING::from(path.as_str()), None).map_err(|e| e.to_string())?;
+        let bitmap = factory.GetImage(SIZE { cx: size, cy: size }, SIIGBF_ICONONLY).map_err(|e| e.to_string())?;
+        let mut info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: size,
+                biHeight: -size,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut pixels = vec![0u8; (size * size * 4) as usize];
+        let dc = GetDC(None);
+        let lines = GetDIBits(dc, bitmap, 0, size as u32, Some(pixels.as_mut_ptr().cast()), &mut info, DIB_RGB_COLORS);
+        ReleaseDC(None, dc);
+        let _ = DeleteObject(bitmap.into());
+        if lines != size {
+            return Err(format!("GetDIBits copied {lines} of {size} lines"));
+        }
+        to_straight_rgba(&mut pixels);
+        let mut png = Vec::new();
+        let mut encoder = png::Encoder::new(&mut png, size as u32, size as u32);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.write_header().and_then(|mut w| w.write_image_data(&pixels)).map_err(|e| e.to_string())?;
+        Ok(png)
+    })
+}
+
+fn to_straight_rgba(pixels: &mut [u8]) {
+    let opaque = pixels.chunks_exact(4).all(|p| p[3] == 0);
+    for p in pixels.chunks_exact_mut(4) {
+        p.swap(0, 2);
+        if opaque {
+            p[3] = 255;
+        } else if p[3] > 0 && p[3] < 255 {
+            let alpha = p[3] as u32;
+            for c in &mut p[..3] {
+                *c = ((*c as u32 * 255 + alpha / 2) / alpha).min(255) as u8;
+            }
+        }
+    }
+}
 
 pub fn start_menu_roots() -> Vec<PathBuf> {
     ["ProgramData", "APPDATA"]
@@ -39,8 +144,8 @@ fn is_uninstaller(name: &str) -> bool {
     name.to_lowercase().starts_with("uninstall")
 }
 
-pub fn scan(roots: &[PathBuf]) -> Vec<InstalledApp> {
-    let mut by_name = BTreeMap::new();
+pub fn scan(roots: &[PathBuf], packaged: Vec<InstalledApp>) -> Vec<InstalledApp> {
+    let mut by_name: BTreeMap<_, _> = packaged.into_iter().map(|app| (app.name.to_lowercase(), app)).collect();
     for root in roots {
         let mut files = Vec::new();
         walk(root, &mut files);
@@ -60,7 +165,7 @@ pub fn launch(path: &str) -> Result<(), String> {
     use windows::Win32::UI::Shell::ShellExecuteW;
     use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY, SW_SHOWNORMAL};
 
-    if !Path::new(path).exists() {
+    if !path.starts_with(APPS_FOLDER) && !Path::new(path).exists() {
         return Err(format!("{path} no longer exists"));
     }
     unsafe {
@@ -95,7 +200,7 @@ mod tests {
         touch(&common.path().join(r"Tool\Uninstall Tool.lnk"));
         touch(&user.path().join("notepad.LNK"));
 
-        let apps = scan(&[common.path().to_path_buf(), user.path().to_path_buf()]);
+        let apps = scan(&[common.path().to_path_buf(), user.path().to_path_buf()], Vec::new());
         let names: Vec<_> = apps.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(names, ["ClickOnce", "Docs", "notepad", "Zed"]);
         assert!(apps[2].path.starts_with(&*user.path().to_string_lossy()));
@@ -103,6 +208,27 @@ mod tests {
 
     #[test]
     fn missing_roots_are_ignored() {
-        assert!(scan(&[PathBuf::from(r"Z:\does\not\exist")]).is_empty());
+        assert!(scan(&[PathBuf::from(r"Z:\does\not\exist")], Vec::new()).is_empty());
+    }
+
+    #[test]
+    fn shortcuts_win_over_packaged_apps_with_the_same_name() {
+        let dir = tempfile::tempdir().unwrap();
+        touch(&dir.path().join("Notepad.lnk"));
+        let packaged = |name: &str| InstalledApp { name: name.into(), path: format!("{APPS_FOLDER}{name}!App") };
+        let apps = scan(&[dir.path().to_path_buf()], vec![packaged("notepad"), packaged("Calculator")]);
+        let names: Vec<_> = apps.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["Calculator", "Notepad"]);
+        assert!(apps[1].path.ends_with("Notepad.lnk"));
+    }
+
+    #[test]
+    fn converts_premultiplied_bgra_to_straight_rgba() {
+        let mut pixels = [10, 20, 30, 255, 0, 64, 128, 128, 0, 0, 0, 0];
+        to_straight_rgba(&mut pixels);
+        assert_eq!(pixels, [30, 20, 10, 255, 255, 128, 0, 128, 0, 0, 0, 0]);
+        let mut no_alpha = [1, 2, 3, 0];
+        to_straight_rgba(&mut no_alpha);
+        assert_eq!(no_alpha, [3, 2, 1, 255]);
     }
 }

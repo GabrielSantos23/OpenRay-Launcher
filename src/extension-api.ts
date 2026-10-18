@@ -2,6 +2,7 @@ export interface Command {
   id: string;
   title: string;
   subtitle?: string;
+  icon?: string;
   keywords?: string[];
   kind: string;
   primaryActionTitle: string;

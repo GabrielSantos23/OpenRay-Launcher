@@ -15,7 +15,11 @@ function Logo() {
   );
 }
 
-function ItemIcon({ title }: { title: string }) {
+function ItemIcon({ title, icon }: { title: string; icon?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (icon && !failed) {
+    return <img src={icon} alt="" loading="lazy" draggable={false} onError={() => setFailed(true)} className="size-[22px] shrink-0" />;
+  }
   return (
     <span
       aria-hidden="true"
@@ -147,7 +151,7 @@ export default function App() {
                   onClick={() => run(command)}
                   className={`flex h-row cursor-default items-center gap-3 rounded-row px-2 text-13 ${isSelected ? "bg-list-selection" : ""}`}
                 >
-                  <ItemIcon title={command.title} />
+                  <ItemIcon title={command.title} icon={command.icon} />
                   <span className="truncate font-medium">{command.title}</span>
                   {command.subtitle && <span className="truncate text-fg-60">{command.subtitle}</span>}
                   <span className="ml-auto shrink-0 text-fg-60">{command.kind}</span>

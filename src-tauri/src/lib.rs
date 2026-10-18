@@ -10,9 +10,26 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager, State, WindowEvent};
 
 #[tauri::command]
-fn list_apps() -> Vec<apps::InstalledApp> {
-    apps::scan(&apps::start_menu_roots())
+async fn list_apps() -> Vec<apps::InstalledApp> {
+    apps::scan(&apps::start_menu_roots(), apps::packaged_apps())
 }
+
+fn serve_app_icon(request: tauri::http::Request<Vec<u8>>, responder: tauri::UriSchemeResponder) {
+    let uri = request.uri();
+    let path = percent_encoding::percent_decode_str(uri.path().trim_start_matches('/')).decode_utf8_lossy().into_owned();
+    let size = uri.query().and_then(|q| q.strip_prefix("size=")).and_then(|s| s.parse().ok()).filter(|s| (16..=256).contains(s)).unwrap_or(32);
+    std::thread::spawn(move || {
+        let response = match apps::icon_png(path, size) {
+            Ok(png) => tauri::http::Response::builder()
+                .header("Content-Type", "image/png")
+                .header("Cache-Control", "max-age=86400")
+                .body(png),
+            Err(_) => tauri::http::Response::builder().status(404).body(Vec::new()),
+        };
+        responder.respond(response.expect("valid icon response"));
+    });
+}
+
 
 #[tauri::command]
 fn launch_app(path: String) -> Result<(), String> {
@@ -67,6 +84,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| launcher::show(app)))
+        .register_asynchronous_uri_scheme_protocol("appicon", |_ctx, request, responder| serve_app_icon(request, responder))
         .setup(|app| {
             let store = Store::load(app.path().app_data_dir()?);
             let hotkey = store.settings.hotkey.clone();
