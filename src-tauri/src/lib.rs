@@ -32,8 +32,28 @@ fn serve_app_icon(request: tauri::http::Request<Vec<u8>>, responder: tauri::UriS
 
 
 #[tauri::command]
-fn launch_app(path: String) -> Result<(), String> {
-    apps::launch(&path)
+fn launch_app(path: String, as_admin: Option<bool>) -> Result<(), String> {
+    apps::launch(&path, as_admin.unwrap_or(false))
+}
+
+#[tauri::command]
+fn show_in_explorer(path: String) -> Result<(), String> {
+    apps::show_in_explorer(&path)
+}
+
+#[tauri::command]
+fn frecency_reset(key: String, store: State<Store>) -> Result<(), String> {
+    store.reset(&key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn favorites_get(store: State<Store>) -> Vec<String> {
+    store.favorites()
+}
+
+#[tauri::command]
+fn favorites_set(keys: Vec<String>, store: State<Store>) -> Result<(), String> {
+    store.set_favorites(keys).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -127,7 +147,18 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![list_apps, launch_app, frecency_visit, frecency_all, hide_launcher, quit_app])
+        .invoke_handler(tauri::generate_handler![
+            list_apps,
+            launch_app,
+            show_in_explorer,
+            frecency_visit,
+            frecency_all,
+            frecency_reset,
+            favorites_get,
+            favorites_set,
+            hide_launcher,
+            quit_app
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Openray");
 }

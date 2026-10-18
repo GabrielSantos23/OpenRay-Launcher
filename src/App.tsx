@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { RegisteredCommand } from "./extension-api";
+import { ActionPanel, Keys } from "./ActionPanel";
+import { actionGroups, matchesShortcut } from "./actions";
+import type { Action, RegisteredCommand } from "./extension-api";
 import { builtInExtensions } from "./extensions";
 import { loadCommands } from "./registry";
 import { search, type Frecency } from "./search";
@@ -36,16 +38,21 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const keepSelected = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [loaded, scores] = await Promise.all([
+    const [loaded, scores, favs] = await Promise.all([
       loadCommands(builtInExtensions),
       invoke<Frecency>("frecency_all").catch(() => ({}) as Frecency),
+      invoke<string[]>("favorites_get").catch(() => []),
     ]);
     setCommands(loaded);
     setFrecency(scores);
+    setFavorites(favs);
   }, []);
 
   useEffect(() => {
@@ -55,6 +62,7 @@ export default function App() {
         setQuery("");
         setSelected(0);
         setError(null);
+        setPanelOpen(false);
         refresh();
       }),
       listen("launcher-shown", () => inputRef.current?.focus()),
@@ -64,21 +72,52 @@ export default function App() {
     };
   }, [refresh]);
 
-  const sections = useMemo(() => search(commands, query, frecency), [commands, query, frecency]);
+  const sections = useMemo(() => search(commands, query, frecency, favorites), [commands, query, frecency, favorites]);
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
   const current = flat[Math.min(selected, flat.length - 1)];
+
+  useEffect(() => {
+    const key = keepSelected.current;
+    keepSelected.current = null;
+    const index = key ? flat.findIndex((c) => c.key === key) : -1;
+    if (index >= 0) setSelected(index);
+  }, [flat]);
 
   useEffect(() => {
     listRef.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" });
   }, [selected, sections]);
 
-  async function run(command: RegisteredCommand) {
+  const groups = current
+    ? actionGroups(current, {
+        favorites,
+        frecency,
+        setFavorites: (keys) => {
+          keepSelected.current = current.key;
+          setFavorites(keys);
+          invoke("favorites_set", { keys }).catch((e) => setError(`Could not save favorites: ${String(e)}`));
+        },
+        resetRanking: (key) => {
+          keepSelected.current = key;
+          setFrecency(({ [key]: _, ...rest }) => rest);
+          invoke("frecency_reset", { key }).catch((e) => setError(`Could not reset ranking: ${String(e)}`));
+        },
+      })
+    : [];
+
+  function closePanel() {
+    setPanelOpen(false);
+    inputRef.current?.focus();
+  }
+
+  async function runAction(command: RegisteredCommand, action: Action) {
+    closePanel();
     try {
-      await command.run();
+      await action.run();
     } catch (e) {
-      setError(`Could not open ${command.title}: ${String(e)}`);
+      setError(action.id === "primary" ? `Could not open ${command.title}: ${String(e)}` : `${action.title} failed: ${String(e)}`);
       return;
     }
+    if (action.keepOpen) return;
     invoke<number>("frecency_visit", { key: command.key })
       .then((score) => setFrecency((f) => ({ ...f, [command.key]: score })))
       .catch((e) => console.error("frecency_visit failed", e));
@@ -86,15 +125,21 @@ export default function App() {
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown") {
+    if (matchesShortcut(event, { key: "k", ctrl: true })) {
+      event.preventDefault();
+      if (current) setPanelOpen(true);
+      return;
+    }
+    const action = groups.flat().find((a) => a.shortcut && matchesShortcut(event, a.shortcut));
+    if (current && action) {
+      event.preventDefault();
+      runAction(current, action);
+    } else if (event.key === "ArrowDown") {
       event.preventDefault();
       setSelected((i) => Math.min(i + 1, flat.length - 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setSelected((i) => Math.max(i - 1, 0));
-    } else if (event.key === "Enter") {
-      event.preventDefault();
-      if (current) run(current);
     } else if (event.key === "Escape") {
       event.preventDefault();
       invoke("hide_launcher", { restoreFocus: true });
@@ -104,7 +149,7 @@ export default function App() {
   let index = -1;
 
   return (
-    <main className="flex h-full flex-col bg-bg text-fg">
+    <main className="relative flex h-full flex-col bg-bg text-fg">
       <h1 className="sr-only">Openray</h1>
       <header className="flex h-header shrink-0 items-center gap-3 border-b border-separator px-search-inset">
         <Logo />
@@ -148,7 +193,7 @@ export default function App() {
                   role="option"
                   aria-selected={isSelected}
                   onMouseMove={() => i !== selected && setSelected(i)}
-                  onClick={() => run(command)}
+                  onClick={() => runAction(command, { id: "primary", title: command.primaryActionTitle, run: command.run })}
                   className={`flex h-row cursor-default items-center gap-3 rounded-row px-2 text-13 ${isSelected ? "bg-list-selection" : ""}`}
                 >
                   <ItemIcon title={command.title} icon={command.icon} />
@@ -162,7 +207,7 @@ export default function App() {
         ))}
       </div>
 
-      <footer className="flex h-footer shrink-0 items-center gap-2 border-t border-separator px-3 text-13">
+      <footer className="flex h-footer shrink-0 items-center gap-2 border-t border-separator pr-[9px] pb-px pl-3 text-13">
         {error ? (
           <span role="alert" className="truncate text-fg-60">
             {error}
@@ -171,12 +216,35 @@ export default function App() {
           <Logo />
         )}
         {current && (
-          <span className="ml-auto flex shrink-0 items-center gap-2 font-medium">
-            {current.primaryActionTitle}
-            <kbd className="flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-key-bg px-1 font-sans text-11 text-fg-60">↵</kbd>
-          </span>
+          <>
+            <span className="ml-auto flex shrink-0 items-center gap-2 font-medium">
+              {current.primaryActionTitle}
+              <Keys labels={["↵"]} />
+            </span>
+            <span aria-hidden="true" className={`-mr-0.5 ml-1 h-[11px] w-px ${panelOpen ? "" : "bg-footer-divider"}`} />
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-expanded={panelOpen}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => (panelOpen ? closePanel() : setPanelOpen(true))}
+              className={`flex h-[26px] shrink-0 cursor-default items-center gap-2 rounded-[6px] pr-[3px] pl-2 font-medium text-fg-60 ${panelOpen ? "bg-list-selection" : ""}`}
+            >
+              Actions
+              <Keys labels={["Ctrl", "K"]} />
+            </button>
+          </>
         )}
       </footer>
+      {panelOpen && current && (
+        <ActionPanel
+          key={current.key}
+          title={current.title}
+          groups={groups}
+          onRun={(action) => runAction(current, action)}
+          onClose={closePanel}
+        />
+      )}
       <div aria-live="polite" className="sr-only">
         {flat.length} {flat.length === 1 ? "result" : "results"}
       </div>

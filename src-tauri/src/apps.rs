@@ -160,7 +160,7 @@ pub fn scan(roots: &[PathBuf], packaged: Vec<InstalledApp>) -> Vec<InstalledApp>
     by_name.into_values().collect()
 }
 
-pub fn launch(path: &str) -> Result<(), String> {
+pub fn launch(path: &str, as_admin: bool) -> Result<(), String> {
     use windows::core::{w, HSTRING, PCWSTR};
     use windows::Win32::UI::Shell::ShellExecuteW;
     use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY, SW_SHOWNORMAL};
@@ -171,12 +171,20 @@ pub fn launch(path: &str) -> Result<(), String> {
     unsafe {
         let _ = AllowSetForegroundWindow(ASFW_ANY);
     }
-    let result = unsafe { ShellExecuteW(None, w!("open"), &HSTRING::from(path), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL) };
+    let result = unsafe { ShellExecuteW(None, if as_admin { w!("runas") } else { w!("open") }, &HSTRING::from(path), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL) };
     if result.0 as isize > 32 {
         Ok(())
     } else {
         Err(format!("ShellExecute failed with code {}", result.0 as isize))
     }
+}
+
+pub fn show_in_explorer(path: &str) -> Result<(), String> {
+    if !Path::new(path).exists() {
+        return Err(format!("{path} no longer exists"));
+    }
+    use std::os::windows::process::CommandExt;
+    std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{path}\"")).spawn().map(drop).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

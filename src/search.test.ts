@@ -88,6 +88,14 @@ describe("search", () => {
     expect(search(many, "", frecency)[0].items).toHaveLength(8);
   });
 
+  it("shows favorites in their saved order above suggestions that exclude them", () => {
+    const sections = search(all, "", { [notepad.key]: 2, [vs.key]: 9 }, [terminal.key, vs.key, "gone/app"]);
+    expect(sections.map((s) => [s.title, s.items.map((c) => c.title)])).toEqual([
+      ["Favorites", ["Windows Terminal", "Visual Studio 2022"]],
+      ["Suggestions", ["Notepad"]],
+    ]);
+  });
+
   it("lists everything alphabetically for an empty query without history", () => {
     const sections = search(all, "", {});
     expect(sections[0].title).toBe("Results");

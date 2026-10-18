@@ -51,11 +51,18 @@ export interface Section {
   items: RegisteredCommand[];
 }
 
-export function search(commands: RegisteredCommand[], query: string, frecency: Frecency): Section[] {
+export function search(commands: RegisteredCommand[], query: string, frecency: Frecency, favorites: string[] = []): Section[] {
   if (!query.trim()) {
-    const used = commands.filter((c) => (frecency[c.key] ?? 0) > 0).sort(byFrecencyThenTitle(frecency));
-    if (used.length > 0) return [{ title: "Suggestions", items: used.slice(0, SUGGESTION_LIMIT) }];
-    return [{ title: "Results", items: [...commands].sort(byFrecencyThenTitle(frecency)) }];
+    const byKey = new Map(commands.map((c) => [c.key, c]));
+    const used = commands
+      .filter((c) => !favorites.includes(c.key) && (frecency[c.key] ?? 0) > 0)
+      .sort(byFrecencyThenTitle(frecency))
+      .slice(0, SUGGESTION_LIMIT);
+    const sections = [
+      { title: "Favorites", items: favorites.flatMap((key) => byKey.get(key) ?? []) },
+      { title: "Suggestions", items: used },
+    ].filter((s) => s.items.length > 0);
+    return sections.length > 0 ? sections : [{ title: "Results", items: [...commands].sort(byFrecencyThenTitle(frecency)) }];
   }
   const tieBreak = byFrecencyThenTitle(frecency);
   const items = commands

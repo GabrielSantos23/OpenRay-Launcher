@@ -12,6 +12,13 @@
   --color-list-selection: rgb(255 255 255 / 10%);
   --color-list-hover: rgb(255 255 255 / 5%);
   --color-key-bg: rgb(255 255 255 / 10%);
+  --color-key-border: rgb(255 255 255 / 18%);
+  --color-footer-divider: rgb(255 255 255 / 20%);
+  --color-panel: #363636;
+  --color-panel-border: #5e5e5e;
+  --color-panel-separator: #4a4a4a;
+  --color-panel-selection: #4a4a4a;
+  --color-destructive: #ff6363;
 
   --text-11: 11px;
   --text-13: 13px;
@@ -25,6 +32,9 @@
   --spacing-icon-22: 22px;
 
   --radius-row: 8px;
+  --radius-panel: 6px;
+
+  --shadow-panel: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
 html,

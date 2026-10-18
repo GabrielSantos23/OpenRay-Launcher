@@ -1,3 +1,22 @@
+import type { ComponentType } from "react";
+
+export interface Shortcut {
+  key: string;
+  ctrl?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+}
+
+export interface Action {
+  id: string;
+  title: string;
+  icon?: ComponentType<{ className?: string }>;
+  shortcut?: Shortcut;
+  destructive?: boolean;
+  keepOpen?: boolean;
+  run: () => Promise<void> | void;
+}
+
 export interface Command {
   id: string;
   title: string;
@@ -6,6 +25,7 @@ export interface Command {
   keywords?: string[];
   kind: string;
   primaryActionTitle: string;
+  actions?: Action[][];
   run: () => Promise<void> | void;
 }
 

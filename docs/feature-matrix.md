@@ -21,8 +21,12 @@ Reference: Raycast for Windows 2.8.2.0 (see version note in `reverse-engineering
 | Applications: app icons | `PngIconDataProvider`, `icons_cache.bin` | `appicon://` protocol: `IShellItemImageFactory` icon at 22 px × DPR, encoded as PNG; letter tile on failure | TESTED | `apps.rs` pixel conversion test; manual E2E: Notepad and Character Map icons render | No disk cache (~90 ms per icon in debug, loaded lazily) |
 | Applications: game launchers (Steam, Epic, GOG, Riot, EA, Blizzard) | `*LauncherBuilder` types, ext `games` | — | CONFIRMED |  |  |
 | Control Panel / Settings pages as apps | `ControlPanelItemsDiscovery`, `SystemPreferencesDiscovery` | — | CONFIRMED |  |  |
-| Footer: primary action + Actions (Ctrl+K) | Live launcher footer "Open Draft ↵ | Actions Ctrl K" | — | CONFIRMED |  |  |
-| Favorites / Suggestions sections in empty root | Live launcher sections "Drafts", "Favorites", "Suggestions" | — | CONFIRMED |  |  |
+| Footer: primary action + Actions (Ctrl+K) | Live launcher footer "Open Draft ↵ \| Actions Ctrl K"; user screenshots of the open panel | Primary title + ↵ keycap, divider, "Actions Ctrl K" button that toggles the panel and is highlighted while open | TESTED | Pixel comparison with the reference at 96 DPI (button 441–466, right edge 740) | Footer left icon is our logo, not the reference glyph |
+| Favorites / Suggestions sections in empty root | Live launcher sections "Drafts", "Favorites", "Suggestions" | Empty query shows Favorites (saved order, `favorites.json`) then Suggestions without the favorites | TESTED | `search.test.ts` favorites case; `store.rs` favorites test; manual E2E | No Drafts section (no drafts feature) |
+| Action panel (Ctrl+K) | User screenshots of the live panel (Steam, Clipboard History, Create Quicklink) | 350 px panel above the footer: title, grouped actions with 16 px icons and keycaps, separators, "Search for actions..." filter; Enter, arrows, Escape, Ctrl+K, and action shortcuts from the list or the panel | TESTED | `actions.test.ts` (6); pixel comparison: edges 392/741, top 145, rows 32 px from 177, search separator 385, bottom 423 | Corner radius ≈ 6 px and shadow are estimates; the reference's noise texture is not reproduced |
+| App actions | Panel for Steam: Open, Run as Administrator, Show in File Explorer, Add to Favorites, Copy Path, Copy Name, Configure Command/Extension, Treat as Application, Reset Ranking, Hide/Quit/Force Quit | Open Application, Run as Administrator (Ctrl+Shift+↵), Show in File Explorer, Add/Remove Favorite (Ctrl+Shift+F), Move Favorite Up/Down (Ctrl+Alt+↑/↓), Copy Path (Ctrl+Alt+C), Copy Name, Reset Ranking | TESTED | Manual E2E: favorite added and removed, Copy Path put the .lnk path on the clipboard, Explorer opened with the shortcut selected, Reset Ranking removed the app from Suggestions | Configure Command/Extension, Treat as Application and Hide/Quit/Force Quit are missing; packaged apps only get Open, favorites, Copy Name and Reset Ranking |
+| Fallback commands | `fallbackStatus` on built-in commands (`backend/index.mjs`); the enabled list lives in encrypted settings | — | CONFIRMED |  | Deferred until there are commands to fall back to (Quicklinks, web search, Search Files) |
+| Command arguments | `arguments` on commands (`backend/index.mjs`) | — | CONFIRMED |  | Deferred until a command takes arguments (Quicklinks) |
 | Settings window | `settings-window.html`, `Raycast.Handlers.Settings` | — | CONFIRMED |  |  |
 | Deep links (raycast://) | AppxManifest protocol `raycast`; `RaycastDeepLinkData` | — | CONFIRMED |  |  |
 | Themes (dark/light, custom) | Settings `themeDarkId`/`themeLightId`, `theme-studio-window.html` | — | CONFIRMED |  |  |
@@ -31,7 +35,7 @@ Reference: Raycast for Windows 2.8.2.0 (see version note in `reverse-engineering
 | Cloud Sync | Settings storage `synced`; cmd `openCloudSyncSettings` | — | NOT_APPLICABLE |  | Raycast servers (excluded) |
 | Raycast Store / third-party Raycast extensions | `api/node_modules/@raycast/api`; ext `developer` | — | NOT_APPLICABLE |  | Excluded by AGENTS.md |
 
-| Extension API (`defineExtension`, registry) | Built-ins declared as `{key,title,commands}` in `backend/index.mjs` | `src/extension-api.ts`, `src/registry.ts`; `applications` and `openray-core` register through it | TESTED | `src/registry.test.ts` (2) | No views, actions, arguments or preferences yet |
+| Extension API (`defineExtension`, registry) | Built-ins declared as `{key,title,commands}` in `backend/index.mjs` | `src/extension-api.ts`, `src/registry.ts`; `applications` and `openray-core` register through it | TESTED | `src/registry.test.ts` (2), `src/actions.test.ts` (6) | Actions supported (`Command.actions`); no views, arguments or preferences yet |
 
 ## Built-in commands
 

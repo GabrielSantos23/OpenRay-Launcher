@@ -50,20 +50,25 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
 | Global hotkey | `src-tauri/src/hotkey.rs` | Parse `settings.json` hotkey, WH_KEYBOARD_LL hook thread, dispatcher thread |
 | Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, AppsFolder (MSIX) scan, shell icons served on `appicon://`, ShellExecute, DWM attributes |
-| Settings and persistence | `src-tauri/src/store.rs` | `settings.json` (hotkey), `frecency.json` in `%APPDATA%\dev.openray.app` |
+| Settings and persistence | `src-tauri/src/store.rs` | `settings.json` (hotkey), `frecency.json`, `favorites.json` in `%APPDATA%\dev.openray.app` |
 | Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
 | Extension API | `src/extension-api.ts` | Types and `defineExtension` |
 | Built-in extensions | `src/extensions/*` | `applications` (first), `openray-core` |
 | Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |
+| Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
 | Launcher UI | `src/App.tsx` | Search input, list, footer, keyboard |
 
 The Rust core exposes Tauri commands:
 
 - `list_apps`
-- `launch_app`
+- `launch_app` (optionally as administrator)
+- `show_in_explorer`
 - `frecency_visit`
 - `frecency_all`
+- `frecency_reset`
+- `favorites_get`
+- `favorites_set`
 - `hide_launcher`
 - `quit_app`
 
@@ -84,15 +89,29 @@ interface Command {
   icon?: string;
   keywords?: string[];
   kind: string;
+  primaryActionTitle: string;
+  actions?: Action[][];
+  run: () => Promise<void> | void;
+}
+
+interface Action {
+  id: string;
+  title: string;
+  icon?: ComponentType<{ className?: string }>;
+  shortcut?: { key: string; ctrl?: boolean; alt?: boolean; shift?: boolean };
+  destructive?: boolean;
+  keepOpen?: boolean;
   run: () => Promise<void> | void;
 }
 ```
+
+- `actions` are groups shown in the Ctrl+K panel. The first group follows the primary action. The launcher adds the favorites group after it and Reset Ranking at the end.
+- An action hides the launcher after it runs, unless `keepOpen` is set.
 
 - Static `commands` declare fixed commands. `items()` supplies dynamic ones, such as one per installed app.
 - The registry namespaces ids as `<extensionId>/<commandId>`. That key is what frecency stores.
 - Built-ins are registered through `defineExtension` in `src/extensions/index.ts`, and nothing else is special-cased.
 - Planned additions, when real features need them:
   - views (list/detail/form);
-  - an action panel (Ctrl+K);
   - arguments;
   - preferences.

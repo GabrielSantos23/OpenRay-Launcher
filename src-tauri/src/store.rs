@@ -53,6 +53,7 @@ pub struct Store {
     dir: PathBuf,
     pub settings: Settings,
     frecency: Mutex<HashMap<String, Visit>>,
+    favorites: Mutex<Vec<String>>,
 }
 
 impl Store {
@@ -64,7 +65,8 @@ impl Store {
             let _ = write_json(&settings_path, &settings);
         }
         let frecency = Mutex::new(read_json(&dir.join("frecency.json")));
-        Self { dir, settings, frecency }
+        let favorites = Mutex::new(read_json(&dir.join("favorites.json")));
+        Self { dir, settings, frecency, favorites }
     }
 
     pub fn visit(&self, key: &str, now_ms: u64) -> std::io::Result<f64> {
@@ -73,6 +75,25 @@ impl Store {
         map.insert(key.to_owned(), Visit { score, last_visit_ms: now_ms });
         write_json(&self.dir.join("frecency.json"), &*map)?;
         Ok(score)
+    }
+
+    pub fn reset(&self, key: &str) -> std::io::Result<()> {
+        let mut map = self.frecency.lock().unwrap();
+        if map.remove(key).is_some() {
+            write_json(&self.dir.join("frecency.json"), &*map)?;
+        }
+        Ok(())
+    }
+
+    pub fn favorites(&self) -> Vec<String> {
+        self.favorites.lock().unwrap().clone()
+    }
+
+    pub fn set_favorites(&self, keys: Vec<String>) -> std::io::Result<()> {
+        let mut favorites = self.favorites.lock().unwrap();
+        write_json(&self.dir.join("favorites.json"), &keys)?;
+        *favorites = keys;
+        Ok(())
     }
 
     pub fn scores(&self, now_ms: u64) -> HashMap<String, f64> {
@@ -126,5 +147,27 @@ mod tests {
         let store = Store::load(dir.path().to_path_buf());
         assert!(store.scores(0).is_empty());
         assert_eq!(fs::read_to_string(dir.path().join("frecency.json.bak")).unwrap(), "{not json");
+    }
+
+    #[test]
+    fn reset_removes_ranking_and_persists() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::load(dir.path().to_path_buf());
+        store.visit("applications/a", 0).unwrap();
+        store.visit("applications/b", 0).unwrap();
+        store.reset("applications/a").unwrap();
+        store.reset("applications/missing").unwrap();
+        let scores = Store::load(dir.path().to_path_buf()).scores(0);
+        assert!(!scores.contains_key("applications/a"));
+        assert_eq!(scores["applications/b"], 1.0);
+    }
+
+    #[test]
+    fn favorites_keep_their_order_across_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::load(dir.path().to_path_buf());
+        assert!(store.favorites().is_empty());
+        store.set_favorites(vec!["applications/b".into(), "applications/a".into()]).unwrap();
+        assert_eq!(Store::load(dir.path().to_path_buf()).favorites(), ["applications/b", "applications/a"]);
     }
 }

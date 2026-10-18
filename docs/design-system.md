@@ -31,6 +31,25 @@ Tokens are measured from Raycast for Windows 2.8.2.0 on a 1920×1080 display at 
 | Row icon | 22 px, 8 px from the row's left edge; title 12 px after the icon | M; C: `--icon-22` | Same |
 | Footer | 40 px content, separator above at y=433 | M (C says 42·spx; measured 40) | `--spacing-footer: 42px` (separator + 40 + hidden border row) |
 | Search glyph | x=16 from the outer edge | M | `--spacing-search-inset: 16px` |
+| Footer Actions button | x 634–740, y 441–466 (26 px), radius ≈ 6, text 8 px from its left, keycaps 3 px from its right; fg 10 % fill while the panel is open; label fg-60 | M (user screenshots) | `h-[26px] pl-2 pr-[3px] rounded-[6px] text-fg-60`, `pb-px` on the footer |
+| Footer divider | 1 px × 11 px at x=627, fg ≈ 20 %; hidden while the panel is open | M | `--color-footer-divider` |
+| Keycap | 18 px tall, 1 px border fg ≈ 18 %, transparent fill, 11 px fg-60 label, 2 px between caps | M | `--color-key-border`, `h-[18px] min-w-[18px] rounded-[4px]` (radius ≈) |
+
+## Action panel (Ctrl+K)
+
+Measured from user-supplied screenshots of Raycast 2.8.2.0 at 100 % scale (750×475 window).
+
+| Element | Reference | Openray |
+|---|---|---|
+| Frame | 350 px wide incl. 1 px border `#5E5E5E`; right edge 8 px from the window edge; bottom border at y=423 (9 px above the footer separator); radius ≈ 6 | `w-[350px] right-2 bottom-[51px]`, `--color-panel-border`, `--radius-panel: 6px` ≈ |
+| Fill | `#363636` with a faint noise texture | `--color-panel` (no noise) |
+| List | 7 px padding inside the border at top and sides, 8 px at the bottom; max 239 px tall, then scrolls with no visible scrollbar | `px-[7px] pt-[7px] pb-2 max-h-[239px]` |
+| Title | 24 px row, 11 px ≈ semibold fg-60, text at x=408 | `h-6 px-2 text-11` |
+| Row | 32 px, inset 8 px from the border, selection `#4A4A4A`; 16 px icon at +8, title at +32, keycaps 8 px from the right | `h-8 px-2 gap-2`, `--color-panel-selection` |
+| Group separator | 1 px `#4A4A4A`, full panel width, 8 px above and 7 px below | `-mx-[7px] mt-2 mb-[7px]`, `--color-panel-separator` |
+| Search | separator at y=385, 37 px input, placeholder at x=408, 13 px fg-40 | `h-[38px] border-t px-[15px]` |
+| Destructive item | text `#FF6363` | `--color-destructive` |
+| Shadow | faint, ≈ | `--shadow-panel` ≈ |
 
 ## Color
 
@@ -57,6 +76,5 @@ Not yet measured:
 - light theme;
 - compact mode;
 - show and hide animation;
-- the action panel;
 - the hover color on the live app;
 - text baselines to the pixel.

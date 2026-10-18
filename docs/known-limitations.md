@@ -26,7 +26,9 @@
 - **Position.** The default position rule is approximate: centered horizontally, with the top at 35.3% of the work area (`unk_341f…`). There is no drag-to-move or remembered position.
 - **Shown ex-style.** It keeps `WS_EX_TOOLWINDOW` (so it never appears in Alt+Tab) and Tauri's `WS_EX_ACCEPTFILES`. The reference drops TOOLWINDOW while shown.
 - **Show and hide.** Show latency was measured only on a debug build at 96 DPI.
-- **Missing UI.** There is no action panel (Ctrl+K), no Favorites section, no fallback commands and no compact mode.
+- **Missing UI.** There are no fallback commands, no command arguments and no compact mode. Fallbacks and arguments wait for commands that use them (Quicklinks, web search, Search Files).
+- **Action panel.** Configure Command, Configure Extension, Treat as Application and Hide/Quit/Force Quit are not offered. The panel has no noise texture, and its radius and shadow are estimates.
+- **App actions.** Show in File Explorer selects the Start Menu shortcut, not its target; the reference behavior is unverified. Packaged apps have no Run as Administrator, Show in File Explorer or Copy Path.
 - **Theme.** Only the dark theme exists, and only at the measured 100% DPI.
 - **Escape.** Escape always hides the launcher. The reference has an `escapeKeyBehavior` setting whose default is unknown.
 - **Search input focus.** The search input has no focus ring. This matches the reference, and the caret stays visible.
