@@ -1,0 +1,41 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+@theme {
+  --font-sans: "Inter Variable", "Segoe UI Variable", "Segoe UI", sans-serif;
+
+  --color-bg: #1f1f1f;
+  --color-fg: #ffffff;
+  --color-fg-60: rgb(255 255 255 / 60%);
+  --color-fg-40: rgb(255 255 255 / 40%);
+  --color-separator: rgb(255 255 255 / 10%);
+  --color-list-selection: rgb(255 255 255 / 10%);
+  --color-list-hover: rgb(255 255 255 / 5%);
+  --color-key-bg: rgb(255 255 255 / 10%);
+
+  --text-11: 11px;
+  --text-13: 13px;
+  --text-18: 18px;
+
+  --spacing-header: 65px;
+  --spacing-footer: 41px;
+  --spacing-row: 38px;
+  --spacing-inset: 7px;
+  --spacing-search-inset: 15px;
+  --spacing-icon-22: 22px;
+
+  --radius-row: 8px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
