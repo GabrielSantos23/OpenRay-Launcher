@@ -33,6 +33,13 @@
 - **Escape.** Escape always hides the launcher. The reference has an `escapeKeyBehavior` setting whose default is unknown.
 - **Search input focus.** The search input has no focus ring. This matches the reference, and the caret stays visible.
 
+## Toasts and HUD
+
+- **HUD position.** The HUD position is an approximation (bottom-center, 12 % above the work-area bottom), because the reference rule is unknown (`unk_3a8f3266…`).
+- **No HUD trigger yet.** Every current action that toasts keeps the launcher open, so only the footer toast shows. The HUD appears for any toast raised while the launcher is hidden.
+- **Footer toast.** There is no toast action menu (Ctrl+T) and no dismiss button.
+- **Loader.** The loader only covers command refreshes and running actions. Most refreshes finish before the launcher is shown.
+
 ## Search and ranking
 
 - **Matching.** The tiers are prefix > word-start > acronym > substring > subsequence. This is our own heuristic, because the reference algorithm is unknown (`unk_93ec…`).

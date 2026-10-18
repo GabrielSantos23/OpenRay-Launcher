@@ -27,6 +27,22 @@
         "shadow": false,
         "center": true,
         "backgroundColor": "#1f1f1f"
+      },
+      {
+        "label": "hud",
+        "title": "Openray HUD",
+        "width": 232,
+        "height": 46,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": false,
+        "backgroundColor": "#1f1f1f"
       }
     ],
     "security": {
@@ -35,7 +51,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.ico"]
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.ico"
+    ]
   }
 }

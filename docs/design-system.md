@@ -51,6 +51,19 @@ Measured from user-supplied screenshots of Raycast 2.8.2.0 at 100 % scale (750×
 | Destructive item | text `#FF6363` | `--color-destructive` |
 | Shadow | faint, ≈ | `--shadow-panel` ≈ |
 
+## Toasts, HUD and loader
+
+| Element | Reference | Openray |
+|---|---|---|
+| Footer toast dot | 5 px, center (22, 454), glow `0 0 12px 8px` color-20 % | `ActivityIndicator`, `size-[5px]` with shadow |
+| Footer toast title | x=37, 12 px regular, white | `text-12`, `gap-[7px]` after the 16 px indicator slot |
+| Footer toast glow | 10000×400 px radial band, rotated 20°, opacity 0.2, center 80/50 px into the toast container, clipped to the footer including its separator | `toast-glow` utility at `left-[88px] top-[48px]` ≈; separator drawn as a `-z-20` layer so the glow tints it |
+| HUD frame | 46 px tall (56 with message), padding 12, gap 12, start 16 with an icon (24 without), end 24, max width 500; border `#414141`; base `#1F1F1F` | `hud` window, `DWMWCP_ROUNDSMALL` ≈, DWM border `0x414141` |
+| HUD glow | two radial gradients from the top center, variant color at 26 % | `hud-glow` utility |
+| HUD position | unknown (`unk_3a8f3266…`) | ≈ centered on the cursor's monitor, bottom edge 12 % of the work-area height above its bottom |
+| Loader | 1 px `linear-gradient(to right, transparent 25%, #FFF, transparent 75%)`, ±35 % over 1.5 s ease-in-out, fade 0.3 s, 300 ms delay | `loader-gradient animate-loader`, overlays the search separator (`-bottom-px`) ≈ |
+| Status colors | green `#59D499`, yellow `#FFC531`, red `#FF6363` (theme `bundled-raycast-dark`) | `--color-green`, `--color-yellow`, `--color-red` |
+
 ## Color
 
 | Token | Value | Source |

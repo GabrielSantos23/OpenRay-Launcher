@@ -57,7 +57,8 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Built-in extensions | `src/extensions/*` | `applications` (first), `openray-core` |
 | Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |
 | Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
-| Launcher UI | `src/App.tsx` | Search input, list, footer, keyboard |
+| Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
+| Launcher UI | `src/App.tsx` | Search input, list, footer, loader, keyboard |
 
 The Rust core exposes Tauri commands:
 
@@ -70,6 +71,7 @@ The Rust core exposes Tauri commands:
 - `favorites_get`
 - `favorites_set`
 - `hide_launcher`
+- `show_hud`, `hud_present`, `hud_hide`
 - `quit_app`
 
 ## Extension API (internal, v0)
@@ -107,6 +109,7 @@ interface Action {
 
 - `actions` are groups shown in the Ctrl+K panel. The first group follows the primary action. The launcher adds the favorites group after it and Reset Ranking at the end.
 - An action hides the launcher after it runs, unless `keepOpen` is set.
+- Actions report results with `showToast({ variant, title, message?, icon? })` from `src/toast.ts`. Failures thrown by `run` become failure toasts.
 
 - Static `commands` declare fixed commands. `items()` supplies dynamic ones, such as one per installed app.
 - The registry namespaces ids as `<extensionId>/<commandId>`. That key is what frecency stores.

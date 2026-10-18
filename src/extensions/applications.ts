@@ -1,6 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { Clipboard, Folder, Shield } from "lucide-react";
 import { defineExtension, type Action } from "../extension-api";
+import { showToast } from "../toast";
 
 interface InstalledApp {
   name: string;
@@ -8,7 +9,11 @@ interface InstalledApp {
 }
 
 function appActions(app: InstalledApp): Action[][] {
-  const copyName: Action = { id: "copy-name", title: "Copy Name", icon: Clipboard, run: () => navigator.clipboard.writeText(app.name) };
+  const copy = (text: string, what: string) => async () => {
+    await navigator.clipboard.writeText(text);
+    showToast({ variant: "success", title: `Copied ${what} to clipboard` });
+  };
+  const copyName: Action = { id: "copy-name", title: "Copy Name", icon: Clipboard, keepOpen: true, run: copy(app.name, "name") };
   if (app.path.startsWith("shell:AppsFolder\\")) return [[], [copyName]];
   return [
     [
@@ -27,7 +32,8 @@ function appActions(app: InstalledApp): Action[][] {
         title: "Copy Path",
         icon: Clipboard,
         shortcut: { key: "c", ctrl: true, alt: true },
-        run: () => navigator.clipboard.writeText(app.path),
+        keepOpen: true,
+        run: copy(app.path, "path"),
       },
       copyName,
     ],

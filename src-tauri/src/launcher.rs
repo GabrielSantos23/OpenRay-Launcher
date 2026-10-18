@@ -25,11 +25,11 @@ fn window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(LABEL)
 }
 
-fn hwnd(window: &WebviewWindow) -> Option<HWND> {
+pub(crate) fn hwnd(window: &WebviewWindow) -> Option<HWND> {
     window.hwnd().ok().map(|h| HWND(h.0 as _))
 }
 
-fn set_dwm<T>(hwnd: HWND, attribute: windows::Win32::Graphics::Dwm::DWMWINDOWATTRIBUTE, value: T) {
+pub(crate) fn set_dwm<T>(hwnd: HWND, attribute: windows::Win32::Graphics::Dwm::DWMWINDOWATTRIBUTE, value: T) {
     unsafe {
         let _ = DwmSetWindowAttribute(hwnd, attribute, &value as *const T as _, std::mem::size_of::<T>() as u32);
     }
@@ -47,16 +47,19 @@ fn set_hidden_styles(hwnd: HWND, hidden: bool) {
     }
 }
 
-pub fn init(window: &WebviewWindow) {
-    let Some(hwnd) = hwnd(window) else { return };
-    let scale = window.scale_factor().unwrap_or(1.0);
+pub(crate) fn make_popup(hwnd: HWND, width: i32, height: i32) {
     unsafe {
         let frame = (WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX).0;
         let style = (GetWindowLongPtrW(hwnd, GWL_STYLE) as u32 & !frame) | WS_POPUP.0;
         SetWindowLongPtrW(hwnd, GWL_STYLE, style as isize);
-        let (width, height) = ((WIDTH * scale).round() as i32, (HEIGHT * scale).round() as i32);
         let _ = SetWindowPos(hwnd, None, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     }
+}
+
+pub fn init(window: &WebviewWindow) {
+    let Some(hwnd) = hwnd(window) else { return };
+    let scale = window.scale_factor().unwrap_or(1.0);
+    make_popup(hwnd, (WIDTH * scale).round() as i32, (HEIGHT * scale).round() as i32);
     set_dwm(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND);
     set_dwm(hwnd, DWMWA_BORDER_COLOR, 0x003B_3B3Bu32);
     set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);

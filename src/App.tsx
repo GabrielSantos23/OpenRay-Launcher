@@ -7,6 +7,8 @@ import type { Action, RegisteredCommand } from "./extension-api";
 import { builtInExtensions } from "./extensions";
 import { loadCommands } from "./registry";
 import { search, type Frecency } from "./search";
+import { setLauncherVisible, showToast, useToast } from "./toast";
+import { FooterToast } from "./FooterToast";
 
 function Logo() {
   return (
@@ -32,40 +34,71 @@ function ItemIcon({ title, icon }: { title: string; icon?: string }) {
   );
 }
 
+function Loader({ active }: { active: boolean }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setShown(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setShown(true), 300);
+    return () => window.clearTimeout(timer);
+  }, [active]);
+  return (
+    <div
+      aria-hidden="true"
+      className={`loader-gradient pointer-events-none absolute inset-x-0 -bottom-px h-px animate-loader transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0 [animation-play-state:paused]"}`}
+    />
+  );
+}
+
+function fail(title: string, error: unknown) {
+  showToast({ variant: "failure", title, message: String(error) });
+}
+
 export default function App() {
   const [commands, setCommands] = useState<RegisteredCommand[]>([]);
   const [frecency, setFrecency] = useState<Frecency>({});
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(0);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const keepSelected = useRef<string | null>(null);
+  const toast = useToast();
 
   const refresh = useCallback(async () => {
-    const [loaded, scores, favs] = await Promise.all([
-      loadCommands(builtInExtensions),
-      invoke<Frecency>("frecency_all").catch(() => ({}) as Frecency),
-      invoke<string[]>("favorites_get").catch(() => []),
-    ]);
-    setCommands(loaded);
-    setFrecency(scores);
-    setFavorites(favs);
+    setLoading((n) => n + 1);
+    try {
+      const [loaded, scores, favs] = await Promise.all([
+        loadCommands(builtInExtensions),
+        invoke<Frecency>("frecency_all").catch(() => ({}) as Frecency),
+        invoke<string[]>("favorites_get").catch(() => []),
+      ]);
+      setCommands(loaded);
+      setFrecency(scores);
+      setFavorites(favs);
+    } finally {
+      setLoading((n) => n - 1);
+    }
   }, []);
 
   useEffect(() => {
     refresh();
     const unlisteners = [
       listen("launcher-hidden", () => {
+        setLauncherVisible(false);
         setQuery("");
         setSelected(0);
-        setError(null);
         setPanelOpen(false);
         refresh();
       }),
-      listen("launcher-shown", () => inputRef.current?.focus()),
+      listen("launcher-shown", () => {
+        setLauncherVisible(true);
+        inputRef.current?.focus();
+      }),
     ];
     return () => {
       unlisteners.forEach((p) => p.then((off) => off()));
@@ -94,12 +127,12 @@ export default function App() {
         setFavorites: (keys) => {
           keepSelected.current = current.key;
           setFavorites(keys);
-          invoke("favorites_set", { keys }).catch((e) => setError(`Could not save favorites: ${String(e)}`));
+          invoke("favorites_set", { keys }).catch((e) => fail("Could not save favorites", e));
         },
         resetRanking: (key) => {
           keepSelected.current = key;
           setFrecency(({ [key]: _, ...rest }) => rest);
-          invoke("frecency_reset", { key }).catch((e) => setError(`Could not reset ranking: ${String(e)}`));
+          invoke("frecency_reset", { key }).catch((e) => fail("Could not reset ranking", e));
         },
       })
     : [];
@@ -111,11 +144,14 @@ export default function App() {
 
   async function runAction(command: RegisteredCommand, action: Action) {
     closePanel();
+    setLoading((n) => n + 1);
     try {
       await action.run();
     } catch (e) {
-      setError(action.id === "primary" ? `Could not open ${command.title}: ${String(e)}` : `${action.title} failed: ${String(e)}`);
+      fail(action.id === "primary" ? `Could not open ${command.title}` : `${action.title} failed`, e);
       return;
+    } finally {
+      setLoading((n) => n - 1);
     }
     if (action.keepOpen) return;
     invoke<number>("frecency_visit", { key: command.key })
@@ -151,7 +187,7 @@ export default function App() {
   return (
     <main className="relative flex h-full flex-col bg-bg text-fg">
       <h1 className="sr-only">Openray</h1>
-      <header className="flex h-header shrink-0 items-center gap-3 border-b border-separator px-search-inset">
+      <header className="relative flex h-header shrink-0 items-center gap-3 border-b border-separator px-search-inset">
         <Logo />
         <input
           ref={inputRef}
@@ -161,7 +197,6 @@ export default function App() {
           onChange={(e) => {
             setQuery(e.target.value);
             setSelected(0);
-            setError(null);
           }}
           onKeyDown={onKeyDown}
           placeholder="Search for apps or commands..."
@@ -172,9 +207,10 @@ export default function App() {
           aria-activedescendant={current ? `option-${Math.min(selected, flat.length - 1)}` : undefined}
           className="h-full min-w-0 flex-1 bg-transparent text-18 text-fg caret-fg outline-none placeholder:text-fg-40"
         />
+        <Loader active={loading > 0} />
       </header>
 
-      <div ref={listRef} id="results" role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto px-inset pb-inset">
+      <div ref={listRef} id="results" role="listbox" aria-label="Results" aria-busy={loading > 0} className="min-h-0 flex-1 overflow-y-auto px-inset pb-inset">
         {sections.length === 0 && (
           <p className="flex h-full items-center justify-center text-13 text-fg-60">No results for “{query.trim()}”</p>
         )}
@@ -207,14 +243,8 @@ export default function App() {
         ))}
       </div>
 
-      <footer className="flex h-footer shrink-0 items-center gap-2 border-t border-separator pr-[9px] pb-px pl-3 text-13">
-        {error ? (
-          <span role="alert" className="truncate text-fg-60">
-            {error}
-          </span>
-        ) : (
-          <Logo />
-        )}
+      <footer className="relative isolate flex h-footer shrink-0 items-center gap-2 overflow-hidden pt-px pr-[9px] pb-px pl-3 text-13 before:absolute before:inset-x-0 before:top-0 before:-z-20 before:h-px before:bg-separator">
+        {toast ? <FooterToast /> : <Logo />}
         {current && (
           <>
             <span className="ml-auto flex shrink-0 items-center gap-2 font-medium">

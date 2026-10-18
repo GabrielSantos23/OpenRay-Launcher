@@ -1,6 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "windows": ["launcher"],
-  "permissions": ["core:default"]
+  "windows": [
+    "launcher",
+    "hud"
+  ],
+  "permissions": [
+    "core:default"
+  ]
 }

@@ -185,6 +185,33 @@ From `frontend/css-C58pR_1e.css` and `main-window-38KZXJcp.css`:
   - Borders and window: `--color-border-separator: fg 10%`, `--color-window-bg: bg 40%`.
 - The theme values for `--bg` and `--fg` are not in the CSS. They come from theme JS, which was not located.
 
+### Toasts, HUD and loader
+
+Sources are under `Raycast\frontend\`. Class names are CSS-module hashes.
+
+- **Routing (`toast-store-yMR5z_cG.js`).** `toast.open(t)` keeps the toast in the window when `window.identifier !== "main"`. In the main window it renders in the footer when `windowStateStore.isVisible && !isCompact`, and otherwise passes the same object to the HUD store (`hud-store-D8l7mVGu.js`, `open/close/get`).
+- **Footer toast (`ActionBarToast` in `main-window-BN8deh-D.js`, CSS `action-bar-toast__*` in `main-window-38KZXJcp.css`).**
+  - It replaces the footer's left element while a toast is set (`ActionBarHost.Root`).
+  - It auto-closes 3000 ms after a non-pending toast appears, with a 200 ms opacity fade when the window is active. Hovering pauses the timer, and a pending toast stays until replaced.
+  - It is a button with a 16 px fake-icon slot, the title and an optional subtitle. An activity indicator sits at `top/left: --space-6`.
+  - Background: an absolutely positioned element at `top: 50·spx; left: 80·spx`, 10000 × 400 px, `translate(-50%,-50%) rotate(20deg)`, `opacity: .2`, `radial-gradient(farthest-side, <variant color>, transparent)`, `z-index: -1`. Variant colors: success `--green`, warning `--yellow`, failure `--red`, pending transparent.
+- **Activity indicator (`activity-indicator-CxsLT95H.css`).** 16 px grid. It shows a 5·spx dot with `box-shadow: 0 0 12px 8px <color>-20` for success/warning/failure, and a rotating 25 % arc (0.8 s) for pending.
+- **HUD (`Hud.*` and `Huds` in `window-shell-hosts-CeP7zO_K.js`, CSS `hud-primitive__*` in `window-shell-hosts-DX8dudFS.css`).**
+  - It renders inside a native "portal" window (`yt` with `feature: "hud"`). `Raycast.dll` has `HUDWindowParameters` next to `PortalWindowParameters`, `TooltipWindowParameters`, `PopoverWindowParameters` and `InfoCardWindowParameters`, and the UTF-16 portal kinds `hud`, `alert`, `dialog`, `popover`, `info-card`.
+  - It auto-closes after 1200 ms, or 3000 ms for failure. Pending stays.
+  - Root: `inline-flex`, height 46·spx (56 with a message), padding 12, gap 12, start padding 16 with an icon (24 without), end padding 24, max-width 500, background `--bg-40`.
+  - Variant background: `radial-gradient(45% 30% at 50% -10%, c, transparent), radial-gradient(100% 90% at 50% -15%, c, transparent)`, where c is the variant color at 26 %.
+  - Icon 22 px. The activity indicator sits at the bottom-right (−6), and the icon is masked with a 6 px radial hole at (20, 20).
+- **Loader (`NavigationBarUI.Root` in `command-list-item-accessory-xaxrXNsQ.js`, CSS in `command-list-item-accessory-FLHqb7-O.css`).**
+  - Windows renders only `loaderClassic`; the glow loader is `null`.
+  - It is a 1 px line at the bottom of the navigation bar: `linear-gradient(to right, loader-0 25%, loader, loader-0 75%)`, animated `translate(-35%) ↔ translate(35%)` over 1.5 s ease-in-out, infinite.
+  - It fades in over 0.3 s, and only after `isLoading` has been true for `loadingDelayMs = 300`.
+- **Theme (`contrast-improvement-CQ0EgiTy.js`, `bundled-raycast-dark`).** background `#000000`, foreground `#FFFFFF`, loader `#FFFFFF`, red `#FF6363`, orange `#FF9217`, yellow `#FFC531`, green `#59D499`, blue `#56C2FF`, purple `#A485FF`, accent `#4FA3F8`.
+- **Measured from user screenshots (100 % scale).**
+  - Footer toast: dot centered at (22, 454); title at x=37, 12 px regular (width and ink compared); glow tints the footer separator.
+  - HUD: 232×46 with a 1 px border `#414141`, a base of `#1F1F1F`, the icon at x=16, the text at x=51 (13 px).
+- **HUD placement is unknown.** One probe found no new top-level `Raycast.exe` window during a HUD (`unk_3a8f3266…`).
+
 ## Feature inventory source
 
 - **Built-in commands.** The list in `docs/feature-matrix.md` was produced by parsing `backend/index.mjs` for `key:` / `title:` / `commands:{…H({title…})}`. The raw dump is in the kickoff scratchpad `inventory.txt`.
@@ -201,10 +228,10 @@ From `frontend/css-C58pR_1e.css` and `main-window-38KZXJcp.css`:
 | `unk_86e9f470…` | Launcher backdrop: opaque vs acrylic or mica | medium |
 | `unk_31815e75…` | Which bundle commands are visible on Windows | medium |
 | `unk_ce5e0942…` | Focus acquisition sequence on show (NOACTIVATE while parked, UIAccess helper) | high |
+| `unk_3a8f3266…` | Screen placement of the HUD portal window | low |
 
 Not yet investigated:
 
-- Theme color values (`--bg`, `--fg`, `--selection`).
 - Exact row text metrics.
 - Show and hide animation.
 - Compact mode height.

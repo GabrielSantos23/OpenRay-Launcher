@@ -1,5 +1,6 @@
 mod apps;
 mod hotkey;
+mod hud;
 mod launcher;
 mod store;
 
@@ -7,7 +8,7 @@ use std::collections::HashMap;
 use store::Store;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 #[tauri::command]
 async fn list_apps() -> Vec<apps::InstalledApp> {
@@ -72,6 +73,21 @@ fn hide_launcher(app: AppHandle, restore_focus: bool) {
 }
 
 #[tauri::command]
+fn show_hud(app: AppHandle, toast: serde_json::Value) -> Result<(), String> {
+    app.emit_to(hud::LABEL, "hud-show", toast).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn hud_present(app: AppHandle, width: f64, height: f64) {
+    hud::present(&app, width, height)
+}
+
+#[tauri::command]
+fn hud_hide(app: AppHandle) {
+    hud::hide(&app)
+}
+
+#[tauri::command]
 fn quit_app(app: AppHandle) {
     app.exit(0)
 }
@@ -112,6 +128,9 @@ pub fn run() {
 
             if let Some(window) = app.get_webview_window(launcher::LABEL) {
                 launcher::init(&window);
+            }
+            if let Some(window) = app.get_webview_window(hud::LABEL) {
+                hud::init(&window);
             }
             setup_tray(app)?;
 
@@ -157,6 +176,9 @@ pub fn run() {
             favorites_get,
             favorites_set,
             hide_launcher,
+            show_hud,
+            hud_present,
+            hud_hide,
             quit_app
         ])
         .run(tauri::generate_context!())
