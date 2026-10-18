@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const HALF_LIFE_MS: f64 = 864e6;
+const DATA_NAMES: [&str; 2] = ["quicklinks", "emoji"];
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -86,16 +87,16 @@ pub fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
-fn read_json<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> T {
+pub(crate) fn read_json<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> T {
     let Ok(text) = fs::read_to_string(path) else { return T::default() };
-    serde_json::from_str(&text).unwrap_or_else(|e| {
+    serde_json::from_str(text.trim_start_matches('\u{feff}')).unwrap_or_else(|e| {
         eprintln!("openray: {} is unreadable ({e}); keeping a .bak copy", path.display());
         let _ = fs::rename(path, path.with_extension("json.bak"));
         T::default()
     })
 }
 
-fn write_json<T: Serialize>(path: &Path, value: &T) -> std::io::Result<()> {
+pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> std::io::Result<()> {
     let tmp = path.with_extension("json.tmp");
     fs::write(&tmp, serde_json::to_vec_pretty(value)?)?;
     fs::rename(tmp, path)
@@ -159,6 +160,18 @@ impl Store {
         Ok(())
     }
 
+    pub fn data(&self, name: &str) -> Result<serde_json::Value, String> {
+        Ok(read_json(&self.data_path(name)?))
+    }
+
+    pub fn set_data(&self, name: &str, value: &serde_json::Value) -> Result<(), String> {
+        write_json(&self.data_path(name)?, value).map_err(|e| e.to_string())
+    }
+
+    fn data_path(&self, name: &str) -> Result<PathBuf, String> {
+        DATA_NAMES.contains(&name).then(|| self.dir.join(format!("{name}.json"))).ok_or_else(|| format!("unknown data file {name}"))
+    }
+
     pub fn scores(&self, now_ms: u64) -> HashMap<String, f64> {
         let map = self.frecency.lock().unwrap();
         map.iter().map(|(k, v)| (k.clone(), decayed(*v, now_ms))).collect()
@@ -218,6 +231,13 @@ mod tests {
     }
 
     #[test]
+    fn files_saved_with_a_byte_order_mark_still_load() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("favorites.json"), "\u{feff}[\"applications/a\"]").unwrap();
+        assert_eq!(Store::load(dir.path().to_path_buf()).favorites(), ["applications/a"]);
+    }
+
+    #[test]
     fn corrupt_file_is_backed_up_not_lost() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("frecency.json"), "{not json").unwrap();
@@ -237,6 +257,16 @@ mod tests {
         let scores = Store::load(dir.path().to_path_buf()).scores(0);
         assert!(!scores.contains_key("applications/a"));
         assert_eq!(scores["applications/b"], 1.0);
+    }
+
+    #[test]
+    fn data_files_round_trip_and_reject_unknown_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::load(dir.path().to_path_buf());
+        assert_eq!(store.data("quicklinks").unwrap(), serde_json::Value::Null);
+        store.set_data("quicklinks", &serde_json::json!([{"name": "google"}])).unwrap();
+        assert_eq!(Store::load(dir.path().to_path_buf()).data("quicklinks").unwrap()[0]["name"], "google");
+        assert!(store.set_data("../settings", &serde_json::Value::Null).is_err());
     }
 
     #[test]

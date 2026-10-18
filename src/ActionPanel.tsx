@@ -95,6 +95,7 @@ export function ActionPanel({ title, groups, onRun, onClose }: ActionPanelProps)
                   >
                     {Icon ? <Icon className="size-4 shrink-0" /> : <span className="size-4 shrink-0" />}
                     <span className="truncate">{action.title}</span>
+                    {action.accessory && <span className="ml-auto min-w-0 truncate pl-2 font-normal text-fg-60">{action.accessory}</span>}
                     {action.shortcut && (
                       <span className="ml-auto">
                         <Keys labels={shortcutLabels(action.shortcut)} />

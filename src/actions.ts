@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, RotateCcw, SquareMenu, Star, StarOff } from "lucide
 import type { Action, RegisteredCommand, Shortcut } from "./extension-api";
 import type { Frecency } from "./search";
 
-const KEY_LABELS: Record<string, string> = { Enter: "↵", ArrowUp: "↑", ArrowDown: "↓" };
+const KEY_LABELS: Record<string, string> = { Enter: "↵", ArrowUp: "↑", ArrowDown: "↓", Backspace: "⌫", Delete: "Del" };
 
 export function shortcutLabels(shortcut: Shortcut): string[] {
   const modifiers = [shortcut.ctrl && "Ctrl", shortcut.alt && "Alt", shortcut.shift && "Shift"].filter((m): m is string => !!m);
@@ -35,7 +35,7 @@ export interface ActionContext {
 export function actionGroups(command: RegisteredCommand, context: ActionContext): Action[][] {
   const { favorites, setFavorites } = context;
   const [own = [], ...rest] = command.actions ?? [];
-  const primary: Action = { id: "primary", title: command.primaryActionTitle, icon: SquareMenu, shortcut: { key: "Enter" }, run: command.run };
+  const primary: Action = { id: "primary", title: command.primaryActionTitle, icon: SquareMenu, shortcut: { key: "Enter" }, run: () => command.run?.() };
   const index = favorites.indexOf(command.key);
   const move = (offset: number) => {
     const next = [...favorites];

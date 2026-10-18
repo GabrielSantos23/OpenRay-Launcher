@@ -112,4 +112,14 @@ describe("search", () => {
       "Windows Terminal",
     ]);
   });
+
+  it("lists extension commands below suggestions without repeating them", () => {
+    const settings = { ...cmd("Settings"), kind: "Command" };
+    const clipboard = { ...cmd("Clipboard History"), kind: "Command" };
+    const sections = search([...all, settings, clipboard], "", { [notepad.key]: 2, [settings.key]: 1 });
+    expect(sections.map((s) => [s.title, s.items.map((c) => c.title)])).toEqual([
+      ["Suggestions", ["Notepad", "Settings"]],
+      ["Commands", ["Clipboard History"]],
+    ]);
+  });
 });

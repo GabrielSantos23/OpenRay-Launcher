@@ -3,6 +3,7 @@
 
 @theme {
   --font-sans: "Inter Variable", "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-emoji: "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
 
   --color-backdrop: #333333;
   --color-bg: color-mix(in srgb, #000000 40%, var(--color-backdrop));
@@ -38,6 +39,20 @@
   --color-switch-on: var(--color-accent);
   --color-switch-off: rgb(from var(--color-fg) r g b / 25%);
   --color-close-hover: #c42b1c;
+  --color-icon-blue-top: oklch(0.72 0.15 252);
+  --color-icon-blue-bottom: oklch(0.55 0.19 262);
+  --color-icon-orange-top: oklch(0.8 0.15 62);
+  --color-icon-orange-bottom: oklch(0.65 0.19 42);
+  --color-icon-red-top: oklch(0.72 0.17 22);
+  --color-icon-red-bottom: oklch(0.57 0.21 18);
+  --color-icon-yellow-top: oklch(0.85 0.16 88);
+  --color-icon-yellow-bottom: oklch(0.7 0.17 62);
+  --color-icon-purple-top: oklch(0.72 0.15 295);
+  --color-icon-purple-bottom: oklch(0.54 0.2 290);
+  --color-icon-green-top: oklch(0.78 0.15 158);
+  --color-icon-green-bottom: oklch(0.6 0.15 165);
+  --color-icon-slate-top: oklch(0.64 0.03 260);
+  --color-icon-slate-bottom: oklch(0.45 0.03 262);
 
   --animate-loader: loader-sweep 1.5s ease-in-out infinite;
 

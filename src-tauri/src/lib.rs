@@ -1,4 +1,5 @@
 mod apps;
+mod clipboard;
 mod registry;
 mod hotkey;
 mod hud;
@@ -148,6 +149,136 @@ fn login_item_set(enabled: bool) -> Result<(), String> {
     registry::set_login_item(enabled)
 }
 
+#[derive(serde::Serialize)]
+struct AppInfo {
+    name: String,
+    path: String,
+}
+
+#[tauri::command]
+fn frontmost_app() -> Option<AppInfo> {
+    let previous = launcher::previous_window();
+    if previous.is_invalid() {
+        return None;
+    }
+    clipboard::window_app(previous).map(|(name, path)| AppInfo { name, path })
+}
+
+fn paste_into_previous(app: &AppHandle) {
+    launcher::hide(app, true);
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        clipboard::send_paste();
+    });
+}
+
+#[tauri::command]
+fn paste_text(app: AppHandle, text: String) -> Result<(), String> {
+    clipboard::write_text(&text)?;
+    paste_into_previous(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn show_launcher(app: AppHandle) {
+    launcher::show(&app)
+}
+
+#[tauri::command]
+fn read_clipboard_text() -> Option<String> {
+    clipboard::read_clipboard_text()
+}
+
+#[tauri::command]
+fn copy_text(text: String) -> Result<(), String> {
+    clipboard::write_text(&text)
+}
+
+#[tauri::command]
+fn clipboard_list(history: State<clipboard::History>) -> Vec<clipboard::Entry> {
+    history.list()
+}
+
+fn clipboard_entry(history: &clipboard::History, id: &str) -> Result<clipboard::Entry, String> {
+    history.get(id).ok_or_else(|| "entry no longer exists".to_string())
+}
+
+#[tauri::command]
+fn clipboard_copy(id: String, history: State<clipboard::History>) -> Result<(), String> {
+    clipboard::write_entry(&history, &clipboard_entry(&history, &id)?)
+}
+
+#[tauri::command]
+fn clipboard_paste(app: AppHandle, id: String, history: State<clipboard::History>) -> Result<(), String> {
+    clipboard::write_entry(&history, &clipboard_entry(&history, &id)?)?;
+    paste_into_previous(&app);
+    Ok(())
+}
+
+fn clipboard_changed(app: &AppHandle, result: Result<(), String>) -> Result<(), String> {
+    result?;
+    app.emit_to(launcher::LABEL, "clipboard-changed", ()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn clipboard_delete(app: AppHandle, id: String, history: State<clipboard::History>) -> Result<(), String> {
+    clipboard_changed(&app, history.delete(&id))
+}
+
+#[tauri::command]
+fn clipboard_delete_all(app: AppHandle, history: State<clipboard::History>) -> Result<(), String> {
+    clipboard_changed(&app, history.delete_all())
+}
+
+#[tauri::command]
+fn clipboard_delete_since(app: AppHandle, since: u64, history: State<clipboard::History>) -> Result<(), String> {
+    clipboard_changed(&app, history.delete_since(since))
+}
+
+#[tauri::command]
+fn clipboard_pin(app: AppHandle, id: String, pinned: bool, history: State<clipboard::History>) -> Result<(), String> {
+    clipboard_changed(&app, history.set_pinned(&id, pinned, store::now_ms()))
+}
+
+#[tauri::command]
+fn data_get(name: String, store: State<Store>) -> Result<serde_json::Value, String> {
+    store.data(&name)
+}
+
+#[tauri::command]
+fn data_set(name: String, value: serde_json::Value, store: State<Store>) -> Result<(), String> {
+    store.set_data(&name, &value)
+}
+
+#[tauri::command]
+fn open_url(url: String, app_path: Option<String>) -> Result<(), String> {
+    apps::open_url(&url, app_path.as_deref())
+}
+
+fn serve_clipboard_image(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
+    let id = request.uri().path().trim_start_matches('/');
+    let history = app.state::<clipboard::History>();
+    match history.image_path(id).and_then(|path| std::fs::read(path).ok()) {
+        Some(png) => tauri::http::Response::builder().header("Content-Type", "image/png").body(png),
+        None => tauri::http::Response::builder().status(404).body(Vec::new()),
+    }
+    .expect("valid clipboard image response")
+}
+
+fn start_clipboard_listener(app: &AppHandle) -> Result<(), String> {
+    let handle = app.clone();
+    clipboard::listen(Box::new(move || {
+        let Some(captured) = clipboard::capture() else { return };
+        let (name, path) = clipboard::owner_app().unwrap_or_default();
+        let history = handle.state::<clipboard::History>();
+        let now = store::now_ms();
+        history.prune(now);
+        if let Err(e) = clipboard_changed(&handle, history.record(captured, name, path, now)) {
+            eprintln!("openray: could not save clipboard entry: {e}");
+        }
+    }))
+}
+
 fn show_settings(app: &AppHandle) {
     launcher::hide(app, false);
     if let Some(window) = app.get_webview_window(SETTINGS_LABEL) {
@@ -193,8 +324,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| launcher::show(app)))
         .register_asynchronous_uri_scheme_protocol("appicon", |_ctx, request, responder| serve_app_icon(request, responder))
+        .register_uri_scheme_protocol("clipimg", |ctx, request| serve_clipboard_image(ctx.app_handle(), request))
         .setup(|app| {
-            let store = Store::load(app.path().app_data_dir()?);
+            let data_dir = app.path().app_data_dir()?;
+            app.manage(clipboard::History::load(data_dir.join("clipboard"), store::now_ms()));
+            let store = Store::load(data_dir);
             let settings = store.settings();
             app.manage(store);
 
@@ -205,6 +339,9 @@ pub fn run() {
                 hud::init(&window);
             }
             setup_tray(app)?;
+            if let Err(e) = start_clipboard_listener(app.handle()) {
+                eprintln!("openray: clipboard history unavailable: {e}");
+            }
 
             let handle = app.handle().clone();
             let registered = hotkey::install(Box::new(move |id| {
@@ -265,7 +402,22 @@ pub fn run() {
             login_item_get,
             system_accent_color,
             login_item_set,
-            open_settings
+            open_settings,
+            frontmost_app,
+            paste_text,
+            copy_text,
+            show_launcher,
+            read_clipboard_text,
+            clipboard_list,
+            clipboard_copy,
+            clipboard_paste,
+            clipboard_delete,
+            clipboard_delete_all,
+            clipboard_delete_since,
+            clipboard_pin,
+            data_get,
+            data_set,
+            open_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running Openray");

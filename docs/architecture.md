@@ -50,12 +50,16 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
 | Global hotkey | `src-tauri/src/hotkey.rs` | Parse hotkeys, bindings list (launcher + command hotkeys, duplicates rejected), WH_KEYBOARD_LL hook thread, dispatcher thread, suspend while recording |
 | Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, AppsFolder (MSIX) scan, shell icons served on `appicon://`, ShellExecute, DWM attributes |
-| Settings and persistence | `src-tauri/src/store.rs`, `src-tauri/src/registry.rs` | `settings.json` (hotkey, tray, show-on screen, Escape options, per-command alias/hotkey/disabled), `frecency.json`, `favorites.json` in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login; Windows accent from `AccentPalette` |
+| Settings and persistence | `src-tauri/src/store.rs`, `src-tauri/src/registry.rs` | `settings.json` (hotkey, tray, show-on screen, Escape options, per-command alias/hotkey/disabled), `frecency.json`, `favorites.json`, and the extension data files `quicklinks.json` and `emoji.json` (`data_get`/`data_set`, names allow-listed) in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login; Windows accent from `AccentPalette` |
 | Settings window | `src/SettingsWindow.tsx`, `src/settings.ts`, `src/Dropdown.tsx`, `src/HotkeyRecorder.tsx` | `settings` Tauri window: pages, hotkey recorder, commands table; `useSettings` keeps every window in sync through the `settings-changed` event |
+| Clipboard | `src-tauri/src/clipboard.rs` | `WM_CLIPBOARDUPDATE` listener thread, capture (text, files, DIB→PNG), exclusion formats, history store with retention and pinning, write-back (text, files, DIB + PNG), Ctrl+V injection, source app lookup; images served on `clipimg://` |
+| Views | `src/ListView.tsx`, `src/ActionHost.tsx` | Pushed command views: back button, search with optional argument field and filter, list or grid, detail with Information, footer; action panel with submenus and confirmation dialogs, shared with the root |
+| Calculator | `src/calculator.ts`, `src/extensions/calculator.ts` | Expression parser, currency and time-zone parsing, color parsing and formats; inline result card |
 | Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
 | Extension API | `src/extension-api.ts` | Types and `defineExtension` |
-| Built-in extensions | `src/extensions/*` | `applications` (first), `openray-core` |
+| Icons | `src/icons.tsx` | `GlyphTile` (extension tiles from an `IconSpec`), `CommandIcon` (URL, tile or fallback), `OpenrayGlyph` |
+| Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `quicklinks`, `web-searches`, `openray-core` |
 | Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |
 | Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
 | Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
@@ -99,7 +103,19 @@ interface Command {
   kind: string;
   primaryActionTitle: string;
   actions?: Action[][];
-  run: () => Promise<void> | void;
+  view?: ComponentType<{ pop: () => void }>;
+  fallback?: (text: string) => Promise<void> | void;
+  run?: () => Promise<void> | void;
+}
+
+interface Extension {
+  icon?: IconSpec;
+  inline?: (query: string) => Promise<InlineResult | null>;
+}
+
+interface IconSpec {
+  glyph: ComponentType<{ className?: string; strokeWidth?: number }>;
+  tone: "blue" | "orange" | "red" | "yellow" | "purple" | "green" | "slate";
 }
 
 interface Action {
@@ -109,9 +125,17 @@ interface Action {
   shortcut?: { key: string; ctrl?: boolean; alt?: boolean; shift?: boolean };
   destructive?: boolean;
   keepOpen?: boolean;
+  accessory?: string;
+  confirm?: { title: string; message: string; confirmTitle: string };
+  submenu?: () => Action[] | Promise<Action[]>;
   run: () => Promise<void> | void;
 }
 ```
+
+- A command with `view` replaces the root with its component (built from `ListView`); `pop` returns to the root. Command hotkeys for view commands show the launcher first.
+- `fallback` commands appear under “Use “text” with...” and receive the root text.
+- `inline` results (the calculator) render as a card above the root results; their actions drive the footer.
+- An action with `submenu` opens its items in the action panel; `confirm` asks first, with Cancel focused.
 
 - `actions` are groups shown in the Ctrl+K panel. The first group follows the primary action. The launcher adds the favorites group after it and Reset Ranking at the end.
 - An action hides the launcher after it runs, unless `keepOpen` is set.
@@ -120,7 +144,4 @@ interface Action {
 - Static `commands` declare fixed commands. `items()` supplies dynamic ones, such as one per installed app.
 - The registry namespaces ids as `<extensionId>/<commandId>`. That key is what frecency stores.
 - Built-ins are registered through `defineExtension` in `src/extensions/index.ts`, and nothing else is special-cased.
-- Planned additions, when real features need them:
-  - views (list/detail/form);
-  - arguments;
-  - preferences.
+- Planned additions, when real features need them: preferences.

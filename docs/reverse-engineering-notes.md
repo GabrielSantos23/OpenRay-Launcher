@@ -236,6 +236,19 @@ Sources are under `Raycast\frontend\`. Class names are CSS-module hashes.
   - HUD: 232×46 with a 1 px border `#414141`, a base of `#1F1F1F`, the icon at x=16, the text at x=51 (13 px).
 - **HUD placement is unknown.** One probe found no new top-level `Raycast.exe` window during a HUD (`unk_3a8f3266…`).
 
+## Built-in features (milestone 4)
+
+- **Clipboard History (`main-window-BN8deh-D.js`).**
+  - Actions come from `qoe`: primary group Paste (`lN`, “Paste to <app>”), Copy to Clipboard (`uN`), Paste and Keep Window Open, Paste as…; secondary group Copy Color as… (`Coe`), Edit, Rename, Copy Formatted JSON, Pin/Unpin (`Aoe`/`Moe`), move pinned; export group (OCR, QR); delete group Delete Entry (`Foe`), Delete Recent Entries… (`Ioe`: Last 5/15/30 Minutes, Last Hour, Last 24 Hours), Delete All Entries (`Loe`).
+  - The type filter (`vT` options) is All Types, Text Only, Images Only, Files Only, Links Only, Emails Only, Colors Only.
+  - The Information panel shows Source, Type, Characters, Words, then Copied, or Times copied / Last copied / First copied.
+  - The retention default is `P1W` (`historyDuration` in `internal-extensions-DZRANhqM.js` and `backend/index.mjs`); options 1 Day to 3 Months, longer ones Pro.
+- **Shortcuts on Windows (`shortcuts-C1kqjDmf.js`).** primary Enter, secondary Ctrl+Enter, tertiary Ctrl+Shift+Enter, quaternary Ctrl+Alt+Enter; clear Ctrl+D, clearSecondary Ctrl+Shift+D, clearTertiary Ctrl+Alt+D; copy Ctrl+Shift+C, copySecondary Ctrl+Alt+C; pin Ctrl+.; edit Ctrl+E; new Ctrl+N; open Ctrl+O, openSecondary Ctrl+Shift+O.
+- **Calculator.** Copy Answer (`vk`, primary + copy) and Paste Answer (`yk`, secondary). Color formats come from the backend `color.getFormatted` (`J1r` ids, `q1r` labels, `SX` = 3 significant digits). Settings: syntax highlighting, color conversion, flight tracker, weather, rem-to-px rate.
+- **Emoji picker.** Categories `mI`: Pinned, Frequently Used, Smileys & People, Animals & Nature, Food & Drink, Activity, Travel & Places, Objects, Symbols, Flags, Other Symbols, AI Results. Settings: column count, primary action (paste/copy), skin tone.
+- **Quicklinks.** Form title Create/Update/Duplicate Quicklink, primary “Save Quicklink” on secondary (Ctrl+Enter); search placeholder “Search for Quicklinks…”. Settings: link previews, prefer existing tabs, pass selected text as argument, delete warning.
+- **Live check (2026-10-18).** In the debug build, PowerShell `Set-Clipboard` produced entries with source “Windows PowerShell”. Reading the clipboard immediately on `WM_CLIPBOARDUPDATE` made `Set-Clipboard` fail and one copy raised several notifications, so capture waits 100 ms and repeats within 1 s are one copy.
+
 ## Feature inventory source
 
 - **Built-in commands.** The list in `docs/feature-matrix.md` was produced by parsing `backend/index.mjs` for `key:` / `title:` / `commands:{…H({title…})}`. The raw dump is in the kickoff scratchpad `inventory.txt`.
@@ -255,6 +268,9 @@ Sources are under `Raycast\frontend\`. Class names are CSS-module hashes.
 | `unk_3a8f3266…` | Screen placement of the HUD portal window | low |
 | `unk_d92d0ead…` | Settings window default size and position (switch color resolved: system accent) | low |
 | `unk_26be2170…` | Alias matching and rank in root search | low |
+| `unk_f8b3baf9…` | Calculator card labels for plain math | low |
+| `unk_b6c2e6e4…` | Default fallback commands and order | low |
+| `unk_66397645…` | Selected emoji cell tint | low |
 
 Not yet investigated:
 

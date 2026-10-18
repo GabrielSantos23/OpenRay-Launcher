@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Keyboard,
-  LayoutGrid,
   Minus,
   Moon,
   Sun,
@@ -33,6 +32,7 @@ import {
   withHotkey,
   type Settings as SettingsData,
 } from "./settings";
+import { CommandIcon, GlyphTile, OpenrayGlyph } from "./icons";
 import { THEMES, type Theme } from "./theme";
 
 type Save = (next: SettingsData) => Promise<void>;
@@ -88,16 +88,11 @@ const PAGES: Page[] = [
 ];
 
 function extensionIcon(extension: Extension) {
-  return extension.id === "applications" ? (
-    <Tile className="bg-[#2f6fde]">
-      <LayoutGrid className="size-3.5" />
-    </Tile>
+  return extension.icon ? (
+    <GlyphTile spec={extension.icon} />
   ) : (
     <Tile>
-      <svg viewBox="0 0 24 24" className="size-3.5">
-        <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="2.5" />
-        <path d="M12 12 L21 3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-      </svg>
+      <OpenrayGlyph className="size-3.5" />
     </Tile>
   );
 }
@@ -279,12 +274,6 @@ function KeyboardPage({ settings, save }: { settings: SettingsData; save: Save }
   );
 }
 
-function CommandIcon({ command }: { command: RegisteredCommand }) {
-  const [failed, setFailed] = useState(false);
-  if (command.icon && !failed) return <img src={command.icon} alt="" loading="lazy" draggable={false} onError={() => setFailed(true)} className="size-4 shrink-0" />;
-  return <Command aria-hidden="true" className="size-4 shrink-0 text-fg-60" />;
-}
-
 function ExtensionTable({
   extension,
   commands,
@@ -317,7 +306,7 @@ function ExtensionTable({
           <Checkbox label={`Enable ${extension.title}`} checked={extensionEnabled} onChange={(on) => save(withCommandPrefs(settings, extension.id, { disabled: !on }))} />
         </span>
       </div>
-      {!collapsed && (
+      {!collapsed && commands.length > 0 && (
         <table className={`w-full table-fixed border-collapse ${extensionEnabled ? "" : "opacity-50"}`}>
           <thead>
             <tr className="h-6 border-b border-card-separator text-left text-12 text-fg-60">
@@ -336,7 +325,7 @@ function ExtensionTable({
                 <tr key={command.key} className="h-[46px] border-b border-card-separator last:border-b-0">
                   <td className="pl-3">
                     <span className="flex min-w-0 items-center gap-2">
-                      <CommandIcon command={command} />
+                      <CommandIcon title={command.title} icon={command.icon} fallback={extension.icon} small />
                       <span className="truncate font-medium">{command.title}</span>
                     </span>
                   </td>

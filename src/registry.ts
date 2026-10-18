@@ -11,6 +11,7 @@ export async function loadCommands(extensions: Extension[]): Promise<RegisteredC
       }
       return [...(extension.commands ?? []), ...dynamic].map((command) => ({
         ...command,
+        icon: command.icon ?? extension.icon,
         key: `${extension.id}/${command.id}`,
         extensionId: extension.id,
       }));

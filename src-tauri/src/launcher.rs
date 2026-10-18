@@ -114,6 +114,10 @@ pub fn owns_foreground(window: &WebviewWindow) -> bool {
     unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) == hwnd }
 }
 
+pub fn previous_window() -> HWND {
+    HWND(PREVIOUS_FOREGROUND.load(Ordering::SeqCst) as _)
+}
+
 pub fn is_shown() -> bool {
     SHOWN.load(Ordering::SeqCst)
 }

@@ -1,61 +1,68 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ActionPanel, Keys } from "./ActionPanel";
+import { Footer, Loader, Logo, useActionHost } from "./ActionHost";
+import { CommandIcon } from "./icons";
 import { actionGroups, matchesShortcut } from "./actions";
-import type { Action, RegisteredCommand } from "./extension-api";
+import type { Action, InlineResult, InlineSide, RegisteredCommand, ViewProps } from "./extension-api";
 import { builtInExtensions } from "./extensions";
 import { loadCommands } from "./registry";
-import { search, type Frecency } from "./search";
-import { setLauncherVisible, showToast, useToast } from "./toast";
-import { FooterToast } from "./FooterToast";
+import { search, type Frecency, type Section } from "./search";
+import { setLauncherVisible } from "./toast";
 import { commandPrefs, isEnabled, useSettings } from "./settings";
 
-function Logo() {
+function CardSide({ side, isInput }: { side: InlineSide; isInput?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className="size-[22px] shrink-0 text-fg-60" aria-hidden="true">
-      <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="2.5" />
-      <path d="M12 12 L21 3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
+    <div className="flex min-w-0 flex-col items-center px-4 pt-1 pb-[13px]">
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        {side.swatch ? (
+          <span aria-label={side.label} style={{ background: side.swatch }} className="h-[72px] w-[98px] rounded-[6px] shadow-[0_0_0_2px_var(--color-fg)]" />
+        ) : (
+          <span className="max-w-full truncate text-[24px] font-semibold text-fg">
+            {isInput
+              ? side.text.split(/(\s+(?:in|to|as|=)\s+)/i).map((part, i) => (
+                  <span key={i} className={i % 2 ? "whitespace-pre text-fg-40" : ""}>
+                    {part}
+                  </span>
+                ))
+              : side.text}
+          </span>
+        )}
+      </div>
+      <span className="max-w-full truncate rounded-[4px] bg-control px-1.5 py-px text-12 font-medium text-fg">{side.label}</span>
+    </div>
   );
 }
 
-function ItemIcon({ title, icon }: { title: string; icon?: string }) {
-  const [failed, setFailed] = useState(false);
-  if (icon && !failed) {
-    return <img src={icon} alt="" loading="lazy" draggable={false} onError={() => setFailed(true)} className="size-[22px] shrink-0" />;
-  }
-  return (
-    <span
-      aria-hidden="true"
-      className="flex size-[22px] shrink-0 items-center justify-center rounded-[5px] bg-key-bg text-11 font-semibold text-fg-60"
-    >
-      {title.trim().charAt(0).toUpperCase()}
-    </span>
-  );
-}
-
-function Loader({ active }: { active: boolean }) {
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    if (!active) {
-      setShown(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setShown(true), 300);
-    return () => window.clearTimeout(timer);
-  }, [active]);
+function InlineCard({ result, selected, onSelect, onRun }: { result: InlineResult; selected: boolean; onSelect: () => void; onRun: () => void }) {
   return (
     <div
-      aria-hidden="true"
-      className={`loader-gradient pointer-events-none absolute inset-x-0 -bottom-px h-px animate-loader transition-opacity duration-300 ${shown ? "opacity-100" : "opacity-0 [animation-play-state:paused]"}`}
-    />
+      id="option-inline"
+      data-index={0}
+      role="option"
+      aria-selected={selected}
+      aria-label={`${result.input.text} = ${result.output.text || result.output.label}`}
+      onMouseMove={onSelect}
+      onClick={onRun}
+      className={`relative grid h-[124px] cursor-default grid-cols-2 rounded-row ${selected ? "bg-list-selection" : "bg-list-hover"}`}
+    >
+      <CardSide side={result.input} isInput />
+      <CardSide side={result.output} />
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 left-1/2 w-px bg-separator [mask-image:linear-gradient(to_bottom,black_calc(50%_-_12px),transparent_calc(50%_-_12px),transparent_calc(50%_+_12px),black_calc(50%_+_12px))]"
+      />
+      <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
+        <span aria-hidden="true" className="text-[15px] leading-none text-fg">
+          →
+        </span>
+        {result.note && <span className="absolute top-full mt-1 text-11 whitespace-nowrap text-fg-60">{result.note}</span>}
+      </div>
+    </div>
   );
 }
 
-function fail(title: string, error: unknown) {
-  showToast({ variant: "failure", title, message: String(error) });
-}
+const EXTENSION_ICONS = new Map(builtInExtensions.map((e) => [e.id, e.icon]));
 
 export default function App() {
   const [commands, setCommands] = useState<RegisteredCommand[]>([]);
@@ -64,12 +71,13 @@ export default function App() {
   const [selected, setSelected] = useState(0);
   const [loading, setLoading] = useState(0);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [view, setView] = useState<{ key: string; Component: ComponentType<ViewProps> } | null>(null);
+  const [inline, setInline] = useState<{ query: string; result: InlineResult } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const keepSelected = useRef<string | null>(null);
-  const toast = useToast();
   const [settings] = useSettings();
+  const host = useActionHost(() => inputRef.current?.focus());
 
   const refresh = useCallback(async () => {
     setLoading((n) => n + 1);
@@ -94,7 +102,8 @@ export default function App() {
         setLauncherVisible(false);
         setQuery("");
         setSelected(0);
-        setPanelOpen(false);
+        setView(null);
+        host.closePanel();
         refresh();
       }),
       listen("launcher-shown", () => {
@@ -107,16 +116,61 @@ export default function App() {
     };
   }, [refresh]);
 
+  useEffect(() => {
+    const text = query;
+    if (!text.trim()) {
+      setInline(null);
+      return;
+    }
+    let cancelled = false;
+    const sources = builtInExtensions.filter((e) => e.inline && (!settings || isEnabled(settings, e.id, e.id)));
+    Promise.all(sources.map((e) => e.inline!(text).catch(() => null))).then((results) => {
+      if (cancelled) return;
+      const result = results.find((r): r is InlineResult => !!r);
+      setInline(result ? { query: text, result } : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [query, settings]);
+
   const enabled = useMemo(() => (settings ? commands.filter((c) => isEnabled(settings, c.key, c.extensionId)) : commands), [commands, settings]);
   const aliases = useMemo(
     () => Object.fromEntries(enabled.map((c) => [c.key, settings ? commandPrefs(settings, c.key).alias : ""])),
     [enabled, settings],
   );
-  const sections = useMemo(() => search(enabled, query, frecency, favorites, aliases), [enabled, query, frecency, favorites, aliases]);
+  const sections = useMemo<Section[]>(() => {
+    const results = search(enabled, query, frecency, favorites, aliases);
+    const text = query.trim();
+    if (!text) return results;
+    const fallbacks = enabled
+      .filter((c) => c.fallback)
+      .map((c): RegisteredCommand => ({ ...c, key: `fallback:${c.key}`, actions: undefined, view: undefined, run: () => c.fallback!(text) }));
+    return fallbacks.length ? [...results, { title: `Use “${text}” with...`, items: fallbacks }] : results;
+  }, [enabled, query, frecency, favorites, aliases]);
+
+  const inlineResult = inline && inline.query === query ? inline.result : null;
+  const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
+  const count = flat.length + (inlineResult ? 1 : 0);
+  const active = Math.max(0, Math.min(selected, count - 1));
+  const isInline = !!inlineResult && active === 0;
+  const current = isInline ? undefined : flat[active - (inlineResult ? 1 : 0)];
+
+  function openView(command: RegisteredCommand) {
+    if (!command.view) return;
+    host.closePanel();
+    setView({ key: command.key, Component: command.view });
+    visit(command);
+  }
+
   const runByKey = useRef<(key: string) => void>(() => {});
   runByKey.current = (key) => {
     const command = enabled.find((c) => c.key === key);
-    if (command) runAction(command, { id: "primary", title: command.primaryActionTitle, run: command.run });
+    if (!command) return;
+    if (command.view) {
+      openView(command);
+      invoke("show_launcher");
+    } else runAction(command, { id: "primary", title: command.primaryActionTitle, run: () => command.run?.() });
   };
 
   useEffect(() => {
@@ -125,76 +179,80 @@ export default function App() {
       unlisten.then((off) => off());
     };
   }, []);
-  const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
-  const current = flat[Math.min(selected, flat.length - 1)];
 
   useEffect(() => {
     const key = keepSelected.current;
     keepSelected.current = null;
     const index = key ? flat.findIndex((c) => c.key === key) : -1;
-    if (index >= 0) setSelected(index);
+    if (index >= 0) setSelected(index + (inlineResult ? 1 : 0));
   }, [flat]);
 
   useEffect(() => {
-    listRef.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [selected, sections]);
+    listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [active, sections]);
 
-  const groups = current
-    ? actionGroups(current, {
-        favorites,
-        frecency,
-        setFavorites: (keys) => {
-          keepSelected.current = current.key;
-          setFavorites(keys);
-          invoke("favorites_set", { keys }).catch((e) => fail("Could not save favorites", e));
-        },
-        resetRanking: (key) => {
-          keepSelected.current = key;
-          setFrecency(({ [key]: _, ...rest }) => rest);
-          invoke("frecency_reset", { key }).catch((e) => fail("Could not reset ranking", e));
-        },
-      })
-    : [];
+  const groups: Action[][] = isInline
+    ? inlineResult!.actions
+    : current?.key.startsWith("fallback:")
+      ? [[{ id: "primary", title: current.primaryActionTitle, shortcut: { key: "Enter" }, run: () => current.run?.() }]]
+      : current
+        ? actionGroups(current, {
+            favorites,
+            frecency,
+            setFavorites: (keys) => {
+              keepSelected.current = current.key;
+              setFavorites(keys);
+              invoke("favorites_set", { keys }).catch((e) => console.error("favorites_set failed", e));
+            },
+            resetRanking: (key) => {
+              keepSelected.current = key;
+              setFrecency(({ [key]: _, ...rest }) => rest);
+              invoke("frecency_reset", { key }).catch((e) => console.error("frecency_reset failed", e));
+            },
+          })
+        : [];
+  const primaryTitle = isInline ? inlineResult!.primaryActionTitle : current?.primaryActionTitle;
+  const panelTitle = isInline ? inlineResult!.output.text || inlineResult!.output.label : (current?.title ?? "");
 
-  function closePanel() {
-    setPanelOpen(false);
-    inputRef.current?.focus();
-  }
-
-  async function runAction(command: RegisteredCommand, action: Action) {
-    closePanel();
-    setLoading((n) => n + 1);
-    try {
-      await action.run();
-    } catch (e) {
-      fail(action.id === "primary" ? `Could not open ${command.title}` : `${action.title} failed`, e);
-      return;
-    } finally {
-      setLoading((n) => n - 1);
-    }
-    if (action.keepOpen) return;
+  function visit(command: RegisteredCommand) {
+    if (command.key.startsWith("fallback:")) return;
     invoke<number>("frecency_visit", { key: command.key })
       .then((score) => setFrecency((f) => ({ ...f, [command.key]: score })))
       .catch((e) => console.error("frecency_visit failed", e));
-    await invoke("hide_launcher", { restoreFocus: true });
+  }
+
+  function runAction(command: RegisteredCommand | undefined, action: Action) {
+    if (command && action.id === "primary" && command.view) {
+      openView(command);
+      return;
+    }
+    const title = action.id === "primary" && command ? `Could not open ${command.title}` : `${action.title.replace(/…$/, "")} failed`;
+    host.run(action, { failTitle: title, onSuccess: () => command && !action.keepOpen && visit(command) });
+  }
+
+  function runSelected(action: Action) {
+    runAction(isInline ? undefined : current, action);
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (matchesShortcut(event, { key: "k", ctrl: true })) {
       event.preventDefault();
-      if (current) setPanelOpen(true);
+      if (groups.length) host.openPanel(panelTitle, groups);
       return;
     }
     const action = groups.flat().find((a) => a.shortcut && matchesShortcut(event, a.shortcut));
-    if (current && action) {
+    if (event.key === "Enter" && !event.ctrlKey && !event.altKey && !event.shiftKey && groups[0]?.[0]) {
       event.preventDefault();
-      runAction(current, action);
+      runSelected(groups[0][0]);
+    } else if (action) {
+      event.preventDefault();
+      runSelected(action);
     } else if (event.key === "ArrowDown") {
       event.preventDefault();
-      setSelected((i) => Math.min(i + 1, flat.length - 1));
+      setSelected(Math.min(active + 1, count - 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setSelected((i) => Math.max(i - 1, 0));
+      setSelected(Math.max(active - 1, 0));
     } else if (event.key === "Escape") {
       event.preventDefault();
       if (query && settings?.escapeKeyBehavior !== "close-and-pop-to-root") {
@@ -206,15 +264,30 @@ export default function App() {
     }
   }
 
-  let index = -1;
+  const keepFocus = (e: React.MouseEvent) => {
+    if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) e.preventDefault();
+  };
+
+  if (view) {
+    const pop = () => {
+      setView(null);
+      setQuery("");
+      setSelected(0);
+      refresh();
+      window.setTimeout(() => inputRef.current?.focus());
+    };
+    return (
+      <main onMouseDown={keepFocus} className="relative flex h-full flex-col text-fg">
+        <h1 className="sr-only">Openray</h1>
+        <view.Component key={view.key} pop={pop} />
+      </main>
+    );
+  }
+
+  let index = inlineResult ? 0 : -1;
 
   return (
-    <main
-      onMouseDown={(e) => {
-        if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
-      }}
-      className="relative flex h-full flex-col text-fg"
-    >
+    <main onMouseDown={keepFocus} className="relative flex h-full flex-col text-fg">
       <h1 className="sr-only">Openray</h1>
       <header className="relative flex h-header shrink-0 items-center gap-3 border-b border-separator px-search-inset">
         <Logo />
@@ -233,15 +306,24 @@ export default function App() {
           role="combobox"
           aria-expanded="true"
           aria-controls="results"
-          aria-activedescendant={current ? `option-${Math.min(selected, flat.length - 1)}` : undefined}
+          aria-activedescendant={isInline ? "option-inline" : current ? `option-${active}` : undefined}
           className="h-full min-w-0 flex-1 bg-transparent text-18 text-fg caret-fg outline-none placeholder:text-fg-40"
         />
-        <Loader active={loading > 0} />
+        <Loader active={loading > 0 || host.busy} />
       </header>
 
       <div ref={listRef} id="results" role="listbox" aria-label="Results" aria-busy={loading > 0} className="min-h-0 flex-1 overflow-y-auto px-inset pb-inset">
-        {sections.length === 0 && (
-          <p className="flex h-full items-center justify-center text-13 text-fg-60">No results for “{query.trim()}”</p>
+        {count === 0 && <p className="flex h-full items-center justify-center text-13 text-fg-60">No results for “{query.trim()}”</p>}
+        {inlineResult && (
+          <div role="group" aria-label={inlineResult.section}>
+            <div className="flex h-8 items-end px-2 pb-[5px] text-11 font-semibold text-fg-60">{inlineResult.section}</div>
+            <InlineCard
+              result={inlineResult}
+              selected={isInline}
+              onSelect={() => active !== 0 && setSelected(0)}
+              onRun={() => inlineResult.actions[0]?.[0] && runSelected(inlineResult.actions[0][0])}
+            />
+          </div>
         )}
         {sections.map((section) => (
           <div key={section.title} role="group" aria-label={section.title}>
@@ -249,7 +331,7 @@ export default function App() {
             {section.items.map((command) => {
               index += 1;
               const i = index;
-              const isSelected = i === Math.min(selected, flat.length - 1);
+              const isSelected = i === active;
               return (
                 <div
                   key={command.key}
@@ -258,10 +340,10 @@ export default function App() {
                   role="option"
                   aria-selected={isSelected}
                   onMouseMove={() => i !== selected && setSelected(i)}
-                  onClick={() => runAction(command, { id: "primary", title: command.primaryActionTitle, run: command.run })}
+                  onClick={() => runAction(command, { id: "primary", title: command.primaryActionTitle, run: () => command.run?.() })}
                   className={`flex h-row cursor-default items-center gap-3 rounded-row px-2 text-13 ${isSelected ? "bg-list-selection" : ""}`}
                 >
-                  <ItemIcon title={command.title} icon={command.icon} />
+                  <CommandIcon title={command.title} icon={command.icon} fallback={EXTENSION_ICONS.get(command.extensionId)} />
                   <span className="truncate font-medium">{command.title}</span>
                   {command.subtitle && <span className="truncate text-fg-60">{command.subtitle}</span>}
                   <span className="ml-auto shrink-0 text-fg-60">{command.kind}</span>
@@ -272,46 +354,20 @@ export default function App() {
         ))}
       </div>
 
-      <footer className="relative isolate flex h-footer shrink-0 items-center gap-2 overflow-hidden pt-px pr-[9px] pb-px pl-3 text-13 before:absolute before:inset-x-0 before:top-0 before:-z-20 before:h-px before:bg-separator">
-        {toast ? (
-          <FooterToast />
-        ) : (
+      <Footer
+        left={
           <button type="button" tabIndex={-1} aria-label="Open Settings" title="Open Settings" onClick={() => invoke("open_settings")} className="-m-1 rounded-[6px] p-1 hover:bg-list-hover">
             <Logo />
           </button>
-        )}
-        {current && (
-          <>
-            <span className="ml-auto flex shrink-0 items-center gap-2 font-medium">
-              {current.primaryActionTitle}
-              <Keys labels={["↵"]} />
-            </span>
-            <span aria-hidden="true" className={`-mr-0.5 ml-1 h-[11px] w-px ${panelOpen ? "" : "bg-footer-divider"}`} />
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-expanded={panelOpen}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => (panelOpen ? closePanel() : setPanelOpen(true))}
-              className={`flex h-[26px] shrink-0 cursor-default items-center gap-2 rounded-[6px] pr-[3px] pl-2 font-medium text-fg-60 ${panelOpen ? "bg-list-selection" : ""}`}
-            >
-              Actions
-              <Keys labels={["Ctrl", "K"]} />
-            </button>
-          </>
-        )}
-      </footer>
-      {panelOpen && current && (
-        <ActionPanel
-          key={current.key}
-          title={current.title}
-          groups={groups}
-          onRun={(action) => runAction(current, action)}
-          onClose={closePanel}
-        />
-      )}
+        }
+        primaryTitle={primaryTitle}
+        panelOpen={host.panelOpen}
+        showActions={groups.flat().length > 1}
+        onTogglePanel={() => (host.panelOpen ? host.closePanel() : groups.length && host.openPanel(panelTitle, groups))}
+      />
+      {host.render(runSelected)}
       <div aria-live="polite" className="sr-only">
-        {flat.length} {flat.length === 1 ? "result" : "results"}
+        {count} {count === 1 ? "result" : "results"}
       </div>
     </main>
   );

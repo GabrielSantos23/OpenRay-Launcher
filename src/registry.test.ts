@@ -28,4 +28,12 @@ describe("loadCommands", () => {
     expect(commands.map((c) => c.key)).toEqual(["broken/static", "ok/x"]);
     expect(error).toHaveBeenCalledOnce();
   });
+
+  it("gives commands without their own icon the extension icon", async () => {
+    const icon = { glyph: () => null, tone: "blue" as const };
+    const ext = defineExtension({ id: "e", title: "E", icon, commands: [{ ...base, id: "a", title: "A" }, { ...base, id: "b", title: "B", icon: "b.png" }] });
+    const [a, b] = await loadCommands([ext]);
+    expect(a.icon).toBe(icon);
+    expect(b.icon).toBe("b.png");
+  });
 });

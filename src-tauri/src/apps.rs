@@ -179,6 +179,30 @@ pub fn launch(path: &str, as_admin: bool) -> Result<(), String> {
     }
 }
 
+pub fn open_url(url: &str, app_path: Option<&str>) -> Result<(), String> {
+    use windows::core::{w, HSTRING, PCWSTR};
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY, SW_SHOWNORMAL};
+
+    if url.trim().is_empty() {
+        return Err("the link is empty".into());
+    }
+    unsafe {
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
+    }
+    let result = match app_path.filter(|p| !p.is_empty()) {
+        Some(app) => unsafe {
+            ShellExecuteW(None, w!("open"), &HSTRING::from(app), &HSTRING::from(format!("\"{}\"", url.replace('"', "%22"))), PCWSTR::null(), SW_SHOWNORMAL)
+        },
+        None => unsafe { ShellExecuteW(None, w!("open"), &HSTRING::from(url), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL) },
+    };
+    if result.0 as isize > 32 {
+        Ok(())
+    } else {
+        Err(format!("could not open {url} (ShellExecute code {})", result.0 as isize))
+    }
+}
+
 pub fn show_in_explorer(path: &str) -> Result<(), String> {
     if !Path::new(path).exists() {
         return Err(format!("{path} no longer exists"));

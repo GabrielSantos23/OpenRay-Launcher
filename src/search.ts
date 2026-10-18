@@ -69,9 +69,13 @@ export function search(
       .filter((c) => !favorites.includes(c.key) && (frecency[c.key] ?? 0) > 0)
       .sort(byFrecencyThenTitle(frecency))
       .slice(0, SUGGESTION_LIMIT);
+    const pinned = favorites.flatMap((key) => byKey.get(key) ?? []);
+    const shown = new Set([...pinned, ...used].map((c) => c.key));
+    const extensionCommands = commands.filter((c) => c.kind === "Command" && !shown.has(c.key)).sort((a, b) => a.title.localeCompare(b.title));
     const sections = [
-      { title: "Favorites", items: favorites.flatMap((key) => byKey.get(key) ?? []) },
+      { title: "Favorites", items: pinned },
       { title: "Suggestions", items: used },
+      { title: "Commands", items: extensionCommands },
     ].filter((s) => s.items.length > 0);
     return sections.length > 0 ? sections : [{ title: "Results", items: [...commands].sort(byFrecencyThenTitle(frecency)) }];
   }

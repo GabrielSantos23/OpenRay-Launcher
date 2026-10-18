@@ -98,6 +98,37 @@ From `css-C58pR_1e.css` and the theme CSS builder in `contrast-improvement-CQ0Eg
 | Menu | search field 40 px, padding 16, separator; items like the action panel; max height 280 | `Dropdown` |
 | Scrollbar | thumb 6 px fg 40 % rounded; 11 px + fg 5 % track on hover | `::-webkit-scrollbar` 10 px with 2 px transparent border |
 
+## Built-in views
+
+Measured from the user's 750×475 screenshots at 100 % scale; values marked ≈ are estimates.
+
+| Element | Reference | Openray |
+|---|---|---|
+| Inline card | section title then a 124 px card, two halves split by a 1 px line broken around a centered →; 24 px semibold text; label chips 12 px on fg 10 % at ≈ 13 px from the bottom; note under the arrow 11 px | `InlineCard` in `App.tsx` |
+| Color swatch | ≈ 98×72, radius 6, light outline | `h-[72px] w-[98px]` with a 2 px fg ring |
+| Master–detail | list 285 px wide with a separator; preview 16 px padding, mono 13 px; Information panel ≈ 148 px tall, rows 33 px with label left and value right | `ListView` `detail`, `Metadata` |
+| Back button | 22×22 tile, fg 10 %, radius 5 | `BackButton` |
+| Filter dropdown | ≈ 197×34, radius 8, bordered | `Dropdown size="field"` |
+| Emoji grid | 8 columns, square cells with gap ≈ 8, radius 8, emoji ≈ 40 px; section titles with a count | `ListView layout="grid"` |
+| Quicklink form | labels right-aligned ending at x = 175, fields 360 px from x = 195, textarea ≈ 100 px, inputs ≈ 34 px | `QuicklinkForm` |
+| Confirm dialog | ≈ (not measured) | 300 px panel, title, message, Delete and Cancel buttons, Cancel focused |
+
+## Extension icons
+
+Original artwork (not Raycast assets). Tokens `--color-icon-<tone>-top` / `-bottom` in `src/styles.css`, OKLCH, rendered with `bg-linear-to-b/oklch`.
+
+| Tone | Top | Bottom | Used by |
+|---|---|---|---|
+| blue | `oklch(0.72 0.15 252)` | `oklch(0.55 0.19 262)` | Applications |
+| orange | `oklch(0.8 0.15 62)` | `oklch(0.65 0.19 42)` | Calculator |
+| red | `oklch(0.72 0.17 22)` | `oklch(0.57 0.21 18)` | Clipboard History, Quit Openray |
+| yellow | `oklch(0.85 0.16 88)` | `oklch(0.7 0.17 62)` | Emoji & Symbols |
+| purple | `oklch(0.72 0.15 295)` | `oklch(0.54 0.2 290)` | Quicklinks |
+| green | `oklch(0.78 0.15 158)` | `oklch(0.6 0.15 165)` | Web Searches |
+| slate | `oklch(0.64 0.03 260)` | `oklch(0.45 0.03 262)` | Openray, Settings |
+
+Tile: 22 px with radius 6 (16 px with radius 4 in footers and tables), white glyph at stroke 2.25, inner highlight `0.5px` white 35 % on top and a `0.5px` black 20 % edge.
+
 ## Color
 
 | Token | Value | Source |

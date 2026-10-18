@@ -34,12 +34,21 @@
 - **Icons.** Icons come from the shell at 22 px × device pixel ratio. They are not cached on disk, so each one is extracted again after a restart. A letter tile shows when extraction fails.
 - **Rescans.** The index is re-scanned every time the launcher hides (about 0.4 s in a debug build, off the UI thread). There is no file watcher and no cache.
 
+## Built-in features
+
+- **Calculator.** Math, currency, time zones and colors only. No unit conversions, dates, history or syntax highlighting. Exchange rates come from open.er-api.com (free, no key, daily updates), cached for 6 hours; without network the last cached rates are used, and with none the currency card does not appear. The math card labels are unverified.
+- **Clipboard History.** Text, files and images are kept 7 days (pinned entries forever), the reference default. There is no retention setting, OCR, disabled-apps list, Paste and Keep Window Open, Paste as…, rename or tags. Delete All keeps pinned entries. Two copies of the same content within a second count as one, because one copy can raise several clipboard notifications.
+- **Paste.** Paste actions restore focus to the previous window and send Ctrl+V. Apps that run elevated ignore the injected keys.
+- **Emoji.** Names come from Unicode only, so searches match fewer words than the reference. No skin tones or pinned emoji.
+- **Quicklinks.** No icon picker, tags or `{selection}`; only the first argument gets a field. Favicons are fetched from Google's favicon service, and offline a link glyph shows.
+
 ## Launcher
 
 - **Position.** The default position rule is approximate: centered horizontally, with the top at 35.3% of the work area (`unk_341f…`). There is no drag-to-move or remembered position.
 - **Shown ex-style.** It keeps `WS_EX_TOOLWINDOW` (so it never appears in Alt+Tab) and Tauri's `WS_EX_ACCEPTFILES`. The reference drops TOOLWINDOW while shown.
 - **Show and hide.** Show latency was measured only on a debug build at 96 DPI.
-- **Missing UI.** There are no fallback commands, no command arguments and no compact mode. Fallbacks and arguments wait for commands that use them (Quicklinks, web search, Search Files).
+- **Missing UI.** There is no compact mode. Fallbacks are a fixed list (web searches and quicklinks with an argument) without a settings page. Arguments have a field only in Search Quicklinks, not inline in the root search.
+- **Leaving a command.** Escape or Backspace on an empty search returns to the root search, which is cleared.
 - **Action panel.** Configure Command, Configure Extension, Treat as Application and Hide/Quit/Force Quit are not offered. The panel has no noise texture, and its radius and shadow are estimates.
 - **App actions.** Show in File Explorer selects the Start Menu shortcut, not its target; the reference behavior is unverified. Packaged apps have no Run as Administrator, Show in File Explorer or Copy Path.
 - **Theme.** Only the dark theme exists, and only at the measured 100% DPI.

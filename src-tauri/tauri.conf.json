@@ -58,7 +58,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: http://appicon.localhost"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: http://appicon.localhost http://clipimg.localhost https://www.google.com https://*.gstatic.com; connect-src 'self' ipc: http://ipc.localhost https://open.er-api.com"
     }
   },
   "bundle": {

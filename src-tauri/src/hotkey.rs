@@ -102,7 +102,7 @@ mod hook {
         CallNextHookEx, GetMessageW, SetWindowsHookExW, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
     };
 
-    const MARKER: usize = 0x4F50_524E;
+    pub const MARKER: usize = 0x4F50_524E;
     const VK_UNASSIGNED: u8 = 0xE8;
 
     struct State {
@@ -218,7 +218,7 @@ pub fn bindings(pairs: &[(String, String)]) -> Result<Vec<(String, Hotkey)>, Str
     Ok(result)
 }
 
-pub use hook::{install, set_bindings, suspend};
+pub use hook::{install, set_bindings, suspend, MARKER};
 
 #[cfg(test)]
 mod tests {

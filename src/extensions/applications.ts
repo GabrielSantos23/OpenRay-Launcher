@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { Clipboard, Folder, Shield } from "lucide-react";
+import { Clipboard, Folder, LayoutGrid, Shield } from "lucide-react";
 import { defineExtension, type Action } from "../extension-api";
 import { showToast } from "../toast";
 
@@ -43,6 +43,7 @@ function appActions(app: InstalledApp): Action[][] {
 export default defineExtension({
   id: "applications",
   title: "Applications",
+  icon: { glyph: LayoutGrid, tone: "blue" },
   items: async () => {
     const apps = await invoke<InstalledApp[]>("list_apps");
     const iconSize = Math.round(22 * window.devicePixelRatio);

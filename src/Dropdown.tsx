@@ -43,7 +43,7 @@ export function Dropdown<T extends string>({
   options: DropdownOption<T>[];
   onChange: (value: T) => void;
   labelledBy: string;
-  size?: "default" | "small";
+  size?: "default" | "small" | "field";
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -126,11 +126,13 @@ export function Dropdown<T extends string>({
         className={`flex items-center gap-2 font-medium text-fg outline-offset-2 ${
           size === "small"
             ? "h-6 rounded-[5px] bg-list-hover pr-1.5 pl-2 shadow-[0_0_0_1px_var(--color-control-hover)]"
-            : `h-8 rounded-md pr-2 pl-3 ${open ? "bg-control" : "hover:bg-list-hover"}`
+            : size === "field"
+              ? "h-[34px] w-full rounded-lg border border-key-border bg-card px-3 text-13 hover:bg-list-hover"
+              : `h-8 rounded-md pr-2 pl-3 ${open ? "bg-control" : "hover:bg-list-hover"}`
         }`}
       >
         {selected?.icon}
-        <span className="truncate">{selected?.label}</span>
+        <span className={`truncate ${size === "field" ? "flex-1 text-left" : ""}`}>{selected?.label}</span>
         <ChevronDown aria-hidden="true" className="size-3 shrink-0 text-fg-60" />
       </button>
       {open && rect && (
