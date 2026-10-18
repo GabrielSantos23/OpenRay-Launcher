@@ -4,25 +4,40 @@
 @theme {
   --font-sans: "Inter Variable", "Segoe UI Variable", "Segoe UI", sans-serif;
 
-  --color-bg: #1f1f1f;
+  --color-backdrop: #333333;
+  --color-bg: color-mix(in srgb, #000000 40%, var(--color-backdrop));
+  --color-bg-bottom: color-mix(in srgb, #000000 40%, var(--color-backdrop));
   --color-fg: #ffffff;
-  --color-fg-60: rgb(255 255 255 / 60%);
-  --color-fg-40: rgb(255 255 255 / 40%);
-  --color-separator: rgb(255 255 255 / 10%);
-  --color-list-selection: rgb(255 255 255 / 10%);
-  --color-list-hover: rgb(255 255 255 / 5%);
-  --color-key-bg: rgb(255 255 255 / 10%);
-  --color-key-border: rgb(255 255 255 / 18%);
-  --color-footer-divider: rgb(255 255 255 / 20%);
-  --color-panel: #363636;
-  --color-panel-border: #5e5e5e;
-  --color-panel-separator: #4a4a4a;
-  --color-panel-selection: #4a4a4a;
-  --color-destructive: #ff6363;
+  --color-fg-60: rgb(from var(--color-fg) r g b / 60%);
+  --color-fg-40: rgb(from var(--color-fg) r g b / 40%);
+  --color-separator: rgb(from var(--color-fg) r g b / 10%);
+  --color-list-selection: rgb(from var(--color-fg) r g b / 10%);
+  --color-list-hover: rgb(from var(--color-fg) r g b / 5%);
+  --color-key-bg: rgb(from var(--color-fg) r g b / 10%);
+  --color-key-border: rgb(from var(--color-fg) r g b / 18%);
+  --color-footer-divider: rgb(from var(--color-fg) r g b / 20%);
+  --color-panel: color-mix(in srgb, #ffffff 10%, color-mix(in srgb, #000000 40%, var(--color-backdrop)));
+  --color-panel-border: color-mix(in srgb, var(--color-fg) 20%, var(--color-panel));
+  --color-panel-separator: color-mix(in srgb, var(--color-fg) 10%, var(--color-panel));
+  --color-panel-selection: color-mix(in srgb, var(--color-fg) 10%, var(--color-panel));
+  --color-red: #ff6363;
+  --color-destructive: var(--color-red);
   --color-green: #59d499;
   --color-yellow: #ffc531;
-  --color-red: #ff6363;
   --color-loader: #ffffff;
+  --color-accent: #4fa3f8;
+  --color-titlebar: rgb(from var(--color-fg) r g b / 5%);
+  --color-titlebar-line: rgb(from var(--color-fg) r g b / 14%);
+  --color-sidebar-border: rgb(from var(--color-fg) r g b / 10%);
+  --color-field: rgb(from var(--color-fg) r g b / 10%);
+  --color-nav-selection: rgb(from var(--color-fg) r g b / 5%);
+  --color-card: rgb(from var(--color-fg) r g b / 2.5%);
+  --color-card-separator: rgb(from var(--color-fg) r g b / 5.5%);
+  --color-control: rgb(from var(--color-fg) r g b / 10%);
+  --color-control-hover: rgb(from var(--color-fg) r g b / 15%);
+  --color-switch-on: var(--color-accent);
+  --color-switch-off: rgb(from var(--color-fg) r g b / 25%);
+  --color-close-hover: #c42b1c;
 
   --animate-loader: loader-sweep 1.5s ease-in-out infinite;
 
@@ -54,13 +69,16 @@
   --shadow-panel: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
+html {
+  background: linear-gradient(to bottom, var(--color-bg), var(--color-bg-bottom));
+}
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
   user-select: none;
@@ -75,8 +93,43 @@ body,
   background-image: radial-gradient(farthest-side at center, var(--glow), rgb(from var(--glow) r g b / 0%));
 }
 
+@utility recorder-conflict {
+  background-image: linear-gradient(to bottom, rgb(from var(--color-red) r g b / 15%), rgb(from var(--color-red) r g b / 8%), rgb(from var(--color-red) r g b / 0%));
+}
+
+@utility recorder-saved {
+  background-image: linear-gradient(to bottom, rgb(from var(--color-green) r g b / 15%), rgb(from var(--color-green) r g b / 8%), rgb(from var(--color-green) r g b / 0%));
+}
+
 @utility hud-glow {
   background-image:
     radial-gradient(45% 30% at 50% -10%, rgb(from var(--glow) r g b / 26%), rgb(from var(--glow) r g b / 0%)),
     radial-gradient(100% 90% at 50% -15%, rgb(from var(--glow) r g b / 26%), rgb(from var(--glow) r g b / 0%));
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  min-height: 16px;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+  background-color: transparent;
+}
+
+:hover::-webkit-scrollbar-thumb {
+  background-color: var(--color-fg-40);
+}
+
+::-webkit-scrollbar-track:hover {
+  background-color: var(--color-list-hover);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

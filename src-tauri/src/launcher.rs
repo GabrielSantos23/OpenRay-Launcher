@@ -1,12 +1,13 @@
+use crate::store::{ShowOn, Store};
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow};
-use windows::Win32::Foundation::{COLORREF, HWND};
+use windows::Win32::Foundation::{COLORREF, HWND, RECT};
 use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_TRANSITIONS_FORCEDISABLED, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
 };
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, GetAncestor, GetForegroundWindow, GetShellWindow, GetWindowLongPtrW, GetWindowThreadProcessId, IsWindow,
+    BringWindowToTop, GetAncestor, GetForegroundWindow, GetShellWindow, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, IsWindow,
     SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE,
     GWL_STYLE, HWND_NOTOPMOST, HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
     SWP_NOZORDER, SW_SHOWNOACTIVATE, WS_CAPTION, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
@@ -69,11 +70,20 @@ pub fn init(window: &WebviewWindow) {
     }
 }
 
-fn place(app: &AppHandle, window: &WebviewWindow) {
-    let monitor = app
-        .cursor_position()
-        .ok()
-        .and_then(|p| app.monitor_from_point(p.x, p.y).ok().flatten())
+fn active_window_center(previous: HWND) -> Option<(f64, f64)> {
+    let mut rect = RECT::default();
+    unsafe { GetWindowRect(previous, &mut rect).ok()? };
+    Some((f64::from(rect.left + rect.right) / 2.0, f64::from(rect.top + rect.bottom) / 2.0))
+}
+
+fn place(app: &AppHandle, window: &WebviewWindow, previous: HWND) {
+    let point = match app.state::<Store>().settings().show_on {
+        ShowOn::MouseScreen => app.cursor_position().ok().map(|p| (p.x, p.y)),
+        ShowOn::ActiveScreen => active_window_center(previous).or_else(|| app.cursor_position().ok().map(|p| (p.x, p.y))),
+        ShowOn::PrimaryScreen => None,
+    };
+    let monitor = point
+        .and_then(|(x, y)| app.monitor_from_point(x, y).ok().flatten())
         .or_else(|| window.primary_monitor().ok().flatten());
     let (Some(monitor), Ok(size)) = (monitor, window.outer_size()) else { return };
     let area = monitor.work_area();
@@ -116,7 +126,7 @@ pub fn show(app: &AppHandle) {
         if previous != hwnd {
             PREVIOUS_FOREGROUND.store(previous.0 as isize, Ordering::SeqCst);
         }
-        place(app, &window);
+        place(app, &window, previous);
     }
     SHOWN.store(true, Ordering::SeqCst);
     set_hidden_styles(hwnd, false);

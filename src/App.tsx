@@ -9,6 +9,7 @@ import { loadCommands } from "./registry";
 import { search, type Frecency } from "./search";
 import { setLauncherVisible, showToast, useToast } from "./toast";
 import { FooterToast } from "./FooterToast";
+import { commandPrefs, isEnabled, useSettings } from "./settings";
 
 function Logo() {
   return (
@@ -68,6 +69,7 @@ export default function App() {
   const listRef = useRef<HTMLDivElement>(null);
   const keepSelected = useRef<string | null>(null);
   const toast = useToast();
+  const [settings] = useSettings();
 
   const refresh = useCallback(async () => {
     setLoading((n) => n + 1);
@@ -105,7 +107,24 @@ export default function App() {
     };
   }, [refresh]);
 
-  const sections = useMemo(() => search(commands, query, frecency, favorites), [commands, query, frecency, favorites]);
+  const enabled = useMemo(() => (settings ? commands.filter((c) => isEnabled(settings, c.key, c.extensionId)) : commands), [commands, settings]);
+  const aliases = useMemo(
+    () => Object.fromEntries(enabled.map((c) => [c.key, settings ? commandPrefs(settings, c.key).alias : ""])),
+    [enabled, settings],
+  );
+  const sections = useMemo(() => search(enabled, query, frecency, favorites, aliases), [enabled, query, frecency, favorites, aliases]);
+  const runByKey = useRef<(key: string) => void>(() => {});
+  runByKey.current = (key) => {
+    const command = enabled.find((c) => c.key === key);
+    if (command) runAction(command, { id: "primary", title: command.primaryActionTitle, run: command.run });
+  };
+
+  useEffect(() => {
+    const unlisten = listen<string>("run-command", (event) => runByKey.current(event.payload));
+    return () => {
+      unlisten.then((off) => off());
+    };
+  }, []);
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
   const current = flat[Math.min(selected, flat.length - 1)];
 
@@ -178,14 +197,24 @@ export default function App() {
       setSelected((i) => Math.max(i - 1, 0));
     } else if (event.key === "Escape") {
       event.preventDefault();
-      invoke("hide_launcher", { restoreFocus: true });
+      if (query && settings?.escapeKeyBehavior !== "close-and-pop-to-root") {
+        setQuery("");
+        setSelected(0);
+      } else {
+        invoke("hide_launcher", { restoreFocus: true });
+      }
     }
   }
 
   let index = -1;
 
   return (
-    <main className="relative flex h-full flex-col bg-bg text-fg">
+    <main
+      onMouseDown={(e) => {
+        if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+      }}
+      className="relative flex h-full flex-col text-fg"
+    >
       <h1 className="sr-only">Openray</h1>
       <header className="relative flex h-header shrink-0 items-center gap-3 border-b border-separator px-search-inset">
         <Logo />
@@ -244,7 +273,13 @@ export default function App() {
       </div>
 
       <footer className="relative isolate flex h-footer shrink-0 items-center gap-2 overflow-hidden pt-px pr-[9px] pb-px pl-3 text-13 before:absolute before:inset-x-0 before:top-0 before:-z-20 before:h-px before:bg-separator">
-        {toast ? <FooterToast /> : <Logo />}
+        {toast ? (
+          <FooterToast />
+        ) : (
+          <button type="button" tabIndex={-1} aria-label="Open Settings" title="Open Settings" onClick={() => invoke("open_settings")} className="-m-1 rounded-[6px] p-1 hover:bg-list-hover">
+            <Logo />
+          </button>
+        )}
         {current && (
           <>
             <span className="ml-auto flex shrink-0 items-center gap-2 font-medium">

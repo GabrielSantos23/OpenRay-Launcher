@@ -106,9 +106,9 @@ mod hook {
     const VK_UNASSIGNED: u8 = 0xE8;
 
     struct State {
-        hotkey: Hotkey,
-        matcher: Matcher,
-        fired: Sender<()>,
+        bindings: Vec<(String, Hotkey, Matcher)>,
+        suspended: bool,
+        fired: Sender<(String, Hotkey)>,
     }
 
     static STATE: OnceLock<Mutex<State>> = OnceLock::new();
@@ -121,21 +121,32 @@ mod hook {
         Modifiers { ctrl: pressed(0x11), alt: pressed(0x12), shift: pressed(0x10), win: pressed(0x5B) || pressed(0x5C) }
     }
 
+    fn decide(state: &mut State, vk: u32, down: bool) -> bool {
+        if state.suspended {
+            return false;
+        }
+        let modifiers = current_modifiers();
+        for (id, hotkey, matcher) in state.bindings.iter_mut() {
+            match matcher.on_key(hotkey, vk, down, modifiers) {
+                Decision::PassThrough => {}
+                Decision::Swallow => return true,
+                Decision::Fire => {
+                    let _ = state.fired.send((id.clone(), *hotkey));
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     unsafe extern "system" fn proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         if code >= 0 {
             let event = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
             if event.dwExtraInfo != MARKER {
                 let down = wparam.0 as u32 == WM_KEYDOWN || wparam.0 as u32 == WM_SYSKEYDOWN;
                 if let Some(state) = STATE.get() {
-                    let mut state = state.lock().unwrap();
-                    let hotkey = state.hotkey;
-                    match state.matcher.on_key(&hotkey, event.vkCode, down, current_modifiers()) {
-                        Decision::PassThrough => {}
-                        Decision::Swallow => return LRESULT(1),
-                        Decision::Fire => {
-                            let _ = state.fired.send(());
-                            return LRESULT(1);
-                        }
+                    if decide(&mut state.lock().unwrap(), event.vkCode, down) {
+                        return LRESULT(1);
                     }
                 }
             }
@@ -143,22 +154,34 @@ mod hook {
         unsafe { CallNextHookEx(None, code, wparam, lparam) }
     }
 
-    pub fn install(hotkey: Hotkey, on_fire: Box<dyn Fn() + Send>) -> Result<(), String> {
-        let (fired, fired_rx) = channel();
+    pub fn set_bindings(bindings: Vec<(String, Hotkey)>) {
+        if let Some(state) = STATE.get() {
+            state.lock().unwrap().bindings = bindings.into_iter().map(|(id, hotkey)| (id, hotkey, Matcher::default())).collect();
+        }
+    }
+
+    pub fn suspend(suspended: bool) {
+        if let Some(state) = STATE.get() {
+            state.lock().unwrap().suspended = suspended;
+        }
+    }
+
+    pub fn install(on_fire: Box<dyn Fn(String) + Send>) -> Result<(), String> {
+        let (fired, fired_rx) = channel::<(String, Hotkey)>();
         STATE
-            .set(Mutex::new(State { hotkey, matcher: Matcher::default(), fired }))
+            .set(Mutex::new(State { bindings: Vec::new(), suspended: false, fired }))
             .map_err(|_| "keyboard hook already installed".to_string())?;
         std::thread::Builder::new()
             .name("openray-hotkey-dispatch".into())
             .spawn(move || {
-                for () in fired_rx {
+                for (id, hotkey) in fired_rx {
                     if hotkey.modifiers.alt || hotkey.modifiers.win {
                         unsafe {
                             keybd_event(VK_UNASSIGNED, 0, Default::default(), MARKER);
                             keybd_event(VK_UNASSIGNED, 0, KEYEVENTF_KEYUP, MARKER);
                         }
                     }
-                    on_fire();
+                    on_fire(id);
                 }
             })
             .map_err(|e| e.to_string())?;
@@ -183,7 +206,19 @@ mod hook {
     }
 }
 
-pub use hook::install;
+pub fn bindings(pairs: &[(String, String)]) -> Result<Vec<(String, Hotkey)>, String> {
+    let mut result: Vec<(String, Hotkey)> = Vec::new();
+    for (id, text) in pairs.iter().filter(|(_, text)| !text.trim().is_empty()) {
+        let hotkey = parse(text)?;
+        if result.iter().any(|(_, existing)| *existing == hotkey) {
+            return Err(format!("{text} is already in use"));
+        }
+        result.push((id.clone(), hotkey));
+    }
+    Ok(result)
+}
+
+pub use hook::{install, set_bindings, suspend};
 
 #[cfg(test)]
 mod tests {
@@ -209,6 +244,15 @@ mod tests {
         assert!(parse("Alt+Banana").is_err());
         assert!(parse("Alt+A+B").is_err());
         assert!(parse("Alt+F25").is_err());
+    }
+
+    #[test]
+    fn bindings_skip_empty_and_reject_duplicates() {
+        let pairs = |list: &[(&str, &str)]| list.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect::<Vec<_>>();
+        let ok = bindings(&pairs(&[("launcher", "Alt+Space"), ("applications/a", ""), ("applications/b", "Ctrl+Alt+B")])).unwrap();
+        assert_eq!(ok.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>(), ["launcher", "applications/b"]);
+        assert!(bindings(&pairs(&[("launcher", "Alt+Space"), ("applications/a", "alt + space")])).is_err());
+        assert!(bindings(&pairs(&[("applications/a", "Banana")])).is_err());
     }
 
     #[test]

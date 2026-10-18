@@ -64,6 +64,40 @@ Measured from user-supplied screenshots of Raycast 2.8.2.0 at 100 % scale (750×
 | Loader | 1 px `linear-gradient(to right, transparent 25%, #FFF, transparent 75%)`, ±35 % over 1.5 s ease-in-out, fade 0.3 s, 300 ms delay | `loader-gradient animate-loader`, overlays the search separator (`-bottom-px`) ≈ |
 | Status colors | green `#59D499`, yellow `#FFC531`, red `#FF6363` (theme `bundled-raycast-dark`) | `--color-green`, `--color-yellow`, `--color-red` |
 
+## Settings window
+
+Measured from the user's General screenshot at 100 % (x and y include the 1 px window border).
+
+| Element | Reference | Openray |
+|---|---|---|
+| Title bar | 40 px, `#2A2A2A` (fg 5 %), line `#3F3F3F` 2 px above its bottom edge; “Settings” at x=16 | `h-10 bg-titlebar`, `after:bottom-px` line |
+| Sidebar | 230 px including a 1 px `#363636` border; padding ≈ 9–10 | `w-[230px] border-sidebar-border px-[9px]` |
+| Sidebar search | y 57–88 (32 px), `#363636`, radius ≈ 6 | `h-8 bg-field rounded-md` |
+| Nav item | 32 px, 22 px icon, text at x≈46, selection fg 5 % | `h-8 gap-2 px-1.5 bg-nav-selection` |
+| Content inset | 16 px from sidebar and title bar (`--content-padding-x`) | `p-4` |
+| Card | fg 2.5 % (`#242424` on `#1F1F1F`), radius ≈ 8 | `bg-card rounded-lg` |
+| Row | 46 px + 1 px separator `#303030`; padding 12 | `min-h-[47px] px-3 border-card-separator` |
+| Switch | 28×16; on = system accent (`#E2241A` here, `AccentPalette[3]`), white knob ≈ 10 px; off ring fg ≈ 25 % | `w-7 h-4 bg-switch-on` |
+| Button | 24 px, `#3A3A3A` (fg 10 % on the card) | `h-6 bg-control` |
+| Commands table | Alias column at x=1073, Hotkey at x=1181, checkbox right edge 12 px from the card | columns `108px` / `133px` / `40px` |
+
+## Theme-derived colors
+
+From `css-C58pR_1e.css` and the theme CSS builder in `contrast-improvement-CQ0EgiTy.js`. The window background is `--bg-40` over the Windows backdrop (`#333` dark, `#CCC` light, opaque variant). For Raycast Dark that gives `#1F1F1F`, the value measured earlier.
+
+| Token | Rule | Openray |
+|---|---|---|
+| Window | `linear-gradient(bg-40, bg-secondary-40)` over the backdrop | `--color-bg` → `--color-bg-bottom` on `html` |
+| Popover / menu | `#FFFFFF1A` overlay over `bg-secondary-40` over `#333` / `#E6E6E6` | `--color-panel`; border, separator and selection mix fg 20/10/10 % |
+| Surfaces | `--fg-5`, `--fg-10`, `--fg-2.5` etc. relative to the theme foreground | `rgb(from var(--color-fg) …)` tokens |
+| Accent | system accent, else theme accent `#4FA3F8` | `--color-accent` |
+| Recorder tint | conflict red 15 % → 8 % → 0, saved green likewise | `recorder-conflict`, `recorder-saved` utilities |
+| Recorder key | 24 px, min-width 24, padding 0 6, fg 10 %, radius 4, inset top/bottom half-pixel highlights | `KeyCap` |
+| Table hotkey | button max 145 × 24, padding 6, keycaps 20 px high, min 16 wide, 1 px apart; clear icon 12 px | `HotkeyRecorder variant="cell"` |
+| Dropdown trigger | ghost: 32 px, padding 12/8, gap 8; small: 24 px, padding 8/6 | `Dropdown` |
+| Menu | search field 40 px, padding 16, separator; items like the action panel; max height 280 | `Dropdown` |
+| Scrollbar | thumb 6 px fg 40 % rounded; 11 px + fg 5 % track on hover | `::-webkit-scrollbar` 10 px with 2 px transparent border |
+
 ## Color
 
 | Token | Value | Source |

@@ -61,6 +61,11 @@ describe("search", () => {
     expect(section.items.map((c) => c.title)).toEqual(["Notepad", "Notion", "Windows Terminal"]);
   });
 
+  it("puts an alias prefix match above title matches", () => {
+    const [section] = search(all, "no", {}, [], { [terminal.key]: "nope" });
+    expect(section.items.map((c) => c.title)).toEqual(["Windows Terminal", "Notepad", "Notion"]);
+  });
+
   it("breaks score ties with frecency", () => {
     const [section] = search(all, "no", { [notion.key]: 5 });
     expect(section.items.map((c) => c.title)).toEqual(["Notion", "Notepad", "Windows Terminal"]);

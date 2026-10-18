@@ -7,15 +7,67 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const HALF_LIFE_MS: f64 = 864e6;
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum ShowOn {
+    #[default]
+    MouseScreen,
+    ActiveScreen,
+    PrimaryScreen,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum EscapeKeyBehavior {
+    #[default]
+    PopBackOrClose,
+    CloseAndPopToRoot,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum Appearance {
+    #[default]
+    System,
+    Dark,
+    Light,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct CommandPrefs {
+    pub alias: String,
+    pub hotkey: String,
+    pub disabled: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[serde(default)]
+#[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     pub hotkey: String,
+    pub show_in_tray: bool,
+    pub show_on: ShowOn,
+    pub escape_key_behavior: EscapeKeyBehavior,
+    pub escape_key_closes_window: bool,
+    pub appearance: Appearance,
+    pub theme_dark_id: String,
+    pub theme_light_id: String,
+    pub commands: HashMap<String, CommandPrefs>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { hotkey: "Alt+Space".into() }
+        Self {
+            hotkey: "Alt+Space".into(),
+            show_in_tray: true,
+            show_on: ShowOn::default(),
+            escape_key_behavior: EscapeKeyBehavior::default(),
+            escape_key_closes_window: true,
+            appearance: Appearance::default(),
+            theme_dark_id: "bundled-raycast-dark".into(),
+            theme_light_id: "bundled-raycast-light".into(),
+            commands: HashMap::new(),
+        }
     }
 }
 
@@ -51,7 +103,7 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> std::io::Result<()> {
 
 pub struct Store {
     dir: PathBuf,
-    pub settings: Settings,
+    settings: Mutex<Settings>,
     frecency: Mutex<HashMap<String, Visit>>,
     favorites: Mutex<Vec<String>>,
 }
@@ -66,7 +118,18 @@ impl Store {
         }
         let frecency = Mutex::new(read_json(&dir.join("frecency.json")));
         let favorites = Mutex::new(read_json(&dir.join("favorites.json")));
-        Self { dir, settings, frecency, favorites }
+        Self { dir, settings: Mutex::new(settings), frecency, favorites }
+    }
+
+    pub fn settings(&self) -> Settings {
+        self.settings.lock().unwrap().clone()
+    }
+
+    pub fn set_settings(&self, value: Settings) -> std::io::Result<()> {
+        let mut settings = self.settings.lock().unwrap();
+        write_json(&self.dir.join("settings.json"), &value)?;
+        *settings = value;
+        Ok(())
     }
 
     pub fn visit(&self, key: &str, now_ms: u64) -> std::io::Result<f64> {
@@ -135,9 +198,23 @@ mod tests {
     #[test]
     fn writes_default_settings_on_first_run_and_reads_edits() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(Store::load(dir.path().to_path_buf()).settings.hotkey, "Alt+Space");
-        fs::write(dir.path().join("settings.json"), r#"{"hotkey":"Ctrl+Space"}"#).unwrap();
-        assert_eq!(Store::load(dir.path().to_path_buf()).settings.hotkey, "Ctrl+Space");
+        assert_eq!(Store::load(dir.path().to_path_buf()).settings().hotkey, "Alt+Space");
+        fs::write(dir.path().join("settings.json"), r#"{"hotkey":"Ctrl+Space","showOn":"primary-screen"}"#).unwrap();
+        let settings = Store::load(dir.path().to_path_buf()).settings();
+        assert_eq!(settings.hotkey, "Ctrl+Space");
+        assert_eq!(settings.show_on, ShowOn::PrimaryScreen);
+        assert!(settings.show_in_tray && settings.escape_key_closes_window);
+    }
+
+    #[test]
+    fn saved_settings_survive_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::load(dir.path().to_path_buf());
+        let mut settings = store.settings();
+        settings.commands.insert("applications/a".into(), CommandPrefs { alias: "a".into(), hotkey: "Ctrl+Alt+A".into(), disabled: true });
+        settings.escape_key_behavior = EscapeKeyBehavior::CloseAndPopToRoot;
+        store.set_settings(settings.clone()).unwrap();
+        assert_eq!(Store::load(dir.path().to_path_buf()).settings(), settings);
     }
 
     #[test]

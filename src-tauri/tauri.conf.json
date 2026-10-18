@@ -43,6 +43,18 @@
         "focus": false,
         "shadow": false,
         "backgroundColor": "#1f1f1f"
+      },
+      {
+        "label": "settings",
+        "title": "Openray Settings",
+        "width": 1370,
+        "height": 836,
+        "minWidth": 800,
+        "minHeight": 500,
+        "decorations": false,
+        "visible": false,
+        "center": true,
+        "backgroundColor": "#1f1f1f"
       }
     ],
     "security": {

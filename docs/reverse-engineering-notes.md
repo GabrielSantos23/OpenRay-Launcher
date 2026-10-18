@@ -134,6 +134,30 @@ Measured on 2026-10-18 for an injected Alt+Space.
   - Each preference is `bg({default, storage:"synced"|"local"})`.
   - General settings keys include `globalHotkey`, `windowMode` (`compact`/`expanded`), `windowPresentationMode`, `popToRootTimeout`, `escapeKeyBehavior`, `escapeKeyClosesWindow`, `showFavoritesInCompactMode`, `faviconProvider`, `uiZoom`, `themeDarkId`/`themeLightId`, `openAtLogin` and `showInMenuBar`.
 
+### Settings window
+
+Sources are in `Raycast\frontend\`.
+
+- **Routes (`settings-routes-DC7HQqEu.js`).** `/general`, `/launcher`, `/shortcuts`, `/keyboard`, `/advanced`, `/about`, plus `/extensions/<id>` per built-in extension.
+- **General defaults (`register-query-client-k6wPQZTD.js`, `gn`).** `openAtLogin: true`, `showInMenuBar: true`, `windowMode: "expanded"`, `windowPresentationMode: "mouse-screen"`, `popToRootTimeout: 90`, `escapeKeyBehavior: "pop-back-or-close"`, `escapeKeyClosesWindow: true`, `navigationBindings: "emacs"`, `pageNavigationKeys: "square-brackets"`, `rootSearchSensitivity: "high"`, `uiZoom: 1`. `openAtLogin` changes go to the host through `settings.openAtLogin`.
+- **Option lists.**
+  - `keyboard-settings-view-Bzez7uVc.js`: Escape `pop-back-or-close` (“Navigate back or close window”) and `close-and-pop-to-root` (“Close window and pop to root”).
+  - `launcher-settings-view-DyZc2mbk.js`: Show on `mouse-screen`, `active-screen`, `primary-screen`; pop-to-root 0, 5, 15, 30, 60, 90, 120 and 180 s; sensitivity low, medium and high.
+- **Row copy.** Titles and descriptions are in `keyboard-settings-page-definition-FqDoobrW.js` and `launcher-settings-page-definition-6EFT4SqQ.js`. Escape Key Closes Window reads “Dismiss windows such as AI Chat, Notes, and Settings by pressing the Escape key”.
+- **Layout CSS.**
+  - `settings-ui-OsI-JiRS.css`: row min-height 46·spx with padding 12, card `rgb(fg / 2.5%)`, section gap 4, section title min-height 32.
+  - `settings-window-Bw5-XMVM.css`: nav link 32 px with padding 6 and gap 8, icon 22, selection `--selection-5`; on Windows the title bar uses `--fg-5` with a 1 px separator and the sidebar has a right border.
+- **Hotkey recorder (`keyboard-shortcut-recorder-DpQf5nsV.js`).**
+  - The popover is 320×170·spx, `side: top`, `align: center`, with an arrow.
+  - Messages: “e.g.” with cycling Single Step / Single Key / Double Tap hints; “Press Backspace to delete” + keys + “or record a new hotkey”; “Already used by **name**” + “Overwrite it or record a new hotkey” (command conflict) or “Discard or record a new hotkey”; “This key combination isn't supported”.
+  - Keys: Escape discards, Backspace clears, Enter overwrites on a command conflict.
+  - On save it shows the `saved` green tint for 200 ms (`xe=200`). The trigger text is “Recording…” while open.
+- **Select (`select-kjjMNEfX.js`).** A popover with a menu whose search field is on by default and max height 280. Arrow keys on the closed trigger change the value; Space and Enter open it; typing a letter opens it with that search term.
+- **Scroll area (`scroll-area-D6piR2l3.css`).** A custom overlay scrollbar, 6 px wide (`--thumb-size`) with an `--fg-40` thumb, widening to 11 px with an `--fg-5` track on hover after a 2 s delay. Native scrollbars are hidden.
+- **Themes (`contrast-improvement-CQ0EgiTy.js`).** Eight bundled themes (`bn`). `Dn()` writes `--bg`, `--bg-secondary`, `--fg`, `--theme-accent`, `--selection`, `--loader` and the status colors. `css-C58pR_1e.css` sets `--color-window-bg: var(--bg-40)` over a Windows backdrop of `#333c` (`#333` with reduced transparency), which explains the measured `#1F1F1F`. `--accent` is `var(--color-system-accent, var(--theme-accent))`.
+- **Accent.** On the dev machine `AccentPalette` entry 3 is `E2241A`, the switch color in the user's screenshot.
+- **Unknowns.** Window size and position (`unk_d92d0ead…`); alias ranking (`unk_26be2170…`).
+
 ### Frecency
 
 From `backend/index.mjs`, a class with `prefetch`, `getScore` and `decayedScore`:
@@ -229,6 +253,8 @@ Sources are under `Raycast\frontend\`. Class names are CSS-module hashes.
 | `unk_31815e75…` | Which bundle commands are visible on Windows | medium |
 | `unk_ce5e0942…` | Focus acquisition sequence on show (NOACTIVATE while parked, UIAccess helper) | high |
 | `unk_3a8f3266…` | Screen placement of the HUD portal window | low |
+| `unk_d92d0ead…` | Settings window default size and position (switch color resolved: system accent) | low |
+| `unk_26be2170…` | Alias matching and rank in root search | low |
 
 Not yet investigated:
 

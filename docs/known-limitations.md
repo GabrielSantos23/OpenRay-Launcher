@@ -10,7 +10,20 @@
   - The hook only decides and returns; a dispatcher thread does the work. Doing work inside the hook made Windows drop it after the first press.
   - For Alt and Win chords, an unassigned key (0xE8) is injected so that releasing the modifier does not open the menu bar or Start menu.
 - **Shared hotkey.** If another running app hooks the same chord (Raycast, RaycastMini on Alt+Space), the most recently installed hook wins. Raycast appears to re-hook, so the two alternate. Use a different hotkey or quit the other launcher. On the dev machine, Raycast was moved to Ctrl+Alt+Space so that Openray keeps Alt+Space.
-- **Settings.** The hotkey is set by `hotkey` in `%APPDATA%\dev.openray.app\settings.json`. An invalid value shows in the tray tooltip. There is no settings UI, and changes need a restart.
+- **Settings.** The hotkey is recorded in Settings › General and applies at once. The recorder pauses the hook while it listens. Chords that Windows keeps for itself (Win+L, Ctrl+Alt+Del, some Win+letter shortcuts) never reach the page and cannot be recorded.
+- **Startup.** If any saved hotkey in `settings.json` is invalid at startup, none are registered and the tray tooltip says so. The Settings window refuses to save an invalid or duplicate hotkey.
+
+## Settings window
+
+- **Scope.** Only settings that change real behavior are shown: General (Open at Login, Show in System Tray, hotkey), Launcher (Show Openray on), Shortcuts (alias, hotkey, enable per command and extension) and Keyboard (Escape behavior, Escape closes window). Appearance, window mode, interface size, pop-to-root, sensitivity, search history, file search, fallbacks, navigation bindings, hyper key, input source, Advanced and About wait for the features behind them.
+- **Open at Login.** It is off until the user turns it on (the reference defaults to on). It points at the running exe, so a debug build registers the debug path.
+- **Controls.** Dropdowns and the hotkey recorder are rebuilt from the reference CSS; widths, alignment, blur and open animations are estimates. Sidebar icons are Lucide glyphs on tiles, not Raycast assets. Back and forward only move between pages visited in this session.
+- **Size.** The window opens at 1370×836 ≈ (taken from one screenshot) and its size is not remembered.
+- **Themes.** The eight bundled themes are available. Theme Studio, custom themes and the reference's contrast-adjusted status colors are not. The native window background is fixed at `#1F1F1F`, so a light theme can flash dark for a frame when a window first paints.
+- **Accent.** The accent is read once at startup from `AccentPalette`. Changing it in Windows needs a restart of Openray.
+- **Scrollbars.** They take a 10 px gutter instead of overlaying the content, do not widen on hover, and show while hovered instead of while scrolling.
+- **Hotkey recorder.** Only modifier + key chords. Single keys, double taps and per-side modifiers are not supported.
+- **Command hotkeys.** A hotkey runs the command's primary action through the launcher webview. That webview must have loaded its commands, which happens shortly after startup.
 
 ## Applications
 

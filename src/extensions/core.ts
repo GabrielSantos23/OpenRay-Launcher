@@ -6,6 +6,15 @@ export default defineExtension({
   title: "Openray",
   commands: [
     {
+      id: "settings",
+      title: "Settings",
+      subtitle: "Openray",
+      keywords: ["preferences", "hotkey", "options"],
+      kind: "Command",
+      primaryActionTitle: "Open Command",
+      run: () => invoke("open_settings"),
+    },
+    {
       id: "quit",
       title: "Quit Openray",
       subtitle: "Openray",

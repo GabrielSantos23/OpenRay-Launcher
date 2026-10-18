@@ -48,9 +48,10 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 |---|---|---|
 | Lifecycle | `src-tauri/src/lib.rs` | Single instance, tray, startup hidden, quit |
 | Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
-| Global hotkey | `src-tauri/src/hotkey.rs` | Parse `settings.json` hotkey, WH_KEYBOARD_LL hook thread, dispatcher thread |
+| Global hotkey | `src-tauri/src/hotkey.rs` | Parse hotkeys, bindings list (launcher + command hotkeys, duplicates rejected), WH_KEYBOARD_LL hook thread, dispatcher thread, suspend while recording |
 | Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, AppsFolder (MSIX) scan, shell icons served on `appicon://`, ShellExecute, DWM attributes |
-| Settings and persistence | `src-tauri/src/store.rs` | `settings.json` (hotkey), `frecency.json`, `favorites.json` in `%APPDATA%\dev.openray.app` |
+| Settings and persistence | `src-tauri/src/store.rs`, `src-tauri/src/registry.rs` | `settings.json` (hotkey, tray, show-on screen, Escape options, per-command alias/hotkey/disabled), `frecency.json`, `favorites.json` in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login; Windows accent from `AccentPalette` |
+| Settings window | `src/SettingsWindow.tsx`, `src/settings.ts`, `src/Dropdown.tsx`, `src/HotkeyRecorder.tsx` | `settings` Tauri window: pages, hotkey recorder, commands table; `useSettings` keeps every window in sync through the `settings-changed` event |
 | Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
 | Extension API | `src/extension-api.ts` | Types and `defineExtension` |
@@ -58,6 +59,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |
 | Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
 | Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
+| Themes | `src/theme.ts` | Bundled theme data, `ThemeRoot` applies CSS variables in every window from settings, system appearance and accent |
 | Launcher UI | `src/App.tsx` | Search input, list, footer, loader, keyboard |
 
 The Rust core exposes Tauri commands:
@@ -73,6 +75,10 @@ The Rust core exposes Tauri commands:
 - `hide_launcher`
 - `show_hud`, `hud_present`, `hud_hide`
 - `quit_app`
+- `settings_get`, `settings_set` (validates hotkeys, saves, re-registers, emits `settings-changed`)
+- `hotkeys_suspend`, `login_item_get`, `login_item_set`, `open_settings`, `system_accent_color`
+
+The hook dispatcher toggles the launcher for the `launcher` binding and emits `run-command` (the command key) to the launcher window for command hotkeys.
 
 ## Extension API (internal, v0)
 

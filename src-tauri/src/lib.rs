@@ -1,11 +1,12 @@
 mod apps;
+mod registry;
 mod hotkey;
 mod hud;
 mod launcher;
 mod store;
 
 use std::collections::HashMap;
-use store::Store;
+use store::{Settings, Store};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
@@ -30,7 +31,6 @@ fn serve_app_icon(request: tauri::http::Request<Vec<u8>>, responder: tauri::UriS
         responder.respond(response.expect("valid icon response"));
     });
 }
-
 
 #[tauri::command]
 fn launch_app(path: String, as_admin: Option<bool>) -> Result<(), String> {
@@ -92,16 +92,88 @@ fn quit_app(app: AppHandle) {
     app.exit(0)
 }
 
+const SETTINGS_LABEL: &str = "settings";
+const LAUNCHER_BINDING: &str = "launcher";
+
+fn hotkey_bindings(settings: &Settings) -> Result<Vec<(String, hotkey::Hotkey)>, String> {
+    let disabled = |key: &str| {
+        let extension = key.split('/').next().unwrap_or(key);
+        [key, extension].iter().any(|k| settings.commands.get(*k).is_some_and(|p| p.disabled))
+    };
+    let mut pairs = vec![(LAUNCHER_BINDING.to_string(), settings.hotkey.clone())];
+    let mut commands: Vec<_> = settings.commands.iter().filter(|(key, _)| key.contains('/') && !disabled(key)).collect();
+    commands.sort_by_key(|(key, _)| key.as_str());
+    pairs.extend(commands.into_iter().map(|(key, prefs)| (key.clone(), prefs.hotkey.clone())));
+    hotkey::bindings(&pairs)
+}
+
+fn apply_settings(app: &AppHandle, settings: &Settings) -> Result<(), String> {
+    hotkey::set_bindings(hotkey_bindings(settings)?);
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_visible(settings.show_in_tray);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn settings_get(store: State<Store>) -> Settings {
+    store.settings()
+}
+
+#[tauri::command]
+fn settings_set(app: AppHandle, settings: Settings, store: State<Store>) -> Result<(), String> {
+    hotkey_bindings(&settings)?;
+    store.set_settings(settings.clone()).map_err(|e| e.to_string())?;
+    apply_settings(&app, &settings)?;
+    app.emit("settings-changed", settings).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn hotkeys_suspend(suspended: bool) {
+    hotkey::suspend(suspended)
+}
+
+#[tauri::command]
+fn system_accent_color() -> Option<String> {
+    registry::accent_color()
+}
+
+#[tauri::command]
+fn login_item_get() -> bool {
+    registry::login_item_enabled()
+}
+
+#[tauri::command]
+fn login_item_set(enabled: bool) -> Result<(), String> {
+    registry::set_login_item(enabled)
+}
+
+fn show_settings(app: &AppHandle) {
+    launcher::hide(app, false);
+    if let Some(window) = app.get_webview_window(SETTINGS_LABEL) {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+#[tauri::command]
+fn open_settings(app: AppHandle) {
+    show_settings(&app)
+}
+
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open Openray", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Openray", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &settings, &quit])?;
     let mut tray = TrayIconBuilder::with_id("main")
         .tooltip("Openray")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => launcher::show(app),
+            "settings" => show_settings(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -123,7 +195,7 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol("appicon", |_ctx, request, responder| serve_app_icon(request, responder))
         .setup(|app| {
             let store = Store::load(app.path().app_data_dir()?);
-            let hotkey = store.settings.hotkey.clone();
+            let settings = store.settings();
             app.manage(store);
 
             if let Some(window) = app.get_webview_window(launcher::LABEL) {
@@ -135,19 +207,21 @@ pub fn run() {
             setup_tray(app)?;
 
             let handle = app.handle().clone();
-            let registered = hotkey::parse(&hotkey).and_then(|parsed| {
-                hotkey::install(
-                    parsed,
-                    Box::new(move || {
-                        let app = handle.clone();
-                        let _ = handle.run_on_main_thread(move || launcher::toggle(&app));
-                    }),
-                )
-            });
+            let registered = hotkey::install(Box::new(move |id| {
+                let app = handle.clone();
+                let _ = handle.run_on_main_thread(move || {
+                    if id == LAUNCHER_BINDING {
+                        launcher::toggle(&app);
+                    } else {
+                        let _ = app.emit_to(launcher::LABEL, "run-command", id);
+                    }
+                });
+            }))
+            .and_then(|()| apply_settings(app.handle(), &settings));
             if let Err(e) = registered {
-                eprintln!("openray: could not register hotkey {hotkey}: {e}");
+                eprintln!("openray: could not register hotkeys: {e}");
                 if let Some(tray) = app.tray_by_id("main") {
-                    let _ = tray.set_tooltip(Some(format!("Openray — hotkey {hotkey} unavailable")));
+                    let _ = tray.set_tooltip(Some(format!("Openray — hotkey {} unavailable", settings.hotkey)));
                 }
             }
 
@@ -157,6 +231,11 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if let (SETTINGS_LABEL, WindowEvent::CloseRequested { api, .. }) = (window.label(), event) {
+                api.prevent_close();
+                let _ = window.hide();
+                return;
+            }
             if window.label() != launcher::LABEL || !matches!(event, WindowEvent::Focused(false)) {
                 return;
             }
@@ -179,8 +258,33 @@ pub fn run() {
             show_hud,
             hud_present,
             hud_hide,
-            quit_app
+            quit_app,
+            settings_get,
+            settings_set,
+            hotkeys_suspend,
+            login_item_get,
+            system_accent_color,
+            login_item_set,
+            open_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running Openray");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use store::CommandPrefs;
+
+    #[test]
+    fn disabled_commands_and_extensions_lose_their_hotkeys() {
+        let mut settings = Settings::default();
+        let prefs = |hotkey: &str, disabled: bool| CommandPrefs { alias: String::new(), hotkey: hotkey.into(), disabled };
+        settings.commands.insert("applications/a".into(), prefs("Ctrl+Alt+A", false));
+        settings.commands.insert("applications/b".into(), prefs("Ctrl+Alt+B", true));
+        settings.commands.insert("openray-core/quit".into(), prefs("Ctrl+Alt+Q", false));
+        settings.commands.insert("openray-core".into(), prefs("", true));
+        let ids: Vec<String> = hotkey_bindings(&settings).unwrap().into_iter().map(|(id, _)| id).collect();
+        assert_eq!(ids, ["launcher", "applications/a"]);
+    }
 }

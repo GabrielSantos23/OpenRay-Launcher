@@ -51,7 +51,18 @@ export interface Section {
   items: RegisteredCommand[];
 }
 
-export function search(commands: RegisteredCommand[], query: string, frecency: Frecency, favorites: string[] = []): Section[] {
+function aliasScore(query: string, alias = ""): number {
+  const q = query.trim().toLowerCase();
+  return alias && alias.toLowerCase().startsWith(q) ? 110 : 0;
+}
+
+export function search(
+  commands: RegisteredCommand[],
+  query: string,
+  frecency: Frecency,
+  favorites: string[] = [],
+  aliases: Record<string, string> = {},
+): Section[] {
   if (!query.trim()) {
     const byKey = new Map(commands.map((c) => [c.key, c]));
     const used = commands
@@ -66,7 +77,7 @@ export function search(commands: RegisteredCommand[], query: string, frecency: F
   }
   const tieBreak = byFrecencyThenTitle(frecency);
   const items = commands
-    .map((command) => ({ command, score: matchScore(query, command.title, command.keywords) }))
+    .map((command) => ({ command, score: Math.max(aliasScore(query, aliases[command.key]), matchScore(query, command.title, command.keywords)) }))
     .filter((m) => m.score > 0)
     .sort((a, b) => b.score - a.score || tieBreak(a.command, b.command))
     .map((m) => m.command);
