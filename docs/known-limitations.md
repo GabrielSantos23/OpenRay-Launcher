@@ -40,6 +40,7 @@
 - **Clipboard History.** Text, files and images are kept 7 days (pinned entries forever), the reference default. There is no retention setting, OCR, disabled-apps list, Paste and Keep Window Open, Paste as…, rename or tags. Delete All keeps pinned entries. Two copies of the same content within a second count as one, because one copy can raise several clipboard notifications.
 - **Paste.** Paste actions restore focus to the previous window and send Ctrl+V. Apps that run elevated ignore the injected keys.
 - **Emoji.** Names come from Unicode only, so searches match fewer words than the reference. No skin tones or pinned emoji.
+- **Notes.** Deleting a note is permanent and asks first; there is no Recently Deleted. No window auto-sizing, Find in Note, Export…, Copy Deeplink, images, zoom or notes settings. Markdown typed as one block (for example pasted plain text) stays plain text until it is retyped, because the live rules run per keystroke. The window size (440×762) and the right-edge spawn rule are estimates.
 - **Quicklinks.** No icon picker, tags or `{selection}`; only the first argument gets a field. Favicons are fetched from Google's favicon service, and offline a link glyph shows.
 
 ## Launcher

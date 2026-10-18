@@ -249,6 +249,15 @@ Sources are under `Raycast\frontend\`. Class names are CSS-module hashes.
 - **Quicklinks.** Form title Create/Update/Duplicate Quicklink, primary “Save Quicklink” on secondary (Ctrl+Enter); search placeholder “Search for Quicklinks…”. Settings: link previews, prefer existing tabs, pass selected text as argument, delete warning.
 - **Live check (2026-10-18).** In the debug build, PowerShell `Set-Clipboard` produced entries with source “Windows PowerShell”. Reading the clipboard immediately on `WM_CLIPBOARDUPDATE` made `Set-Clipboard` fail and one copy raised several notifications, so capture waits 100 ms and repeats within 1 s are one copy.
 
+## Notes (milestone 5)
+
+- **Stack.** `notes-window.html` loads `notes-window-xfFlM24C.js`, a ProseMirror editor (`use-runtime-kit-editor-CDrYHN4a.js`). The native host has `NotesWindow`, `FrontendNotesWindow`, `webview/noteswindow.baml` and IPC `raycast.showNotesWindow`, `notes.getWindowData`, `notes.navigateToNote` (`Raycast.dll` strings).
+- **Windows top bar (`notes-window-aIQeS33F.css`, `NotesTopBarWindows`).** Padding `--space-8`, three 24 px actions with 8 px gaps (Action Panel `Ctrl K`, Browse Notes `Ctrl P`, Create Note `Ctrl N`, each wrapped in a tooltip with its shortcut), title centered between insets of 8 + 3×24 + 2×8 + 12 px in Segoe UI. Bottom bar is `--space-32` tall with 4 px gaps and 1×16 px dividers with 4 px margins. The separator under the top bar shows only once the editor scrolls.
+- **Actions (`notes-window-xfFlM24C.js`).** Groups: New Note (`z.new`, disabled when the note is empty), Duplicate Note (no Windows shortcut), Pin/Unpin (`z.togglePinChat` = Ctrl+Shift+P); Browse Notes (`z.toggleFilter` = Ctrl+P), Go Back/Forward (Ctrl+[ / Ctrl+]); Find in Note (Ctrl+F), Copy Note/Selection As… (Markdown, Plain Text, HTML), Copy Deeplink, Export…; Enable/Disable Window Auto-Sizing (Ctrl+Shift+/), Toggle Format Bar (`le.comma` = Ctrl+Alt+,); zoom; Open Raycast Notes Settings; Delete Note (`z.clear` = Ctrl+D), Delete All Notes (`z.clearTertiary` = Ctrl+Alt+D, confirm “All notes will move to Recently Deleted…”).
+- **Browse (`BrowseNotesMenu`).** Subtitles “Current • N characters” with a 5 px accent dot, or “Opened <relative> • N characters”. The notes window sets the accent to the brand color.
+- **Store (`notes-store-DZhnhCik.js`).** `createOrReuseEmptyNote`, toast “You already have an empty note”; free plan limit of 5 notes (not reproduced). Notes zoom 0.75–2 in 0.05 steps (`notes-zoom-CIb67TDf.js`). Settings rows: Show Notes Toggle Button in Menu Bar, Escape Key Loses Focus, Zoom (`notes-settings-page-definition-CEKi0hFz.js`).
+- **Geometry.** The user's screenshots show a 440×762 window at 100 % scale. Placement and auto-size bounds are in the .NET host and remain open (`unk_601fffe2…`).
+
 ## Feature inventory source
 
 - **Built-in commands.** The list in `docs/feature-matrix.md` was produced by parsing `backend/index.mjs` for `key:` / `title:` / `commands:{…H({title…})}`. The raw dump is in the kickoff scratchpad `inventory.txt`.
@@ -271,6 +280,7 @@ Sources are under `Raycast\frontend\`. Class names are CSS-module hashes.
 | `unk_f8b3baf9…` | Calculator card labels for plain math | low |
 | `unk_b6c2e6e4…` | Default fallback commands and order | low |
 | `unk_66397645…` | Selected emoji cell tint | low |
+| `unk_601fffe2…` | Notes window default size, spawn rule, auto-size bounds, taskbar presence | medium |
 
 Not yet investigated:
 

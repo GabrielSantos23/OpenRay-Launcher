@@ -113,6 +113,23 @@ Measured from the user's 750×475 screenshots at 100 % scale; values marked ≈ 
 | Quicklink form | labels right-aligned ending at x = 175, fields 360 px from x = 195, textarea ≈ 100 px, inputs ≈ 34 px | `QuicklinkForm` |
 | Confirm dialog | ≈ (not measured) | 300 px panel, title, message, Delete and Cancel buttons, Cancel focused |
 
+## Notes window
+
+From `notes-window-aIQeS33F.css` and the user's 100 % screenshots; ≈ marks estimates.
+
+| Element | Reference | Openray |
+|---|---|---|
+| Window | 440×762 (screenshot), frameless, always on top | same, resizable down to ≈ 300×200 |
+| Top bar | padding 8, actions 24 px, gap 8, title centered with 108 px side insets | `h-10 p-2 gap-2`, title `left/right-[108px]`, 13 px Segoe UI, fg 60 % ≈ |
+| Body text | ≈ 14 px on a 21 px line, 16 px side padding | `.notes-editor` in `styles.css` |
+| Headings | ≈ 24 px bold (h1), ≈ 18 px semibold (h2) | 24/30 bold, 18/24 semibold, 15/21 semibold (h3 ≈) |
+| Links | brand red, underlined | `--color-red` underlined |
+| Inline code | chip on fg 10 % | 12 px mono on `--color-key-bg`, radius 4 |
+| Bottom bar | 32 px, buttons 24 px, gap 4, dividers 1×16 with 4 px margins | same |
+| Action panel / Browse | 320 px wide, top ≈ 118, search on top | `top-[118px] w-[320px]`, rows 32 px (browse rows 52 px ≈) |
+| Format popovers | not measured | 260 px, 40 px above the bottom edge ≈ |
+| Tooltip | dark pill above the button with keycaps, may extend past the window | `tooltip` window, 28 px tall, 12 px text, 6 px gap above the button ≈ |
+
 ## Extension icons
 
 Original artwork (not Raycast assets). Tokens `--color-icon-<tone>-top` / `-bottom` in `src/styles.css`, OKLCH, rendered with `bg-linear-to-b/oklch`.
@@ -125,6 +142,7 @@ Original artwork (not Raycast assets). Tokens `--color-icon-<tone>-top` / `-bott
 | yellow | `oklch(0.85 0.16 88)` | `oklch(0.7 0.17 62)` | Emoji & Symbols |
 | purple | `oklch(0.72 0.15 295)` | `oklch(0.54 0.2 290)` | Quicklinks |
 | green | `oklch(0.78 0.15 158)` | `oklch(0.6 0.15 165)` | Web Searches |
+| pink | `oklch(0.74 0.16 0)` | `oklch(0.58 0.2 5)` | Notes |
 | slate | `oklch(0.64 0.03 260)` | `oklch(0.45 0.03 262)` | Openray, Settings |
 
 Tile: 22 px with radius 6 (16 px with radius 4 in footers and tables), white glyph at stroke 2.25, inner highlight `0.5px` white 35 % on top and a `0.5px` black 20 % edge.

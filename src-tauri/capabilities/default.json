@@ -4,7 +4,9 @@
   "windows": [
     "launcher",
     "hud",
-    "settings"
+    "settings",
+    "notes",
+    "tooltip"
   ],
   "permissions": [
     "core:default",

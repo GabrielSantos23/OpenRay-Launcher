@@ -18,14 +18,22 @@ export function Keys({ labels }: { labels: string[] }) {
   );
 }
 
+export interface PanelPlacement {
+  className: string;
+  searchFirst?: boolean;
+}
+
+const FOOTER_PLACEMENT: PanelPlacement = { className: "absolute right-2 bottom-[51px] w-[350px]" };
+
 interface ActionPanelProps {
   title: string;
   groups: Action[][];
   onRun: (action: Action) => void;
   onClose: () => void;
+  placement?: PanelPlacement;
 }
 
-export function ActionPanel({ title, groups, onRun, onClose }: ActionPanelProps) {
+export function ActionPanel({ title, groups, onRun, onClose, placement = FOOTER_PLACEMENT }: ActionPanelProps) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -47,7 +55,7 @@ export function ActionPanel({ title, groups, onRun, onClose }: ActionPanelProps)
       onClose();
     } else if (plain && event.key === "Enter") {
       event.preventDefault();
-      if (flat[active]) onRun(flat[active]);
+      if (flat[active] && !flat[active].disabled) onRun(flat[active]);
     } else if (plain && event.key === "ArrowDown") {
       event.preventDefault();
       setSelected(Math.min(active + 1, flat.length - 1));
@@ -55,13 +63,33 @@ export function ActionPanel({ title, groups, onRun, onClose }: ActionPanelProps)
       event.preventDefault();
       setSelected(Math.max(active - 1, 0));
     } else {
-      const action = flat.find((a) => a.shortcut && matchesShortcut(event, a.shortcut));
+      const action = flat.find((a) => a.shortcut && !a.disabled && matchesShortcut(event, a.shortcut));
       if (action) {
         event.preventDefault();
         onRun(action);
       }
     }
   }
+
+  const search = (
+    <input
+      autoFocus
+      spellCheck={false}
+      value={query}
+      onChange={(e) => {
+        setQuery(e.target.value);
+        setSelected(0);
+      }}
+      onKeyDown={onKeyDown}
+      placeholder="Search for actions..."
+      aria-label="Search for actions"
+      role="combobox"
+      aria-expanded="true"
+      aria-controls="actions"
+      aria-activedescendant={flat[active] ? `action-${active}` : undefined}
+      className={`h-[38px] shrink-0 border-panel-separator bg-transparent px-[15px] text-13 text-fg caret-fg outline-none placeholder:text-fg-40 ${placement.searchFirst ? "border-b" : "border-t"}`}
+    />
+  );
 
   let index = -1;
   return (
@@ -70,8 +98,9 @@ export function ActionPanel({ title, groups, onRun, onClose }: ActionPanelProps)
       <div
         role="dialog"
         aria-label={`Actions for ${title}`}
-        className="absolute right-2 bottom-[51px] z-20 flex w-[350px] flex-col rounded-panel border border-panel-border bg-panel shadow-panel"
+        className={`z-20 flex flex-col rounded-panel border border-panel-border bg-panel shadow-panel ${placement.className}`}
       >
+        {placement.searchFirst && search}
         <div ref={listRef} id="actions" role="listbox" aria-label="Actions" className="max-h-[239px] overflow-y-auto [scrollbar-width:none] px-[7px] pt-[7px] pb-2">
           <div className="flex h-6 items-center px-2 text-11 font-semibold text-fg-60">{title}</div>
           {flat.length === 0 && <p className="flex h-8 items-center px-2 text-13 text-fg-60">No matching actions</p>}
@@ -89,9 +118,10 @@ export function ActionPanel({ title, groups, onRun, onClose }: ActionPanelProps)
                     data-index={i}
                     role="option"
                     aria-selected={i === active}
+                    aria-disabled={action.disabled || undefined}
                     onMouseMove={() => i !== active && setSelected(i)}
-                    onClick={() => onRun(action)}
-                    className={`flex h-8 cursor-default items-center gap-2 rounded-row px-2 text-13 font-medium ${i === active ? "bg-panel-selection" : ""} ${action.destructive ? "text-destructive" : "text-fg"}`}
+                    onClick={() => !action.disabled && onRun(action)}
+                    className={`flex h-8 cursor-default items-center gap-2 rounded-row px-2 text-13 font-medium ${i === active ? "bg-panel-selection" : ""} ${action.destructive ? "text-destructive" : "text-fg"} ${action.disabled ? "opacity-40" : ""}`}
                   >
                     {Icon ? <Icon className="size-4 shrink-0" /> : <span className="size-4 shrink-0" />}
                     <span className="truncate">{action.title}</span>
@@ -107,23 +137,7 @@ export function ActionPanel({ title, groups, onRun, onClose }: ActionPanelProps)
             </Fragment>
           ))}
         </div>
-        <input
-          autoFocus
-          spellCheck={false}
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setSelected(0);
-          }}
-          onKeyDown={onKeyDown}
-          placeholder="Search for actions..."
-          aria-label="Search for actions"
-          role="combobox"
-          aria-expanded="true"
-          aria-controls="actions"
-          aria-activedescendant={flat[active] ? `action-${active}` : undefined}
-          className="h-[38px] shrink-0 border-t border-panel-separator bg-transparent px-[15px] text-13 text-fg caret-fg outline-none placeholder:text-fg-40"
-        />
+        {!placement.searchFirst && search}
       </div>
     </>
   );

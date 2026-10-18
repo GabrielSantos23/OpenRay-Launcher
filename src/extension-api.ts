@@ -7,7 +7,7 @@ export interface Shortcut {
   shift?: boolean;
 }
 
-export type IconTone = "blue" | "orange" | "red" | "yellow" | "purple" | "green" | "slate";
+export type IconTone = "blue" | "orange" | "red" | "yellow" | "purple" | "green" | "pink" | "slate";
 
 export interface IconSpec {
   glyph: ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -26,6 +26,7 @@ export interface Action {
   icon?: ComponentType<{ className?: string }>;
   shortcut?: Shortcut;
   destructive?: boolean;
+  disabled?: boolean;
   keepOpen?: boolean;
   accessory?: string;
   confirm?: Confirmation;

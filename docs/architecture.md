@@ -50,16 +50,17 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
 | Global hotkey | `src-tauri/src/hotkey.rs` | Parse hotkeys, bindings list (launcher + command hotkeys, duplicates rejected), WH_KEYBOARD_LL hook thread, dispatcher thread, suspend while recording |
 | Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, AppsFolder (MSIX) scan, shell icons served on `appicon://`, ShellExecute, DWM attributes |
-| Settings and persistence | `src-tauri/src/store.rs`, `src-tauri/src/registry.rs` | `settings.json` (hotkey, tray, show-on screen, Escape options, per-command alias/hotkey/disabled), `frecency.json`, `favorites.json`, and the extension data files `quicklinks.json` and `emoji.json` (`data_get`/`data_set`, names allow-listed) in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login; Windows accent from `AccentPalette` |
+| Settings and persistence | `src-tauri/src/store.rs`, `src-tauri/src/registry.rs` | `settings.json` (hotkey, tray, show-on screen, Escape options, per-command alias/hotkey/disabled), `frecency.json`, `favorites.json`, and the extension data files `quicklinks.json`, `emoji.json` and `notes.json` (`data_get`/`data_set`, names allow-listed) in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login; Windows accent from `AccentPalette` |
 | Settings window | `src/SettingsWindow.tsx`, `src/settings.ts`, `src/Dropdown.tsx`, `src/HotkeyRecorder.tsx` | `settings` Tauri window: pages, hotkey recorder, commands table; `useSettings` keeps every window in sync through the `settings-changed` event |
 | Clipboard | `src-tauri/src/clipboard.rs` | `WM_CLIPBOARDUPDATE` listener thread, capture (text, files, DIB→PNG), exclusion formats, history store with retention and pinning, write-back (text, files, DIB + PNG), Ctrl+V injection, source app lookup; images served on `clipimg://` |
 | Views | `src/ListView.tsx`, `src/ActionHost.tsx` | Pushed command views: back button, search with optional argument field and filter, list or grid, detail with Information, footer; action panel with submenus and confirmation dialogs, shared with the root |
+| Notes | `src/NotesWindow.tsx`, `src/notes.ts`, `src/Tooltip.tsx`, `src-tauri/src/notes.rs`, `src/extensions/notes.tsx` | `notes` window (Tiptap editor with the markdown extension, format bar, action panel, browse list, history), `notes.json` through `data_get`/`data_set`, right-edge placement on first show, `tooltip` window (non-activating, click-through) positioned above the hovered button in screen coordinates; launcher commands open it through `notes_show` |
 | Calculator | `src/calculator.ts`, `src/extensions/calculator.ts` | Expression parser, currency and time-zone parsing, color parsing and formats; inline result card |
 | Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
 | Extension API | `src/extension-api.ts` | Types and `defineExtension` |
 | Icons | `src/icons.tsx` | `GlyphTile` (extension tiles from an `IconSpec`), `CommandIcon` (URL, tile or fallback), `OpenrayGlyph` |
-| Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `quicklinks`, `web-searches`, `openray-core` |
+| Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `notes`, `quicklinks`, `web-searches`, `openray-core` |
 | Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |
 | Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
 | Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
@@ -80,6 +81,7 @@ The Rust core exposes Tauri commands:
 - `show_hud`, `hud_present`, `hud_hide`
 - `quit_app`
 - `settings_get`, `settings_set` (validates hotkeys, saves, re-registers, emits `settings-changed`)
+- `notes_show` (hides the launcher, shows and focuses the notes window, emits `notes-open`), `tooltip_show`, `tooltip_present`, `tooltip_hide`
 - `hotkeys_suspend`, `login_item_get`, `login_item_set`, `open_settings`, `system_accent_color`
 
 The hook dispatcher toggles the launcher for the `launcher` binding and emits `run-command` (the command key) to the launcher window for command hotkeys.

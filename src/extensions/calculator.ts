@@ -66,14 +66,14 @@ async function rates(): Promise<Rates | null> {
   return pending;
 }
 
-export function updatedAgo(updated: number, now = Date.now()): string {
+export function updatedAgo(updated: number, now = Date.now(), verb = "Updated"): string {
   const minutes = Math.max(0, Math.round((now - updated) / 60_000));
-  if (minutes < 1) return "Updated just now";
-  if (minutes < 60) return `Updated ${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+  if (minutes < 1) return `${verb} just now`;
+  if (minutes < 60) return `${verb} ${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `Updated about ${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+  if (hours < 24) return `${verb} about ${hours} ${hours === 1 ? "hour" : "hours"} ago`;
   const days = Math.round(hours / 24);
-  return `Updated ${days} ${days === 1 ? "day" : "days"} ago`;
+  return `${verb} ${days} ${days === 1 ? "day" : "days"} ago`;
 }
 
 function currencyName(code: string): string {

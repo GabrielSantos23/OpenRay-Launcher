@@ -4,13 +4,14 @@ mod registry;
 mod hotkey;
 mod hud;
 mod launcher;
+mod notes;
 mod store;
 
 use std::collections::HashMap;
 use store::{Settings, Store};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 #[tauri::command]
 async fn list_apps() -> Vec<apps::InstalledApp> {
@@ -255,6 +256,28 @@ fn open_url(url: String, app_path: Option<String>) -> Result<(), String> {
     apps::open_url(&url, app_path.as_deref())
 }
 
+#[tauri::command]
+fn notes_show(app: AppHandle, request: serde_json::Value) {
+    launcher::hide(&app, false);
+    notes::show(&app, request)
+}
+
+#[tauri::command]
+fn tooltip_show(app: AppHandle, window: WebviewWindow, tooltip: serde_json::Value, rect: [f64; 4]) -> Result<(), String> {
+    notes::set_tooltip_anchor(&window, Some(rect));
+    app.emit_to(notes::TOOLTIP_LABEL, "tooltip-show", tooltip).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn tooltip_present(app: AppHandle, width: f64, height: f64) {
+    notes::present_tooltip(&app, width, height)
+}
+
+#[tauri::command]
+fn tooltip_hide(app: AppHandle) {
+    notes::hide_tooltip(&app)
+}
+
 fn serve_clipboard_image(app: &AppHandle, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
     let id = request.uri().path().trim_start_matches('/');
     let history = app.state::<clipboard::History>();
@@ -335,8 +358,10 @@ pub fn run() {
             if let Some(window) = app.get_webview_window(launcher::LABEL) {
                 launcher::init(&window);
             }
-            if let Some(window) = app.get_webview_window(hud::LABEL) {
-                hud::init(&window);
+            for label in [hud::LABEL, notes::TOOLTIP_LABEL] {
+                if let Some(window) = app.get_webview_window(label) {
+                    hud::init(&window);
+                }
             }
             setup_tray(app)?;
             if let Err(e) = start_clipboard_listener(app.handle()) {
@@ -368,10 +393,13 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let (SETTINGS_LABEL, WindowEvent::CloseRequested { api, .. }) = (window.label(), event) {
+            if let (SETTINGS_LABEL | notes::LABEL, WindowEvent::CloseRequested { api, .. }) = (window.label(), event) {
                 api.prevent_close();
                 let _ = window.hide();
                 return;
+            }
+            if window.label() == notes::LABEL && matches!(event, WindowEvent::Focused(false) | WindowEvent::Moved(_)) {
+                notes::hide_tooltip(window.app_handle());
             }
             if window.label() != launcher::LABEL || !matches!(event, WindowEvent::Focused(false)) {
                 return;
@@ -417,7 +445,11 @@ pub fn run() {
             clipboard_pin,
             data_get,
             data_set,
-            open_url
+            open_url,
+            notes_show,
+            tooltip_show,
+            tooltip_present,
+            tooltip_hide
         ])
         .run(tauri::generate_context!())
         .expect("error while running Openray");

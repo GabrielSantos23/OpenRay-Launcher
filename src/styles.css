@@ -51,6 +51,8 @@
   --color-icon-purple-bottom: oklch(0.54 0.2 290);
   --color-icon-green-top: oklch(0.78 0.15 158);
   --color-icon-green-bottom: oklch(0.6 0.15 165);
+  --color-icon-pink-top: oklch(0.74 0.16 0);
+  --color-icon-pink-bottom: oklch(0.58 0.2 5);
   --color-icon-slate-top: oklch(0.64 0.03 260);
   --color-icon-slate-bottom: oklch(0.45 0.03 262);
 
@@ -147,4 +149,128 @@ body,
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+@layer components {
+  .notes-editor .ProseMirror {
+    min-height: 100%;
+    padding: 4px 16px 16px;
+    outline: none;
+    font-size: 14px;
+    line-height: 21px;
+    color: var(--color-fg);
+    user-select: text;
+    overflow-wrap: anywhere;
+  }
+
+  .notes-editor .ProseMirror > * + * {
+    margin-top: 8px;
+  }
+
+  .notes-editor h1 {
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 700;
+  }
+
+  .notes-editor h2 {
+    margin-top: 16px;
+    font-size: 18px;
+    line-height: 24px;
+    font-weight: 600;
+  }
+
+  .notes-editor h3 {
+    margin-top: 12px;
+    font-size: 15px;
+    line-height: 21px;
+    font-weight: 600;
+  }
+
+  .notes-editor a {
+    color: var(--color-red);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .notes-editor code {
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--color-key-bg);
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 12px;
+  }
+
+  .notes-editor pre {
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: var(--color-key-bg);
+    white-space: pre-wrap;
+  }
+
+  .notes-editor pre code {
+    padding: 0;
+    background: none;
+  }
+
+  .notes-editor blockquote {
+    padding-left: 12px;
+    border-left: 2px solid var(--color-footer-divider);
+    color: var(--color-fg-60);
+  }
+
+  .notes-editor hr {
+    height: 2px;
+    margin: 16px 0;
+    border: 0;
+    background: var(--color-separator);
+  }
+
+  .notes-editor hr.ProseMirror-selectednode {
+    background: var(--color-accent);
+  }
+
+  .notes-editor ul,
+  .notes-editor ol {
+    padding-left: 22px;
+  }
+
+  .notes-editor ul {
+    list-style: disc;
+  }
+
+  .notes-editor ol {
+    list-style: decimal;
+  }
+
+  .notes-editor ul[data-type="taskList"] {
+    padding-left: 2px;
+    list-style: none;
+  }
+
+  .notes-editor li[data-checked] {
+    display: flex;
+    gap: 8px;
+  }
+
+  .notes-editor li[data-checked] > label {
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .notes-editor li[data-checked] > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .notes-editor li[data-checked="true"] > div {
+    color: var(--color-fg-40);
+    text-decoration: line-through;
+  }
+
+  .notes-editor input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--color-accent);
+  }
 }

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActionPanel, Keys } from "./ActionPanel";
+import { ActionPanel, Keys, type PanelPlacement } from "./ActionPanel";
 import type { Action, Confirmation } from "./extension-api";
 import { FooterToast } from "./FooterToast";
 import { showToast, useToast } from "./toast";
@@ -94,7 +94,7 @@ interface RunOptions {
   onSuccess?: () => void;
 }
 
-export function useActionHost(focusInput: () => void) {
+export function useActionHost(focusInput: () => void, placement?: PanelPlacement) {
   const [panel, setPanel] = useState<{ title: string; groups: Action[][] } | null>(null);
   const [confirming, setConfirming] = useState<{ confirmation: Confirmation; resolve: (ok: boolean) => void } | null>(null);
   const [busy, setBusy] = useState(0);
@@ -136,7 +136,7 @@ export function useActionHost(focusInput: () => void) {
   function render(onRun: (action: Action) => void) {
     return (
       <>
-        {panel && <ActionPanel key={panel.title} title={panel.title} groups={panel.groups} onRun={onRun} onClose={closePanel} />}
+        {panel && <ActionPanel key={panel.title} title={panel.title} groups={panel.groups} onRun={onRun} onClose={closePanel} placement={placement} />}
         {confirming && (
           <ConfirmDialog
             confirmation={confirming.confirmation}

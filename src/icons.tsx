@@ -8,6 +8,7 @@ const TONES: Record<IconTone, string> = {
   yellow: "from-icon-yellow-top to-icon-yellow-bottom",
   purple: "from-icon-purple-top to-icon-purple-bottom",
   green: "from-icon-green-top to-icon-green-bottom",
+  pink: "from-icon-pink-top to-icon-pink-bottom",
   slate: "from-icon-slate-top to-icon-slate-bottom",
 };
 
