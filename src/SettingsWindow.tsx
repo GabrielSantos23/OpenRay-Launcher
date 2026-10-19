@@ -482,7 +482,7 @@ export function SettingsWindow() {
   useEffect(() => {
     reloadExtensions();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented && escapeCloses.current) getCurrentWindow().hide();
+      if (event.key === "Escape" && !event.defaultPrevented && escapeCloses.current) getCurrentWindow().close();
     };
     const onFocus = () => void reloadExtensions();
     window.addEventListener("keydown", onKeyDown);
@@ -606,7 +606,7 @@ export function SettingsWindow() {
         <TitleBarButton label="Minimize" onClick={() => getCurrentWindow().minimize()}>
           <Minus className="size-4" strokeWidth={1.5} />
         </TitleBarButton>
-        <TitleBarButton label="Close" danger onClick={() => getCurrentWindow().hide()}>
+        <TitleBarButton label="Close" danger onClick={() => getCurrentWindow().close()}>
           <X className="size-4" strokeWidth={1.5} />
         </TitleBarButton>
       </header>

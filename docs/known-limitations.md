@@ -93,6 +93,10 @@
 - The release workflow builds only the Windows x64 NSIS installer.
 - Installing shows no download progress. The app exits while the passive NSIS installer runs.
 
+## Windows on demand
+
+- Settings and Notes are created each time they open, so they open slower than a window kept alive. Notes keeps its last position and size only until Openray quits.
+
 ## Platform
 
 - Built and tested only on Windows 11 x64 at 96 DPI. Windows 10 is untested.

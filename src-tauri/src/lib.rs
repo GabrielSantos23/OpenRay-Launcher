@@ -265,6 +265,11 @@ fn notes_show(app: AppHandle, request: serde_json::Value) {
 }
 
 #[tauri::command]
+fn notes_pending() -> Option<serde_json::Value> {
+    notes::take_pending()
+}
+
+#[tauri::command]
 fn tooltip_show(app: AppHandle, window: WebviewWindow, tooltip: serde_json::Value, rect: [f64; 4]) -> Result<(), String> {
     notes::set_tooltip_anchor(&window, Some(rect));
     app.emit_to(notes::TOOLTIP_LABEL, "tooltip-show", tooltip).map_err(|e| e.to_string())
@@ -304,13 +309,34 @@ fn start_clipboard_listener(app: &AppHandle) -> Result<(), String> {
     }))
 }
 
+pub(crate) fn open_window(app: &AppHandle, label: &'static str, then: impl FnOnce(&AppHandle, WebviewWindow) + Send + 'static) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let window = match app.get_webview_window(label) {
+            Some(window) => window,
+            None => {
+                let Some(config) = app.config().app.windows.iter().find(|w| w.label == label).cloned() else { return };
+                match tauri::WebviewWindowBuilder::from_config(&app, &config).and_then(|b| b.build()) {
+                    Ok(window) => window,
+                    Err(e) => {
+                        eprintln!("openray: could not create the {label} window: {e}");
+                        return;
+                    }
+                }
+            }
+        };
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || then(&handle, window));
+    });
+}
+
 fn show_settings(app: &AppHandle) {
     launcher::hide(app, false);
-    if let Some(window) = app.get_webview_window(SETTINGS_LABEL) {
+    open_window(app, SETTINGS_LABEL, |_, window| {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
-    }
+    });
 }
 
 #[tauri::command]
@@ -363,10 +389,8 @@ pub fn run() {
             if let Some(window) = app.get_webview_window(launcher::LABEL) {
                 launcher::init(&window);
             }
-            for label in [hud::LABEL, notes::TOOLTIP_LABEL] {
-                if let Some(window) = app.get_webview_window(label) {
-                    hud::init(&window);
-                }
+            if let Some(window) = app.get_webview_window(hud::LABEL) {
+                hud::init(&window);
             }
             setup_tray(app)?;
             if let Err(e) = start_clipboard_listener(app.handle()) {
@@ -398,13 +422,15 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let (SETTINGS_LABEL | notes::LABEL, WindowEvent::CloseRequested { api, .. }) = (window.label(), event) {
-                api.prevent_close();
-                let _ = window.hide();
-                return;
-            }
-            if window.label() == notes::LABEL && matches!(event, WindowEvent::Focused(false) | WindowEvent::Moved(_)) {
-                notes::hide_tooltip(window.app_handle());
+            if window.label() == notes::LABEL {
+                match event {
+                    WindowEvent::Moved(_) | WindowEvent::Resized(_) => notes::remember_geometry(window),
+                    WindowEvent::Destroyed => notes::closed(window.app_handle()),
+                    _ => {}
+                }
+                if matches!(event, WindowEvent::Focused(false) | WindowEvent::Moved(_)) {
+                    notes::hide_tooltip(window.app_handle());
+                }
             }
             if window.label() != launcher::LABEL || !matches!(event, WindowEvent::Focused(false)) {
                 return;
@@ -452,6 +478,7 @@ pub fn run() {
             data_set,
             open_url,
             notes_show,
+            notes_pending,
             tooltip_show,
             tooltip_present,
             tooltip_hide,

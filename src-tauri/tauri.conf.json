@@ -54,7 +54,8 @@
         "decorations": false,
         "visible": false,
         "center": true,
-        "backgroundColor": "#1f1f1f"
+        "backgroundColor": "#1f1f1f",
+        "create": false
       },
       {
         "label": "notes",
@@ -69,7 +70,8 @@
         "maximizable": false,
         "minimizable": false,
         "visible": false,
-        "backgroundColor": "#1f1f1f"
+        "backgroundColor": "#1f1f1f",
+        "create": false
       },
       {
         "label": "tooltip",
@@ -85,7 +87,8 @@
         "visible": false,
         "focus": false,
         "shadow": false,
-        "backgroundColor": "#1f1f1f"
+        "backgroundColor": "#1f1f1f",
+        "create": false
       }
     ],
     "security": {

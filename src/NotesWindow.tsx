@@ -296,7 +296,7 @@ export function NotesWindow() {
     if (!saveTimer.current) return;
     window.clearTimeout(saveTimer.current);
     saveTimer.current = 0;
-    saveNotes(notesRef.current).catch((e) => fail("Could not save note", e));
+    return saveNotes(notesRef.current).catch((e) => fail("Could not save note", e));
   }
 
   function commit(next: Note[]) {
@@ -581,10 +581,13 @@ export function NotesWindow() {
         open(currentNote(initial)!.id);
       });
     const unlisten = listen<NotesRequest>("notes-open", (event) => handleRef.current(event.payload ?? {}));
+    invoke<NotesRequest | null>("notes_pending").then((request) => request && handleRef.current(request));
+    const unlistenClose = getCurrentWindow().onCloseRequested(() => flush());
     const onBlur = () => flush();
     window.addEventListener("blur", onBlur);
     return () => {
       unlisten.then((off) => off());
+      unlistenClose.then((off) => off());
       window.removeEventListener("blur", onBlur);
       flush();
     };
@@ -605,7 +608,7 @@ export function NotesWindow() {
       if (!action.disabled) runRef.current(action);
     };
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented && !overlayRef.current && escapeCloses.current) getCurrentWindow().hide();
+      if (event.key === "Escape" && !event.defaultPrevented && !overlayRef.current && escapeCloses.current) getCurrentWindow().close();
     };
     window.addEventListener("keydown", onShortcut, true);
     window.addEventListener("keydown", onEscape);
@@ -633,7 +636,7 @@ export function NotesWindow() {
           <span className="truncate">{title}</span>
         </h1>
         <span data-tauri-drag-region className="flex-1 self-stretch" />
-        <button type="button" tabIndex={-1} aria-label="Close" title="Close" onClick={() => getCurrentWindow().hide()} className={iconButton}>
+        <button type="button" tabIndex={-1} aria-label="Close" title="Close" onClick={() => getCurrentWindow().close()} className={iconButton}>
           <X className="size-4" />
         </button>
       </header>

@@ -46,7 +46,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 
 | Module | Location | Owns |
 |---|---|---|
-| Lifecycle | `src-tauri/src/lib.rs` | Single instance, tray, startup hidden, quit |
+| Lifecycle | `src-tauri/src/lib.rs` | Single instance, tray, startup hidden, quit; `open_window` builds the Settings, Notes and tooltip windows from their `tauri.conf.json` entries (`"create": false`) on demand, and they are destroyed on close |
 | Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
 | Global hotkey | `src-tauri/src/hotkey.rs` | Parse hotkeys, bindings list (launcher + command hotkeys, duplicates rejected), WH_KEYBOARD_LL hook thread, dispatcher thread, suspend while recording |
 | Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, AppsFolder (MSIX) scan, shell icons served on `appicon://`, ShellExecute, DWM attributes |
@@ -86,7 +86,7 @@ The Rust core exposes Tauri commands:
 - `show_hud`, `hud_present`, `hud_hide`
 - `quit_app`
 - `settings_get`, `settings_set` (validates hotkeys, saves, re-registers, emits `settings-changed`)
-- `notes_show` (hides the launcher, shows and focuses the notes window, emits `notes-open`), `tooltip_show`, `tooltip_present`, `tooltip_hide`
+- `notes_show` (hides the launcher, creates or shows and focuses the notes window, emits `notes-open` to an existing window or keeps the request for `notes_pending` when it creates one), `notes_pending`, `tooltip_show`, `tooltip_present`, `tooltip_hide`
 - `translate` (text, source, target → translated text and detected source language)
 - `hotkeys_suspend`, `login_item_get`, `login_item_set`, `open_settings`, `system_accent_color`
 

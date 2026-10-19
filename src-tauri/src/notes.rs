@@ -1,5 +1,4 @@
 use crate::launcher::hwnd;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 use windows::Win32::Foundation::COLORREF;
@@ -10,7 +9,8 @@ pub const TOOLTIP_LABEL: &str = "tooltip";
 const EDGE_MARGIN: f64 = 16.0;
 const TOOLTIP_GAP: f64 = 6.0;
 
-static PLACED: AtomicBool = AtomicBool::new(false);
+static GEOMETRY: Mutex<Option<(PhysicalPosition<i32>, PhysicalSize<u32>)>> = Mutex::new(None);
+static PENDING: Mutex<Option<serde_json::Value>> = Mutex::new(None);
 static TOOLTIP_ANCHOR: Mutex<Option<[i32; 4]>> = Mutex::new(None);
 
 pub fn right_edge_position(area: (i32, i32, i32, i32), size: (i32, i32), margin: i32) -> (i32, i32) {
@@ -39,14 +39,45 @@ fn place(app: &AppHandle, window: &WebviewWindow) {
 }
 
 pub fn show(app: &AppHandle, request: serde_json::Value) {
-    let Some(window) = app.get_webview_window(LABEL) else { return };
-    if !PLACED.swap(true, Ordering::SeqCst) {
-        place(app, &window);
+    let existed = app.get_webview_window(LABEL).is_some();
+    if !existed {
+        *PENDING.lock().unwrap_or_else(|e| e.into_inner()) = Some(request.clone());
+        crate::open_window(app, TOOLTIP_LABEL, |_, tooltip| crate::hud::init(&tooltip));
     }
-    let _ = window.unminimize();
-    let _ = window.show();
-    let _ = window.set_focus();
-    let _ = app.emit_to(LABEL, "notes-open", request);
+    crate::open_window(app, LABEL, move |app, window| {
+        if !existed {
+            match *GEOMETRY.lock().unwrap_or_else(|e| e.into_inner()) {
+                Some((position, size)) => {
+                    let _ = window.set_size(size);
+                    let _ = window.set_position(position);
+                }
+                None => place(app, &window),
+            }
+        }
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        if existed {
+            let _ = app.emit_to(LABEL, "notes-open", request);
+        }
+    });
+}
+
+pub fn take_pending() -> Option<serde_json::Value> {
+    PENDING.lock().unwrap_or_else(|e| e.into_inner()).take()
+}
+
+pub fn remember_geometry(window: &tauri::Window) {
+    if let (Ok(position), Ok(size)) = (window.outer_position(), window.inner_size()) {
+        *GEOMETRY.lock().unwrap_or_else(|e| e.into_inner()) = Some((position, size));
+    }
+}
+
+pub fn closed(app: &AppHandle) {
+    hide_tooltip(app);
+    if let Some(tooltip) = app.get_webview_window(TOOLTIP_LABEL) {
+        let _ = tooltip.destroy();
+    }
 }
 
 pub fn tooltip_position(anchor: [i32; 4], size: (i32, i32), area: (i32, i32, i32, i32), gap: i32) -> (i32, i32) {

@@ -1,11 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { lazy, StrictMode, Suspense } from "react";
+import { lazy, StrictMode, Suspense, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
-import { Hud } from "./Hud";
-import { SettingsWindow } from "./SettingsWindow";
 import { ThemeRoot } from "./theme";
-import { Tooltip } from "./Tooltip";
 import "./styles.css";
 
 function windowLabel() {
@@ -16,24 +12,20 @@ function windowLabel() {
   }
 }
 
-const NotesWindow = lazy(() => import("./NotesWindow").then((m) => ({ default: m.NotesWindow })));
-
-const views: Record<string, () => React.ReactElement> = {
-  hud: () => <Hud />,
-  settings: () => <SettingsWindow />,
-  notes: () => (
-    <Suspense>
-      <NotesWindow />
-    </Suspense>
-  ),
-  tooltip: () => <Tooltip />,
+const views: Record<string, () => Promise<{ default: ComponentType }>> = {
+  hud: () => import("./Hud").then((m) => ({ default: m.Hud })),
+  settings: () => import("./SettingsWindow").then((m) => ({ default: m.SettingsWindow })),
+  notes: () => import("./NotesWindow").then((m) => ({ default: m.NotesWindow })),
+  tooltip: () => import("./Tooltip").then((m) => ({ default: m.Tooltip })),
 };
-const View = views[windowLabel()] ?? (() => <App />);
+const View = lazy(views[windowLabel()] ?? (() => import("./App")));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeRoot>
-      <View />
+      <Suspense>
+        <View />
+      </Suspense>
     </ThemeRoot>
   </StrictMode>,
 );
