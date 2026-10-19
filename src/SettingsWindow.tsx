@@ -14,11 +14,17 @@ import {
   Search,
   Settings as Gear,
   Command,
+  Puzzle,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Extension, RegisteredCommand } from "./extension-api";
 import { builtInExtensions } from "./extensions";
+import { flowKeyFailures, flowKeyInstalled, loadFlowKeyExtensions } from "./extensions/flowkey";
+import { FlowKeyDialog } from "./flowkey/Dialog";
+import { FlowKeyIcon } from "./flowkey/FlowKeyIcon";
+import { FlowKeyDetails, FlowKeyInstallCard } from "./flowkey/SettingsPanel";
+import type { Failure } from "./flowkey/extensions";
 import { loadCommands } from "./registry";
 import { Dropdown as Select } from "./Dropdown";
 import { HotkeyRecorder, type HotkeyConflict } from "./HotkeyRecorder";
@@ -85,9 +91,12 @@ const PAGES: Page[] = [
   { id: "launcher", title: "Launcher", icon: <Tile><Rocket className="size-3.5" /></Tile>, keywords: ["show openray on", "screen"] },
   { id: "shortcuts", title: "Shortcuts", icon: <Tile><Command className="size-3.5" /></Tile>, keywords: ["alias", "hotkey", "commands"] },
   { id: "keyboard", title: "Keyboard", icon: <Tile><Keyboard className="size-3.5" /></Tile>, keywords: ["escape key"] },
+  { id: "extensions", title: "Extensions", icon: <Tile><Puzzle className="size-3.5" /></Tile>, keywords: ["install", "flowkey", "package", "uninstall"] },
 ];
 
 function extensionIcon(extension: Extension) {
+  const flowkey = flowKeyInstalled.get(extension.id);
+  if (flowkey) return <FlowKeyIcon fields={{ icon: flowkey.manifest.icon }} extension={flowkey} title={flowkey.manifest.name} />;
   return extension.icon ? (
     <GlyphTile spec={extension.icon} />
   ) : (
@@ -97,7 +106,7 @@ function extensionIcon(extension: Extension) {
   );
 }
 
-function Switch({ checked, onChange, labelledBy }: { checked: boolean; onChange: (checked: boolean) => void; labelledBy: string }) {
+export function Switch({ checked, onChange, labelledBy }: { checked: boolean; onChange: (checked: boolean) => void; labelledBy: string }) {
   return (
     <button
       type="button"
@@ -114,7 +123,7 @@ function Switch({ checked, onChange, labelledBy }: { checked: boolean; onChange:
   );
 }
 
-function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
+export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
   return (
     <span className="relative flex size-4 shrink-0">
       <input
@@ -129,7 +138,7 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (c
   );
 }
 
-function Row({ id, title, description, children }: { id: string; title: string; description?: string; children: ReactNode }) {
+export function Row({ id, title, description, children }: { id: string; title: string; description?: string; children: ReactNode }) {
   return (
     <div className="flex min-h-[47px] items-center justify-between gap-3 border-b border-card-separator px-3 py-2 last:min-h-[46px] last:border-b-0">
       <div className="flex min-w-0 flex-col gap-1">
@@ -143,7 +152,7 @@ function Row({ id, title, description, children }: { id: string; title: string; 
   );
 }
 
-function Card({ children }: { children: ReactNode }) {
+export function Card({ children }: { children: ReactNode }) {
   return <section className="flex flex-col overflow-hidden rounded-lg bg-card">{children}</section>;
 }
 
@@ -388,6 +397,8 @@ function TitleBarButton({ label, onClick, children, danger = false }: { label: s
 export function SettingsWindow() {
   const [settings, save] = useSettings();
   const [commands, setCommands] = useState<RegisteredCommand[]>([]);
+  const [flowkey, setFlowkey] = useState<Extension[]>([]);
+  const [failures, setFailures] = useState<Failure[]>([]);
   const [history, setHistory] = useState({ stack: ["general"], index: 0 });
   const [navFilter, setNavFilter] = useState("");
   const [extensionFilter, setExtensionFilter] = useState("all");
@@ -397,13 +408,25 @@ export function SettingsWindow() {
   escapeCloses.current = settings?.escapeKeyClosesWindow ?? true;
   const page = history.stack[history.index];
 
+  const reloadExtensions = () =>
+    loadFlowKeyExtensions().then((loaded) => {
+      setFlowkey(loaded);
+      setFailures(flowKeyFailures);
+      return loadCommands([...builtInExtensions, ...loaded]).then(setCommands);
+    });
+
   useEffect(() => {
-    loadCommands(builtInExtensions).then(setCommands);
+    reloadExtensions();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !event.defaultPrevented && escapeCloses.current) getCurrentWindow().hide();
     };
+    const onFocus = () => void reloadExtensions();
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   function navigate(id: string) {
@@ -416,8 +439,10 @@ export function SettingsWindow() {
 
   const q = navFilter.trim().toLowerCase();
   const matches = (title: string, keywords: string[] = []) => !q || [title, ...keywords].some((t) => t.toLowerCase().includes(q));
-  const extensionPage = builtInExtensions.find((e) => `extension:${e.id}` === page);
-  const tableExtensions = extensionPage ? [extensionPage] : builtInExtensions.filter((e) => extensionFilter === "all" || e.id === extensionFilter);
+  const allExtensions = [...builtInExtensions, ...flowkey];
+  const extensionPage = allExtensions.find((e) => `extension:${e.id}` === page);
+  const flowkeyPage = extensionPage && flowKeyInstalled.get(extensionPage.id);
+  const tableExtensions = extensionPage ? [extensionPage] : allExtensions.filter((e) => extensionFilter === "all" || e.id === extensionFilter);
   const filteredCommands = useMemo(() => {
     const term = commandFilter.trim().toLowerCase();
     return term ? commands.filter((c) => c.title.toLowerCase().includes(term)) : commands;
@@ -509,7 +534,7 @@ export function SettingsWindow() {
                 size="small"
                 value={extensionFilter}
                 onChange={setExtensionFilter}
-                options={[{ value: "all", label: "All Extensions" }, ...builtInExtensions.map((e) => ({ value: e.id, label: e.title }))]}
+                options={[{ value: "all", label: "All Extensions" }, ...allExtensions.map((e) => ({ value: e.id, label: e.title }))]}
               />
             </span>
           </span>
@@ -537,7 +562,7 @@ export function SettingsWindow() {
           </label>
           <div className="flex flex-col gap-0.5">{PAGES.filter((p) => matches(p.title, p.keywords)).map((p) => navLink(p.id, p.title, p.icon))}</div>
           <div className="flex flex-col gap-0.5">
-            {builtInExtensions.filter((e) => matches(e.title)).map((e) => navLink(`extension:${e.id}`, e.title, extensionIcon(e)))}
+            {allExtensions.filter((e) => matches(e.title)).map((e) => navLink(`extension:${e.id}`, e.title, extensionIcon(e)))}
           </div>
         </nav>
 
@@ -548,6 +573,18 @@ export function SettingsWindow() {
               {page === "general" && <GeneralPage settings={settings} save={save} recorder={recorder} />}
               {page === "launcher" && <LauncherPage settings={settings} save={save} />}
               {page === "keyboard" && <KeyboardPage settings={settings} save={save} />}
+              {page === "extensions" && <FlowKeyInstallCard failures={failures} onChanged={reloadExtensions} />}
+              {flowkeyPage && (
+                <FlowKeyDetails
+                  key={flowkeyPage.manifest.id}
+                  extension={flowkeyPage}
+                  onChanged={() =>
+                    reloadExtensions().then(() => {
+                      if (!flowKeyInstalled.has(extensionPage!.id)) setHistory({ stack: ["extensions"], index: 0 });
+                    })
+                  }
+                />
+              )}
               {(page === "shortcuts" || extensionPage) &&
                 tableExtensions.map((extension) => (
                   <ExtensionTable
@@ -563,6 +600,7 @@ export function SettingsWindow() {
           )}
         </main>
       </div>
+      <FlowKeyDialog />
     </div>
   );
 }

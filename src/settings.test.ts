@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hotkeyFromEvent, hotkeyOwner, isEnabled, sameHotkey, withCommandPrefs, withHotkey, type Settings } from "./settings";
+import { hotkeyFromEvent, hotkeyLabels, hotkeyOwner, isEnabled, sameHotkey, withCommandPrefs, withHotkey, type Settings } from "./settings";
 
 const event = (code: string, mods: Partial<{ ctrlKey: boolean; altKey: boolean; shiftKey: boolean; metaKey: boolean }> = {}) => ({
   code,
@@ -34,7 +34,13 @@ describe("hotkeyFromEvent", () => {
   it("waits for a key with at least one modifier", () => {
     expect(hotkeyFromEvent(event("KeyA"))).toBeNull();
     expect(hotkeyFromEvent(event("ControlLeft", { ctrlKey: true }))).toBeNull();
-    expect(hotkeyFromEvent(event("ArrowUp", { ctrlKey: true }))).toBeNull();
+    expect(hotkeyFromEvent(event("CapsLock", { ctrlKey: true }))).toBeNull();
+  });
+
+  it("records arrows, navigation keys and numpad digits", () => {
+    expect(hotkeyFromEvent(event("ArrowRight", { ctrlKey: true, shiftKey: true }))).toBe("Ctrl+Shift+ArrowRight");
+    expect(hotkeyFromEvent(event("Numpad7", { altKey: true }))).toBe("Alt+Numpad7");
+    expect(hotkeyLabels("Ctrl+Shift+ArrowRight")).toEqual(["Ctrl", "Shift", "→"]);
   });
 });
 

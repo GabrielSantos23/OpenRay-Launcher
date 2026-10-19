@@ -8,5 +8,7 @@ export default defineConfig({
   clearScreen: false,
   server: { port: 1420, strictPort: true },
   build: { target: "chrome120" },
+  worker: { format: "es" },
+  optimizeDeps: { include: ["@flowkey-cli/react-ui", "@flowkey-cli/native-sdk", "marked"] },
   test: { environment: "node" },
 });

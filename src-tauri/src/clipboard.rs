@@ -169,7 +169,7 @@ mod win {
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE};
     use windows::Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION};
-    use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_CONTROL, VK_V};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_C, VK_CONTROL, VK_V};
     use windows::Win32::UI::Shell::{DragQueryFileW, DROPFILES, HDROP};
     use windows::Win32::UI::WindowsAndMessaging::{
         CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowThreadProcessId, RegisterClassW, HWND_MESSAGE, MSG,
@@ -424,6 +424,61 @@ mod win {
         set(CF_HDROP, &bytes)
     }
 
+    fn html_fragment(html: &str) -> Vec<u8> {
+        let prefix = "<html><body><!--StartFragment-->";
+        let suffix = "<!--EndFragment--></body></html>";
+        let header_len = "Version:0.9
+StartHTML:0000000000
+EndHTML:0000000000
+StartFragment:0000000000
+EndFragment:0000000000
+".len();
+        let start_fragment = header_len + prefix.len();
+        let end_fragment = start_fragment + html.len();
+        let end_html = end_fragment + suffix.len();
+        let mut bytes = format!("Version:0.9
+StartHTML:{header_len:010}
+EndHTML:{end_html:010}
+StartFragment:{start_fragment:010}
+EndFragment:{end_fragment:010}
+{prefix}{html}{suffix}").into_bytes();
+        bytes.push(0);
+        bytes
+    }
+
+    pub fn write_rich(text: Option<&str>, html: Option<&str>, paths: Option<&[String]>) -> Result<(), String> {
+        if let Some(paths) = paths.filter(|p| !p.is_empty()) {
+            write_files(paths)?;
+        }
+        let _open = Open::new()?;
+        if paths.is_none_or(|p| p.is_empty()) {
+            unsafe { EmptyClipboard() }.map_err(|e| e.to_string())?;
+        }
+        if let Some(text) = text {
+            set(CF_UNICODETEXT, &utf16z(text))?;
+        }
+        if let Some(html) = html {
+            set(format("HTML Format"), &html_fragment(html))?;
+        }
+        Ok(())
+    }
+
+    fn read_html() -> Option<String> {
+        let bytes = global_bytes(format("HTML Format"))?;
+        let raw = String::from_utf8_lossy(&bytes).into_owned();
+        let offset = |name: &str| raw.lines().find_map(|line| line.strip_prefix(name)).and_then(|v| v.trim().parse::<usize>().ok());
+        let (start, end) = (offset("StartFragment:")?, offset("EndFragment:")?);
+        bytes.get(start..end).map(|slice| String::from_utf8_lossy(slice).into_owned())
+    }
+
+    pub fn read_rich() -> (Option<String>, Option<String>, Option<Vec<String>>) {
+        let Ok(_open) = Open::new() else { return (None, None, None) };
+        let text = available(CF_UNICODETEXT).then(read_text).flatten();
+        let html = available(format("HTML Format")).then(read_html).flatten();
+        let paths = available(CF_HDROP).then(read_files).flatten();
+        (text, html, paths)
+    }
+
     pub fn write_image(png_bytes: &[u8]) -> Result<(), String> {
         let dib = png_to_dib(png_bytes)?;
         let _open = Open::new()?;
@@ -479,19 +534,27 @@ mod win {
     }
 
     pub fn send_paste() {
+        send_ctrl(VK_V)
+    }
+
+    pub fn send_copy() {
+        send_ctrl(VK_C)
+    }
+
+    fn send_ctrl(letter: VIRTUAL_KEY) {
         let key = |vk, up: bool| INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
                 ki: KEYBDINPUT { wVk: vk, dwFlags: if up { KEYEVENTF_KEYUP } else { Default::default() }, dwExtraInfo: crate::hotkey::MARKER, ..Default::default() },
             },
         };
-        let inputs = [key(VK_CONTROL, false), key(VK_V, false), key(VK_V, true), key(VK_CONTROL, true)];
+        let inputs = [key(VK_CONTROL, false), key(letter, false), key(letter, true), key(VK_CONTROL, true)];
         unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
     }
 }
 
 #[cfg(windows)]
-pub use win::{capture, listen, owner_app, read_clipboard_text, send_paste, window_app, write_files, write_image, write_text};
+pub use win::{capture, listen, owner_app, read_clipboard_text, read_rich, send_copy, send_paste, window_app, write_files, write_image, write_rich, write_text};
 
 pub fn write_entry(history: &History, entry: &Entry) -> Result<(), String> {
     match &entry.content {

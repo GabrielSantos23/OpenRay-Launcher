@@ -5,6 +5,7 @@ import core from "./core";
 import emoji from "./emoji";
 import notes from "./notes";
 import quicklinks from "./quicklinks";
+import translate from "./translate";
 import webSearches from "./web-searches";
 
-export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, notes, quicklinks, webSearches, core];
+export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, notes, quicklinks, translate, webSearches, core];

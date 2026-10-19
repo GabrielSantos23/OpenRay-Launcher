@@ -36,7 +36,25 @@ fn key_code(name: &str) -> Option<u32> {
         "SEMICOLON" | ";" => 0xBA,
         "MINUS" | "-" => 0xBD,
         "EQUAL" | "=" => 0xBB,
-        _ => return None,
+        "BRACKETLEFT" | "[" => 0xDB,
+        "BACKSLASH" | "\\" => 0xDC,
+        "BRACKETRIGHT" | "]" => 0xDD,
+        "QUOTE" | "'" => 0xDE,
+        "BACKSPACE" => 0x08,
+        "PAGEUP" => 0x21,
+        "PAGEDOWN" => 0x22,
+        "END" => 0x23,
+        "HOME" => 0x24,
+        "ARROWLEFT" | "LEFT" => 0x25,
+        "ARROWUP" | "UP" => 0x26,
+        "ARROWRIGHT" | "RIGHT" => 0x27,
+        "ARROWDOWN" | "DOWN" => 0x28,
+        "INSERT" => 0x2D,
+        "DELETE" => 0x2E,
+        _ => match upper.strip_prefix("NUMPAD").and_then(|n| n.parse::<u32>().ok()) {
+            Some(n) if n <= 9 => 0x60 + n,
+            _ => return None,
+        },
     })
 }
 
@@ -240,6 +258,9 @@ mod tests {
     #[test]
     fn rejects_invalid_hotkeys() {
         assert!(parse("Space").is_err());
+        assert_eq!(parse("Ctrl+Shift+ArrowRight").unwrap(), Hotkey { modifiers: mods(true, false, true, false), vk: 0x27 });
+        assert_eq!(parse("Alt+Numpad7").unwrap().vk, 0x67);
+        assert_eq!(parse("Ctrl+[").unwrap().vk, 0xDB);
         assert!(parse("Alt+").is_err());
         assert!(parse("Alt+Banana").is_err());
         assert!(parse("Alt+A+B").is_err());

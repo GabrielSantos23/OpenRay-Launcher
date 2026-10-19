@@ -6,6 +6,9 @@ import { CommandIcon } from "./icons";
 import { actionGroups, matchesShortcut } from "./actions";
 import type { Action, InlineResult, InlineSide, RegisteredCommand, ViewProps } from "./extension-api";
 import { builtInExtensions } from "./extensions";
+import { LAUNCH_EVENT, loadFlowKeyExtensions } from "./extensions/flowkey";
+import { FlowKeyDialog } from "./flowkey/Dialog";
+import { WINDOW_EVENT, type WindowSignal } from "./flowkey/FlowKeyView";
 import { loadCommands } from "./registry";
 import { search, type Frecency, type Section } from "./search";
 import { setLauncherVisible } from "./toast";
@@ -83,7 +86,7 @@ export default function App() {
     setLoading((n) => n + 1);
     try {
       const [loaded, scores, favs] = await Promise.all([
-        loadCommands(builtInExtensions),
+        loadFlowKeyExtensions(true).then((flowkey) => loadCommands([...builtInExtensions, ...flowkey])),
         invoke<Frecency>("frecency_all").catch(() => ({}) as Frecency),
         invoke<string[]>("favorites_get").catch(() => []),
       ]);
@@ -175,8 +178,18 @@ export default function App() {
 
   useEffect(() => {
     const unlisten = listen<string>("run-command", (event) => runByKey.current(event.payload));
+    const onLaunch = (event: Event) => runByKey.current((event as CustomEvent<{ key: string }>).detail.key);
+    const onSignal = (event: Event) => {
+      const { command } = (event as CustomEvent<WindowSignal>).detail;
+      if (command === "popToRoot") setView(null);
+      else if (command === "clearSearchBar") setQuery("");
+    };
+    window.addEventListener(LAUNCH_EVENT, onLaunch);
+    window.addEventListener(WINDOW_EVENT, onSignal);
     return () => {
       unlisten.then((off) => off());
+      window.removeEventListener(LAUNCH_EVENT, onLaunch);
+      window.removeEventListener(WINDOW_EVENT, onSignal);
     };
   }, []);
 
@@ -280,6 +293,7 @@ export default function App() {
       <main onMouseDown={keepFocus} className="relative flex h-full flex-col text-fg">
         <h1 className="sr-only">Openray</h1>
         <view.Component key={view.key} pop={pop} />
+        <FlowKeyDialog />
       </main>
     );
   }
@@ -366,6 +380,7 @@ export default function App() {
         onTogglePanel={() => (host.panelOpen ? host.closePanel() : groups.length && host.openPanel(panelTitle, groups))}
       />
       {host.render(runSelected)}
+      <FlowKeyDialog />
       <div aria-live="polite" className="sr-only">
         {count} {count === 1 ? "result" : "results"}
       </div>

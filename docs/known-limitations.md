@@ -41,6 +41,7 @@
 - **Paste.** Paste actions restore focus to the previous window and send Ctrl+V. Apps that run elevated ignore the injected keys.
 - **Emoji.** Names come from Unicode only, so searches match fewer words than the reference. No skin tones or pinned emoji.
 - **Notes.** Deleting a note is permanent and asks first; there is no Recently Deleted. No window auto-sizing, Find in Note, Export…, Copy Deeplink, images, zoom or notes settings. Markdown typed as one block (for example pasted plain text) stays plain text until it is retyped, because the live rules run per keystroke. The window size (440×762) and the right-edge spawn rule are estimates.
+- **Translator.** Translations come from Google's unofficial free endpoint (`translate.googleapis.com/translate_a/single?client=gtx`), not Raycast's Pro backend. It has no key and no published limits: it can rate-limit or change without notice, and text is sent to Google. Long text is sent as a form body, so there is no URL length limit, but no length cap is enforced. No dictation, text-to-speech, prefill from selected text, quick-translate results in root search, custom translate commands or translator settings. The text does not shrink to fit as in the reference. Source text is not kept between openings. The nav bar height (54 px) and the translation pane's left inset (38 px) are measured from one screenshot, not from the reference CSS.
 - **Quicklinks.** No icon picker, tags or `{selection}`; only the first argument gets a field. Favicons are fetched from Google's favicon service, and offline a link glyph shows.
 
 ## Launcher
@@ -68,6 +69,23 @@
 - **Matching.** The tiers are prefix > word-start > acronym > substring > subsequence. This is our own heuristic, because the reference algorithm is unknown (`unk_93ec…`).
 - **Frecency.** It uses the reference's decay (10-day half-life, floor 1). The +1-per-visit increment is an approximation (`unk_f0ba…`).
 - **Suggestions.** Up to 8 entries are shown. The cap is ≈, not measured.
+
+## FlowKey extensions
+
+- **Shared install folder.** Openray reads and installs into `%LOCALAPPDATA%\FlowKey.Shell\extensions`, as `flowkey dev` does, but keeps its own consent and data. Extensions installed by FlowKey ask for permission once in Openray, and uninstalling from Openray removes the folder for FlowKey too.
+- **Not implemented:** `system.control` and `windows.list/focus/close` return `methodNotSupported`. Only the opt-in Ctrl+C fallback of `system.selectedText` works (no UI Automation). `image.fetch` does not downscale. The `mediaKeys` flag on detail views and `isDevelopment` are ignored.
+- **Arguments** are typed in a header form after choosing the command, not inline in root search.
+- **fs scopes** are checked on the path text; a symlink or junction inside a scope that points outside it is followed.
+- **OAuth** supports only the `spotify` provider, like FlowKey. It needs the user's own Spotify app client ID (preference, `FLOWKEY_SPOTIFY_CLIENT_ID`, or `spotify-auth.json` in Openray's or FlowKey's data folder) with `http://127.0.0.1/callback` registered.
+- **Release build.** The production CSP path (blob worker importing from `flowkey://`, iframe on `flowkey://`) was not checked in a release build; all live checks ran under `tauri dev`.
+- **Bundle size.** The renderer imports Lucide's full icon map so extensions can name any icon; the main chunk grew to about 870 kB.
+
+## Spotify Player
+
+- Not exercised signed in: no Spotify client ID was configured for Openray on the dev machine, so every signed-in view and command follows the reference source but is unverified live.
+- Start Radio calls `/recommendations`, which Spotify restricted for new apps in November 2024; it may fail with a 404 or 403 for user-created apps.
+- The duplicate-check preference and quicklink creation from Add Playing Song to Playlist are left out, because FlowKey has no quicklink launch context.
+- Current Track shows a HUD instead of updating the command subtitle.
 
 ## Platform
 

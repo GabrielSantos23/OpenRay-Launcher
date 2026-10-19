@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, RotateCcw, SquareMenu, Star, StarOff } from "lucide
 import type { Action, RegisteredCommand, Shortcut } from "./extension-api";
 import type { Frecency } from "./search";
 
-const KEY_LABELS: Record<string, string> = { Enter: "↵", ArrowUp: "↑", ArrowDown: "↓", Backspace: "⌫", Delete: "Del" };
+const KEY_LABELS: Record<string, string> = { Enter: "↵", ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Backspace: "⌫", Delete: "Del", Escape: "Esc", PageUp: "PgUp", PageDown: "PgDn", Home: "Home", End: "End", Tab: "Tab", " ": "Space" };
 
 export function shortcutLabels(shortcut: Shortcut): string[] {
   const modifiers = [shortcut.ctrl && "Ctrl", shortcut.alt && "Alt", shortcut.shift && "Shift"].filter((m): m is string => !!m);

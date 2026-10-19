@@ -258,6 +258,19 @@ Sources are under `Raycast\frontend\`. Class names are CSS-module hashes.
 - **Store (`notes-store-DZhnhCik.js`).** `createOrReuseEmptyNote`, toast “You already have an empty note”; free plan limit of 5 notes (not reproduced). Notes zoom 0.75–2 in 0.05 steps (`notes-zoom-CIb67TDf.js`). Settings rows: Show Notes Toggle Button in Menu Bar, Escape Key Loses Focus, Zoom (`notes-settings-page-definition-CEKi0hFz.js`).
 - **Geometry.** The user's screenshots show a 440×762 window at 100 % scale. Placement and auto-size bounds are in the .NET host and remain open (`unk_601fffe2…`).
 
+## Translator
+
+Inspected 2026-10-19 by reading the bundle files from the install folder (`Raycast/frontend`, `Raycast/backend/index.mjs`).
+
+- **Pro feature on Raycast servers.** Commands `translate` (view), `quickTranslate` (root search) and dynamic `customTranslate` all set `proFeature: "translator"` (`internal-extensions-DZRANhqM.js`). The backend handler (`index.mjs` near offset 6050764) posts `{format:"text", q, source, target}` with a Bearer token to `translations` on `https://backend.raycast.com/api/v1` and maps `data.translations[].translatedText` and `detectedSourceLanguage`, a Google Cloud Translation v2 shape. Openray uses the free Google `gtx` endpoint instead.
+- **Languages.** 133 languages plus "Detect Language" (`auto`) for the source (`en` array in `internal-extensions-DZRANhqM.js`). The codes are Google's (`iw`, `jw`, `mni-Mtei`, `zh-TW`). Openray uses `zh-CN` where the bundle has `zh`.
+- **Defaults and persistence (`TranslateView` / `A7` in `main-window-BN8deh-D.js`).** Source `auto`, target `en`, stored under `translator::source-language` and `translator::target-language`. The settings' Default Source/Target Language override them. The last source text is kept for the pop-to-root timeout (`translator::recent-text`).
+- **Behavior (`lge`).** Debounce 330 ms. Empty text clears. When the source equals the target, the output is the source text. A request sequence number drops stale responses. Errors show a failure toast "Translation failed". While a request runs, the old translation stays visible with "…" appended.
+- **Detect.** With `auto`, the trigger reads "<Language> (Detected)" with a wand icon (`Qhe`). Swap is disabled while the source is `auto` and nothing has been detected. Swap moves the translation into the source and prefills the output with the old source text.
+- **Actions (primary action `copy`, the default).** Copy Translation (Ctrl+Enter and Ctrl+Shift+C), Paste (Ctrl+Alt+Enter), Copy Source Text (Ctrl+Shift+Enter); Swap Languages (`save` = Ctrl+S), Change Source Language (`toggleFilterSecondary` = Ctrl+Shift+P), Change Target Language (`toggleFilter` = Ctrl+P); Continue in AI Chat (AI, excluded). Backspace on empty text goes back. Listen buttons use TTS (Ctrl+L / Ctrl+Shift+L, not reproduced).
+- **Layout (`main-window-38KZXJcp.css`, `translate-view__*`).** Root padding `--space-8`. Two `1fr` columns. Panels have padding `--space-8`, top `--space-56` and radius 2 px on Windows 11. The source panel has an `--fg-5` background with a 44 px circular notch cut at its right middle. Text is 24 px, weight 400, padding 8 px 24 px. The placeholder uses tertiary text. The swap button is 36 px round with `--fg-5` and sits at the centre. Selectors are centred over each column in an overlay nav bar. Word and character counts sit in the source footer with tabular numerals.
+- **Placeholder.** The bundle's source placeholder is "Enter text…". The user's screenshot shows "Speak now", which Openray follows (`unk_44c97973…`).
+
 ## Feature inventory source
 
 - **Built-in commands.** The list in `docs/feature-matrix.md` was produced by parsing `backend/index.mjs` for `key:` / `title:` / `commands:{…H({title…})}`. The raw dump is in the kickoff scratchpad `inventory.txt`.
@@ -281,6 +294,7 @@ Sources are under `Raycast\frontend\`. Class names are CSS-module hashes.
 | `unk_b6c2e6e4…` | Default fallback commands and order | low |
 | `unk_66397645…` | Selected emoji cell tint | low |
 | `unk_601fffe2…` | Notes window default size, spawn rule, auto-size bounds, taskbar presence | medium |
+| `unk_44c97973…` | Translate view: "Speak now" vs "Enter text…" placeholder, overlay nav height, select menu styling | low |
 
 Not yet investigated:
 

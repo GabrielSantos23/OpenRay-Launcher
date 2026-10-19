@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { isValidElement, useState, type ReactElement } from "react";
 import type { IconSpec, IconTone } from "./extension-api";
 
 const TONES: Record<IconTone, string> = {
@@ -35,9 +35,10 @@ export function GlyphTile({ spec, small = false }: { spec: IconSpec; small?: boo
   );
 }
 
-export function CommandIcon({ title, icon, fallback, small = false }: { title: string; icon?: string | IconSpec; fallback?: IconSpec; small?: boolean }) {
+export function CommandIcon({ title, icon, fallback, small = false }: { title: string; icon?: string | IconSpec | ReactElement; fallback?: IconSpec; small?: boolean }) {
   const [failed, setFailed] = useState(false);
   const size = small ? "size-4" : "size-[22px]";
+  if (isValidElement(icon)) return icon;
   if (icon && typeof icon !== "string") return <GlyphTile spec={icon} small={small} />;
   if (icon && !failed) {
     return <img src={icon} alt="" loading="lazy" draggable={false} onError={() => setFailed(true)} className={`${size} shrink-0 rounded-[4px]`} />;

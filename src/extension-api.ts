@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType, ReactElement, ReactNode } from "react";
 
 export interface Shortcut {
   key: string;
@@ -42,7 +42,7 @@ export interface Command {
   id: string;
   title: string;
   subtitle?: string;
-  icon?: string | IconSpec;
+  icon?: string | IconSpec | ReactElement;
   keywords?: string[];
   kind: string;
   primaryActionTitle: string;
@@ -86,7 +86,7 @@ export interface Item {
   title: string;
   icon?: ReactNode;
   subtitle?: string;
-  accessory?: string;
+  accessory?: ReactNode;
   keywords?: string[];
   actions: Action[][];
 }

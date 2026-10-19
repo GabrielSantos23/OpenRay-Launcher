@@ -1,11 +1,13 @@
 mod apps;
 mod clipboard;
+mod flowkey;
 mod registry;
 mod hotkey;
 mod hud;
 mod launcher;
 mod notes;
 mod store;
+mod translate;
 
 use std::collections::HashMap;
 use store::{Settings, Store};
@@ -348,6 +350,8 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| launcher::show(app)))
         .register_asynchronous_uri_scheme_protocol("appicon", |_ctx, request, responder| serve_app_icon(request, responder))
         .register_uri_scheme_protocol("clipimg", |ctx, request| serve_clipboard_image(ctx.app_handle(), request))
+        .register_uri_scheme_protocol("flowkey", |ctx, request| flowkey::serve(ctx.app_handle(), request))
+        .register_uri_scheme_protocol("extimg", |ctx, request| flowkey::serve_image(ctx.app_handle(), request))
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             app.manage(clipboard::History::load(data_dir.join("clipboard"), store::now_ms()));
@@ -449,7 +453,28 @@ pub fn run() {
             notes_show,
             tooltip_show,
             tooltip_present,
-            tooltip_hide
+            tooltip_hide,
+            translate::translate,
+            flowkey::flowkey_list,
+            flowkey::flowkey_extensions_dir,
+            flowkey::flowkey_package_manifest,
+            flowkey::flowkey_install,
+            flowkey::flowkey_uninstall,
+            flowkey::flowkey_data_get,
+            flowkey::flowkey_data_set,
+            flowkey::flowkey_secret,
+            flowkey::flowkey_http,
+            flowkey::flowkey_oauth,
+            flowkey::flowkey_image,
+            flowkey::flowkey_media_current,
+            flowkey::flowkey_media_control,
+            flowkey::flowkey_fs,
+            flowkey::flowkey_default_app,
+            flowkey::flowkey_pick_path,
+            flowkey::flowkey_selected_text,
+            flowkey::flowkey_edit_clipboard_entry,
+            flowkey::copy_rich,
+            flowkey::read_clipboard_rich
         ])
         .run(tauri::generate_context!())
         .expect("error while running Openray");

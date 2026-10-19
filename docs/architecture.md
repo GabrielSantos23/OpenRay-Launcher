@@ -56,16 +56,20 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Views | `src/ListView.tsx`, `src/ActionHost.tsx` | Pushed command views: back button, search with optional argument field and filter, list or grid, detail with Information, footer; action panel with submenus and confirmation dialogs, shared with the root |
 | Notes | `src/NotesWindow.tsx`, `src/notes.ts`, `src/Tooltip.tsx`, `src-tauri/src/notes.rs`, `src/extensions/notes.tsx` | `notes` window (Tiptap editor with the markdown extension, format bar, action panel, browse list, history), `notes.json` through `data_get`/`data_set`, right-edge placement on first show, `tooltip` window (non-activating, click-through) positioned above the hovered button in screen coordinates; launcher commands open it through `notes_show` |
 | Calculator | `src/calculator.ts`, `src/extensions/calculator.ts` | Expression parser, currency and time-zone parsing, color parsing and formats; inline result card |
+| Translator | `src/translate.ts`, `src/extensions/translate.tsx`, `src-tauri/src/translate.rs` | Language list and swap/restore logic; two-pane view; HTTP call to the Google `gtx` endpoint and response parsing in Rust (no CSP change needed) |
 | Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
 | Extension API | `src/extension-api.ts` | Types and `defineExtension` |
 | Icons | `src/icons.tsx` | `GlyphTile` (extension tiles from an `IconSpec`), `CommandIcon` (URL, tile or fallback), `OpenrayGlyph` |
-| Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `notes`, `quicklinks`, `web-searches`, `openray-core` |
+| Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `notes`, `quicklinks`, `translator`, `web-searches`, `openray-core` |
 | Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |
 | Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
 | Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
 | Themes | `src/theme.ts` | Bundled theme data, `ThemeRoot` applies CSS variables in every window from settings, system appearance and accent |
 | Launcher UI | `src/App.tsx` | Search input, list, footer, loader, keyboard |
+| FlowKey host (web) | `src/flowkey/*`, `src/extensions/flowkey.tsx` | Extension list and consent (`extensions.ts`), capability gate (`gate.ts`), native dispatcher (`natives.ts`), per-extension worker runtime (`runtime.ts`, `worker.ts`, `protocol.ts`), tree renderer (`FlowKeyView.tsx`, `Markdown.tsx`, `FlowKeyIcon.tsx`), web commands (`WebCommand.tsx`), dialogs, Settings panel |
+| FlowKey host (native) | `src-tauri/src/flowkey.rs` | `flowkey://` and `extimg://` protocols, package install and uninstall, per-extension data files, DPAPI secrets and OAuth tokens, HTTP with host and private-address checks, Spotify PKCE, image cache, SMTC media, scoped file operations, file pickers, rich clipboard |
+| Bundled FlowKey extensions | `extensions/spotify-player` | A FlowKey CLI project; `npm run build:extensions` runs `flowkey build`, and `dist/` is bundled as `resources/extensions/spotify-player` |
 
 The Rust core exposes Tauri commands:
 
@@ -82,7 +86,10 @@ The Rust core exposes Tauri commands:
 - `quit_app`
 - `settings_get`, `settings_set` (validates hotkeys, saves, re-registers, emits `settings-changed`)
 - `notes_show` (hides the launcher, shows and focuses the notes window, emits `notes-open`), `tooltip_show`, `tooltip_present`, `tooltip_hide`
+- `translate` (text, source, target → translated text and detected source language)
 - `hotkeys_suspend`, `login_item_get`, `login_item_set`, `open_settings`, `system_accent_color`
+
+- FlowKey host: `flowkey_list`, `flowkey_extensions_dir`, `flowkey_package_manifest`, `flowkey_install`, `flowkey_uninstall`, `flowkey_data_get`, `flowkey_data_set`, `flowkey_secret`, `flowkey_http`, `flowkey_oauth`, `flowkey_image`, `flowkey_media_current`, `flowkey_media_control`, `flowkey_fs`, `flowkey_default_app`, `flowkey_pick_path`, `flowkey_selected_text`, `flowkey_edit_clipboard_entry`, `copy_rich`, `read_clipboard_rich`
 
 The hook dispatcher toggles the launcher for the `launcher` binding and emits `run-command` (the command key) to the launcher window for command hotkeys.
 
@@ -147,3 +154,13 @@ interface Action {
 - The registry namespaces ids as `<extensionId>/<commandId>`. That key is what frecency stores.
 - Built-ins are registered through `defineExtension` in `src/extensions/index.ts`, and nothing else is special-cased.
 - Planned additions, when real features need them: preferences.
+
+## FlowKey extension host
+
+Openray runs extensions built with the user's FlowKey CLI unchanged. This does not reopen ADR-001: built-in features still use the internal API above, and each FlowKey extension is adapted into it as one Openray extension keyed `flowkey.<id>`.
+
+- **Isolation.** Each extension runs in its own module Web Worker. Workers cannot reach Tauri IPC (the invoke key lives only in the window), and `fetch`, XHR, WebSocket and similar globals are removed before the bundle loads. The worker starts from a blob so it inherits the window CSP, which limits script loads to the app and `flowkey://`.
+- **Native calls.** The worker posts `nativeCall`; the window checks the method against manifest ∩ stored consent (`gate.ts`) and runs it (`natives.ts`), mostly through `flowkey.rs`. Calls are attributed to the worker's own extension, never to an id inside the message.
+- **Trees.** React extensions render through `@flowkey-cli/react-ui`'s reconciler in the worker; trees are pushed at most every 16 ms and deduplicated. The window renders them with the existing ListView, footer and action panel.
+- **Web commands** run in a sandboxed iframe served from `flowkey://<source>/<id>/__host__/<entry>` with a strict CSP. A shim maps `chrome.webview` to `postMessage`, and the host recognises the frame by its window, not by message fields.
+- **Data** lives in `%APPDATA%\dev.openray.app\flowkey\<id>\`: `storage`, `cache`, `consent` and `preferences` as JSON, and DPAPI-sealed `secrets.bin` and `oauth-<provider>.bin`. OAuth tokens never reach the extension; `http.fetch` with `auth` injects them only for the provider's pinned host.

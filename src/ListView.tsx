@@ -32,6 +32,8 @@ interface ListViewProps {
   accessory?: ReactNode;
   argument?: ArgumentField;
   emptyText?: string;
+  emptyDescription?: string;
+  tileTitles?: boolean;
   isLoading?: boolean;
   selectedId?: string;
   onSelectionChange?: (item: Item | undefined) => void;
@@ -74,6 +76,8 @@ export function ListView({
   accessory,
   argument,
   emptyText = "No Results",
+  emptyDescription,
+  tileTitles = false,
   isLoading = false,
   selectedId,
   onSelectionChange,
@@ -228,7 +232,12 @@ export function ListView({
           aria-busy={isLoading}
           className={`min-h-0 overflow-y-auto px-inset pb-inset ${detail ? "w-[285px] shrink-0 border-r border-separator" : "flex-1"}`}
         >
-          {flat.length === 0 && !isLoading && <p className="flex h-full items-center justify-center text-13 text-fg-60">{emptyText}</p>}
+          {flat.length === 0 && !isLoading && (
+            <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center text-13">
+              <p className={emptyDescription ? "font-medium text-fg" : "text-fg-60"}>{emptyText}</p>
+              {emptyDescription && <p className="max-w-[420px] text-fg-60">{emptyDescription}</p>}
+            </div>
+          )}
           {visible.map((section) => (
             <div key={section.title} role="group" aria-label={section.title}>
               <div className="flex h-8 items-end gap-2 px-2 pb-[5px] text-11 font-semibold text-fg-60">
@@ -255,12 +264,24 @@ export function ListView({
                         if (primary && i === active) runAction(primary);
                       }}
                       className={
-                        layout === "grid"
-                          ? `flex aspect-square cursor-default items-center justify-center rounded-row bg-list-hover text-[40px] leading-none ${isSelected ? "bg-list-selection shadow-[inset_0_0_0_2px_var(--color-fg-60)]" : ""}`
-                          : `flex h-row cursor-default items-center gap-3 rounded-row px-2 text-13 ${isSelected ? "bg-list-selection" : ""}`
+                        layout === "grid" && tileTitles
+                          ? "flex min-w-0 cursor-default flex-col gap-1.5 pb-1"
+                          : layout === "grid"
+                            ? `flex aspect-square cursor-default items-center justify-center rounded-row bg-list-hover text-[40px] leading-none ${isSelected ? "bg-list-selection shadow-[inset_0_0_0_2px_var(--color-fg-60)]" : ""}`
+                            : `flex h-row cursor-default items-center gap-3 rounded-row px-2 text-13 ${isSelected ? "bg-list-selection" : ""}`
                       }
                     >
-                      {layout === "grid" ? (
+                      {layout === "grid" && tileTitles ? (
+                        <>
+                          <span
+                            className={`flex aspect-square items-center justify-center overflow-hidden rounded-row bg-list-hover text-[40px] leading-none ${isSelected ? "bg-list-selection shadow-[inset_0_0_0_2px_var(--color-fg-60)]" : ""}`}
+                          >
+                            {item.icon}
+                          </span>
+                          <span className="truncate px-0.5 text-12 font-medium text-fg">{item.title}</span>
+                          {item.subtitle && <span className="-mt-1 truncate px-0.5 text-11 text-fg-60">{item.subtitle}</span>}
+                        </>
+                      ) : layout === "grid" ? (
                         item.icon
                       ) : (
                         <>

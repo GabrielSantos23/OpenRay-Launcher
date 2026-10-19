@@ -76,6 +76,21 @@ const KEY_NAMES: Record<string, string> = {
   Semicolon: ";",
   Minus: "-",
   Equal: "=",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Backslash: "\\",
+  Quote: "'",
+  ArrowUp: "ArrowUp",
+  ArrowDown: "ArrowDown",
+  ArrowLeft: "ArrowLeft",
+  ArrowRight: "ArrowRight",
+  Home: "Home",
+  End: "End",
+  PageUp: "PageUp",
+  PageDown: "PageDown",
+  Insert: "Insert",
+  Delete: "Delete",
+  Backspace: "Backspace",
 };
 
 interface KeyEventLike {
@@ -88,14 +103,16 @@ interface KeyEventLike {
 
 export function hotkeyFromEvent(event: KeyEventLike): string | null {
   const key =
-    KEY_NAMES[event.code] ?? event.code.match(/^Key([A-Z])$/)?.[1] ?? event.code.match(/^Digit(\d)$/)?.[1] ?? event.code.match(/^(F\d{1,2})$/)?.[1];
+    KEY_NAMES[event.code] ?? event.code.match(/^Key([A-Z])$/)?.[1] ?? event.code.match(/^Digit(\d)$/)?.[1] ?? event.code.match(/^(F\d{1,2})$/)?.[1] ?? event.code.match(/^(Numpad\d)$/)?.[1];
   const modifiers = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Win"].filter(Boolean);
   if (!key || modifiers.length === 0) return null;
   return [...modifiers, key].join("+");
 }
 
+const KEY_GLYPHS: Record<string, string> = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Backspace: "⌫", PageUp: "PgUp", PageDown: "PgDn", Delete: "Del", Insert: "Ins" };
+
 export function hotkeyLabels(hotkey: string): string[] {
-  return hotkey.split("+").map((part) => part.trim());
+  return hotkey.split("+").map((part) => KEY_GLYPHS[part.trim()] ?? part.trim());
 }
 
 export function useSettings(): [Settings | null, (next: Settings) => Promise<void>] {
