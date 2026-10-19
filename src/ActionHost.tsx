@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionPanel, Keys, type PanelPlacement } from "./ActionPanel";
 import type { Action, Confirmation } from "./extension-api";
@@ -171,7 +172,11 @@ export function Footer({
 }) {
   const toast = useToast();
   return (
-    <footer className="relative isolate flex h-footer shrink-0 items-center gap-2 overflow-hidden pt-px pr-[9px] pb-px pl-3 text-13 before:absolute before:inset-x-0 before:top-0 before:-z-20 before:h-px before:bg-separator">
+    <footer
+      onMouseDown={(e) => {
+        if (e.button === 0 && !(e.target as Element).closest("button,a,input")) void getCurrentWindow().startDragging();
+      }}
+      className="relative isolate flex h-footer shrink-0 items-center gap-2 overflow-hidden pt-px pr-[9px] pb-px pl-3 text-13 before:absolute before:inset-x-0 before:top-0 before:-z-20 before:h-px before:bg-separator">
       {toast ? <FooterToast /> : left}
       {primaryTitle && (
         <span className="ml-auto flex shrink-0 items-center gap-2 font-medium">

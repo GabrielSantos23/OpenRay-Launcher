@@ -1,4 +1,6 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import type { Update } from "@tauri-apps/plugin-updater";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Check,
@@ -40,6 +42,7 @@ import {
 } from "./settings";
 import { CommandIcon, GlyphTile, OpenrayGlyph } from "./icons";
 import { THEMES, type Theme } from "./theme";
+import { checkForUpdate } from "./updater";
 
 type Save = (next: SettingsData) => Promise<void>;
 type RecorderFor = (owner: string) => {
@@ -87,7 +90,7 @@ function Tile({ children, className = "bg-control" }: { children: ReactNode; cla
 }
 
 const PAGES: Page[] = [
-  { id: "general", title: "General", icon: <Tile><Gear className="size-3.5" /></Tile>, keywords: ["open at login", "system tray", "hotkey"] },
+  { id: "general", title: "General", icon: <Tile><Gear className="size-3.5" /></Tile>, keywords: ["open at login", "system tray", "hotkey", "updates", "check for updates", "version"] },
   { id: "launcher", title: "Launcher", icon: <Tile><Rocket className="size-3.5" /></Tile>, keywords: ["show openray on", "screen"] },
   { id: "shortcuts", title: "Shortcuts", icon: <Tile><Command className="size-3.5" /></Tile>, keywords: ["alias", "hotkey", "commands"] },
   { id: "keyboard", title: "Keyboard", icon: <Tile><Keyboard className="size-3.5" /></Tile>, keywords: ["escape key"] },
@@ -156,6 +159,66 @@ export function Card({ children }: { children: ReactNode }) {
   return <section className="flex flex-col overflow-hidden rounded-lg bg-card">{children}</section>;
 }
 
+const TEXT_BUTTON = "h-6 shrink-0 rounded-[5px] bg-control px-2.5 font-medium text-fg outline-offset-2 hover:bg-control-hover disabled:text-fg-40";
+
+function UpdatesRow() {
+  const [version, setVersion] = useState("");
+  const [status, setStatus] = useState<{ state: "idle" | "checking" | "current" | "installing" } | { state: "available"; update: Update } | { state: "failed"; error: string }>({ state: "idle" });
+
+  useEffect(() => {
+    getVersion().then(setVersion);
+  }, []);
+
+  async function runCheck() {
+    setStatus({ state: "checking" });
+    try {
+      const update = await checkForUpdate();
+      setStatus(update ? { state: "available", update } : { state: "current" });
+    } catch (e) {
+      setStatus({ state: "failed", error: String(e) });
+    }
+  }
+
+  async function install(update: Update) {
+    setStatus({ state: "installing" });
+    try {
+      await update.downloadAndInstall();
+    } catch (e) {
+      setStatus({ state: "failed", error: String(e) });
+    }
+  }
+
+  const description =
+    status.state === "checking"
+      ? "Checking for updates..."
+      : status.state === "current"
+        ? `Openray ${version} is up to date`
+        : status.state === "available"
+          ? `Openray ${status.update.version} is available. You have ${version}.`
+          : status.state === "installing"
+            ? "Downloading and installing. Openray restarts when it finishes."
+            : status.state === "failed"
+              ? `Could not check for updates: ${status.error}`
+              : version && `Version ${version}`;
+
+  return (
+    <Row id="updates" title="Updates" description={description || undefined}>
+      <span aria-live="polite" className="sr-only">
+        {status.state === "idle" ? "" : description}
+      </span>
+      {status.state === "available" ? (
+        <button type="button" onClick={() => install(status.update)} className={TEXT_BUTTON}>
+          Install Update
+        </button>
+      ) : (
+        <button type="button" disabled={status.state === "checking" || status.state === "installing"} onClick={runCheck} className={TEXT_BUTTON}>
+          {status.state === "failed" ? "Try Again" : "Check for Updates"}
+        </button>
+      )}
+    </Row>
+  );
+}
+
 function GeneralPage({ settings, save, recorder }: { settings: SettingsData; save: Save; recorder: RecorderFor }) {
   const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -201,6 +264,7 @@ function GeneralPage({ settings, save, recorder }: { settings: SettingsData; sav
           <RotateCcw className="size-3.5" />
         </button>
       </Row>
+      <UpdatesRow />
       </Card>
       <Section id="appearance" title="Appearance">
         <Card>

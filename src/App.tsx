@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { RefreshCw } from "lucide-react";
 import { Footer, Loader, Logo, useActionHost } from "./ActionHost";
-import { CommandIcon } from "./icons";
+import { CommandIcon, GlyphTile } from "./icons";
 import { actionGroups, matchesShortcut } from "./actions";
 import type { Action, InlineResult, InlineSide, RegisteredCommand, ViewProps } from "./extension-api";
 import { builtInExtensions } from "./extensions";
@@ -13,6 +14,7 @@ import { loadCommands } from "./registry";
 import { search, type Frecency, type Section } from "./search";
 import { setLauncherVisible } from "./toast";
 import { commandPrefs, isEnabled, useSettings } from "./settings";
+import { useAvailableUpdate } from "./updater";
 
 function CardSide({ side, isInput }: { side: InlineSide; isInput?: boolean }) {
   return (
@@ -81,6 +83,7 @@ export default function App() {
   const keepSelected = useRef<string | null>(null);
   const [settings] = useSettings();
   const host = useActionHost(() => inputRef.current?.focus());
+  const update = useAvailableUpdate();
 
   const refresh = useCallback(async () => {
     setLoading((n) => n + 1);
@@ -154,10 +157,13 @@ export default function App() {
 
   const inlineResult = inline && inline.query === query ? inline.result : null;
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
-  const count = flat.length + (inlineResult ? 1 : 0);
+  const showUpdate = !!update && !query.trim();
+  const lead = inlineResult || showUpdate ? 1 : 0;
+  const count = flat.length + lead;
   const active = Math.max(0, Math.min(selected, count - 1));
   const isInline = !!inlineResult && active === 0;
-  const current = isInline ? undefined : flat[active - (inlineResult ? 1 : 0)];
+  const isUpdate = showUpdate && active === 0;
+  const current = isInline || isUpdate ? undefined : flat[active - lead];
 
   function openView(command: RegisteredCommand) {
     if (!command.view) return;
@@ -197,14 +203,17 @@ export default function App() {
     const key = keepSelected.current;
     keepSelected.current = null;
     const index = key ? flat.findIndex((c) => c.key === key) : -1;
-    if (index >= 0) setSelected(index + (inlineResult ? 1 : 0));
+    if (index >= 0) setSelected(index + lead);
   }, [flat]);
 
   useEffect(() => {
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
   }, [active, sections]);
 
-  const groups: Action[][] = isInline
+  const installUpdate: Action = { id: "install-update", title: "Install Update", shortcut: { key: "Enter" }, keepOpen: true, run: () => update!.downloadAndInstall() };
+  const groups: Action[][] = isUpdate
+    ? [[installUpdate]]
+    : isInline
     ? inlineResult!.actions
     : current?.key.startsWith("fallback:")
       ? [[{ id: "primary", title: current.primaryActionTitle, shortcut: { key: "Enter" }, run: () => current.run?.() }]]
@@ -224,8 +233,8 @@ export default function App() {
             },
           })
         : [];
-  const primaryTitle = isInline ? inlineResult!.primaryActionTitle : current?.primaryActionTitle;
-  const panelTitle = isInline ? inlineResult!.output.text || inlineResult!.output.label : (current?.title ?? "");
+  const primaryTitle = isUpdate ? installUpdate.title : isInline ? inlineResult!.primaryActionTitle : current?.primaryActionTitle;
+  const panelTitle = isUpdate ? "New Update Available" : isInline ? inlineResult!.output.text || inlineResult!.output.label : (current?.title ?? "");
 
   function visit(command: RegisteredCommand) {
     if (command.key.startsWith("fallback:")) return;
@@ -298,7 +307,7 @@ export default function App() {
     );
   }
 
-  let index = inlineResult ? 0 : -1;
+  let index = lead ? 0 : -1;
 
   return (
     <main onMouseDown={keepFocus} className="relative flex h-full flex-col text-fg">
@@ -320,7 +329,7 @@ export default function App() {
           role="combobox"
           aria-expanded="true"
           aria-controls="results"
-          aria-activedescendant={isInline ? "option-inline" : current ? `option-${active}` : undefined}
+          aria-activedescendant={isUpdate ? "option-update" : isInline ? "option-inline" : current ? `option-${active}` : undefined}
           className="h-full min-w-0 flex-1 bg-transparent text-18 text-fg caret-fg outline-none placeholder:text-fg-40"
         />
         <Loader active={loading > 0 || host.busy} />
@@ -328,6 +337,20 @@ export default function App() {
 
       <div ref={listRef} id="results" role="listbox" aria-label="Results" aria-busy={loading > 0} className="min-h-0 flex-1 overflow-y-auto px-inset pb-inset">
         {count === 0 && <p className="flex h-full items-center justify-center text-13 text-fg-60">No results for “{query.trim()}”</p>}
+        {showUpdate && (
+          <div
+            id="option-update"
+            data-index={0}
+            role="option"
+            aria-selected={isUpdate}
+            onMouseMove={() => active !== 0 && setSelected(0)}
+            onClick={() => runSelected(installUpdate)}
+            className={`mt-2 flex h-[56px] cursor-default items-center gap-3 rounded-row px-2 text-13 ${isUpdate ? "bg-list-selection" : "bg-list-hover"}`}
+          >
+            <GlyphTile spec={{ glyph: RefreshCw, tone: "red" }} />
+            <span className="truncate font-medium">New Update Available</span>
+          </div>
+        )}
         {inlineResult && (
           <div role="group" aria-label={inlineResult.section}>
             <div className="flex h-8 items-end px-2 pb-[5px] text-11 font-semibold text-fg-60">{inlineResult.section}</div>

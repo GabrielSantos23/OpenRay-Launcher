@@ -87,6 +87,12 @@
 - The duplicate-check preference and quicklink creation from Add Playing Song to Playlist are left out, because FlowKey has no quicklink launch context.
 - Current Track shows a HUD instead of updating the command subtitle.
 
+## Updates
+
+- Updates need a GitHub release built by `.github/workflows/release.yml` with the repository secret `TAURI_SIGNING_PRIVATE_KEY` (and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` when the key has one). Without a release, every check fails, the failure goes only to the console, and the launcher shows no row.
+- The release workflow builds only the Windows x64 NSIS installer.
+- Installing shows no download progress. The app exits while the passive NSIS installer runs.
+
 ## Platform
 
 - Built and tested only on Windows 11 x64 at 96 DPI. Windows 10 is untested.

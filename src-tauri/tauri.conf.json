@@ -104,6 +104,18 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMxM0VDMUM5NzczOEQyNjYKUldSbTBqaDN5Y0Urd2FHMmcxdGpRVUZBVTZtckhJc21VS1RaOGEyRlFkNkVKN1NVbkFwSExMa28K",
+      "endpoints": [
+        "https://github.com/GabrielSantos23/OpenRay-Launcher/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

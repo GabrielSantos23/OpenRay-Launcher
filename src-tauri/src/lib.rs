@@ -348,6 +348,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| launcher::show(app)))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol("appicon", |_ctx, request, responder| serve_app_icon(request, responder))
         .register_uri_scheme_protocol("clipimg", |ctx, request| serve_clipboard_image(ctx.app_handle(), request))
         .register_uri_scheme_protocol("flowkey", |ctx, request| flowkey::serve(ctx.app_handle(), request))
