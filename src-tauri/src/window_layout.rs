@@ -123,7 +123,7 @@ fn target() -> Result<HWND, String> {
     }
 }
 
-fn outer_and_visible(hwnd: HWND) -> Result<(Rect, Rect), String> {
+pub(crate) fn outer_and_visible(hwnd: HWND) -> Result<(Rect, Rect), String> {
     let mut outer = RECT::default();
     let mut visible = RECT::default();
     unsafe {

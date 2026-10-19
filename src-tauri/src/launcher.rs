@@ -93,7 +93,7 @@ fn place(app: &AppHandle, window: &WebviewWindow, previous: HWND) {
     let _ = window.set_position(PhysicalPosition::new(x, y.min(max_y).max(area.position.y)));
 }
 
-fn force_foreground(hwnd: HWND) {
+pub(crate) fn force_foreground(hwnd: HWND) {
     unsafe {
         let current = GetCurrentThreadId();
         let foreground = GetWindowThreadProcessId(GetForegroundWindow(), None);

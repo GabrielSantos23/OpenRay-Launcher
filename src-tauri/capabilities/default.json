@@ -6,7 +6,10 @@
     "hud",
     "settings",
     "notes",
-    "tooltip"
+    "tooltip",
+    "focus-panel",
+    "focus-toast",
+    "focus-block"
   ],
   "permissions": [
     "core:default",

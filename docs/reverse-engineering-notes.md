@@ -301,3 +301,11 @@ Not yet investigated:
 - Exact row text metrics.
 - Show and hide animation.
 - Compact mode height.
+
+## Raycast Focus (2.8.2)
+
+- **Commands and settings.** `backend/index.mjs` @914374, extension `raycast-focus`: start, toggle, pause, resume, complete, edit, searchCategories, createCategory, importCategories, the AI extension, and a dynamic `session` item (actions Edit Session, Restart, Complete, Pause submenu, Resume, Cancel, Move to/Detach from Taskbar). Preferences: `snoozeDurationMs` 180000, `playSound` true, `restoreAppsWhenSessionEnds` false, `allowAllOnEmptyWebsiteAllowlist` false.
+- **Session input.** `main-window-*.js` @742388: default title `Focus session`, mode `block`/`allow`, `categoryIds`, `raycastAppIds`, `websiteHosts`, goal `noLimit` or `duration` (max 24 h). The last start input is stored under `raycast-focus::last-start-input`. Form labels: Goal (“What are you focusing on?”), Duration (placeholder No Limit), Mode (“Block Apps & Websites” / “Allow Apps & Websites”), Block/Allow (“What apps or websites do you want to block?”, “Block website: …”). Success toasts: “Focus session started.”, “Focus session updated.”.
+- **Panel.** `window-shell-hosts-*.js` `FocusSessionPanel` and `window-shell-hosts-*.css`: 265×40, progress width = elapsed fraction, green at 28% (yellow when paused), summary (icon when no limit, else a timer pill) fades to controls on hover; pause menu 1, 2, 5, 10 minutes and Indefinitely; ··· menu Edit, Cancel, Move to Taskbar, Reset Panel Position; drag handle, double-click resets. Timer format `mm:ss` under an hour, `hh:mm` above; refresh step 1 s up to 10 min, 5 s up to 1 h, 60 s above. Hover and menus come from native code (`forceNativeOnWindows`, mouse-entered/exited events).
+- **Blocking.** `Raycast.dll` UTF-16 strings: “ has been blocked by Raycast”, “Snooze for ”, `focus/focusnotificationtoastwindow.xaml`, “[Focus] Blocked app is still running; requesting force quit”, “[Focus] Restoring previously terminated app”. Website blocks redirect to `https://raycast.com/focus-session` with `&snooze_duration=`. Built-in categories are upserted from `backend/index.mjs` @~4854000 (not copied; Openray ships its own lists).
+- **Unknowns.** Notification auto-dismiss time, panel bottom margin, the sound used, and the exact window sizes of the overlay and notification were not measured.

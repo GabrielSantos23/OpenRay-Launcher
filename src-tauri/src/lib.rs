@@ -1,6 +1,7 @@
 mod apps;
 mod clipboard;
 mod flowkey;
+mod focus;
 mod registry;
 mod hotkey;
 mod hud;
@@ -267,6 +268,84 @@ fn notes_show(app: AppHandle, request: serde_json::Value) {
 }
 
 #[tauri::command]
+fn focus_get() -> Option<focus::Session> {
+    focus::get()
+}
+
+#[tauri::command]
+fn focus_start(app: AppHandle, input: focus::StartInput) -> focus::Session {
+    focus::start(&app, input)
+}
+
+#[tauri::command]
+fn focus_update(app: AppHandle, input: focus::StartInput) -> Result<focus::Session, String> {
+    focus::update(&app, input)
+}
+
+#[tauri::command]
+fn focus_pause(app: AppHandle, duration_ms: Option<u64>) -> Result<(), String> {
+    focus::pause(&app, duration_ms)
+}
+
+#[tauri::command]
+fn focus_resume(app: AppHandle) -> Result<(), String> {
+    focus::resume(&app)
+}
+
+#[tauri::command]
+fn focus_restart(app: AppHandle) -> Result<(), String> {
+    focus::restart(&app)
+}
+
+#[tauri::command]
+fn focus_complete(app: AppHandle) -> Result<(), String> {
+    focus::complete(&app)
+}
+
+#[tauri::command]
+fn focus_cancel(app: AppHandle) -> Result<(), String> {
+    focus::cancel(&app)
+}
+
+#[tauri::command]
+fn focus_snooze(app: AppHandle) -> Result<(), String> {
+    focus::snooze(&app)
+}
+
+#[tauri::command]
+fn focus_close_tab(app: AppHandle) -> Result<(), String> {
+    focus::close_tab(&app)
+}
+
+#[tauri::command]
+fn focus_block_info() -> Option<serde_json::Value> {
+    focus::current_block()
+}
+
+#[tauri::command]
+fn focus_panel_menu(app: AppHandle, menu: String, x: f64, y: f64) -> Result<(), String> {
+    focus::panel_menu(&app, &menu, x, y)
+}
+
+#[tauri::command]
+fn focus_panel_reset(app: AppHandle) {
+    focus::reset_panel(&app)
+}
+
+#[tauri::command]
+fn focus_toast_hide(app: AppHandle) {
+    focus::hide_toast(&app)
+}
+
+#[tauri::command]
+fn read_json_file(path: String) -> Result<String, String> {
+    if !path.to_lowercase().ends_with(".json") {
+        return Err("Choose a JSON file".into());
+    }
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn system_action(app: AppHandle, action: String) -> Result<(), String> {
     system_actions::run(&app, &action)
 }
@@ -434,6 +513,11 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            match (window.label(), event) {
+                (focus::BLOCK, WindowEvent::Focused(false)) => focus::block_left(window.app_handle()),
+                (focus::PANEL, WindowEvent::Moved(_)) => focus::panel_moved(window),
+                _ => {}
+            }
             if window.label() == notes::LABEL {
                 match event {
                     WindowEvent::Moved(_) | WindowEvent::Resized(_) => notes::remember_geometry(window),
@@ -493,6 +577,21 @@ pub fn run() {
             notes_pending,
             window_layout,
             system_action,
+            focus_get,
+            focus_start,
+            focus_update,
+            focus_pause,
+            focus_resume,
+            focus_restart,
+            focus_complete,
+            focus_cancel,
+            focus_snooze,
+            focus_close_tab,
+            focus_block_info,
+            focus_panel_menu,
+            focus_panel_reset,
+            focus_toast_hide,
+            read_json_file,
             tooltip_show,
             tooltip_present,
             tooltip_hide,

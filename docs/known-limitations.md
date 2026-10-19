@@ -87,6 +87,13 @@
 - The duplicate-check preference and quicklink creation from Add Playing Song to Playlist are left out, because FlowKey has no quicklink launch context.
 - Current Track shows a HUD instead of updating the command subtitle.
 
+## Focus
+
+- A session lives in memory: it ends if Openray quits or the computer restarts, and nothing pauses it during sleep.
+- Website blocking reads the browser's address bar with UI Automation, so it only works in the listed Chromium and Firefox browsers and was only tested in Edge.
+- Blocked apps are asked to close, not force-quit; an app that shows a save prompt stays open behind the overlay.
+- No Move to Taskbar, focus statistics, or typed durations.
+
 ## System Actions
 
 - Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Volume Mixer, active-app volume, sound device pickers, Set Volume with a typed value, Energy Saver, Night Light, HDR and camera mute.

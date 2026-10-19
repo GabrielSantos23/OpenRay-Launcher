@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const HALF_LIFE_MS: f64 = 864e6;
-const DATA_NAMES: [&str; 3] = ["quicklinks", "emoji", "notes"];
+const DATA_NAMES: [&str; 4] = ["quicklinks", "emoji", "notes", "focus"];
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
 #[serde(rename_all = "kebab-case")]

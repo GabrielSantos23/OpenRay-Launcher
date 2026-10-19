@@ -25,6 +25,7 @@
   --color-destructive: var(--color-red);
   --color-green: #59d499;
   --color-yellow: #ffc531;
+  --color-focus-overlay: #050505;
   --color-loader: #ffffff;
   --color-accent: #4fa3f8;
   --color-titlebar: rgb(from var(--color-fg) r g b / 5%);
@@ -71,6 +72,7 @@
   --text-11: 11px;
   --text-12: 12px;
   --text-13: 13px;
+  --text-15: 15px;
   --text-18: 18px;
 
   --spacing-header: 66px;

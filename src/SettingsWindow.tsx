@@ -43,6 +43,7 @@ import {
 import { CommandIcon, GlyphTile, OpenrayGlyph } from "./icons";
 import { THEMES, type Theme } from "./theme";
 import { checkForUpdate } from "./updater";
+import { DEFAULT_PREFERENCES, loadPreferences, savePreferences, SNOOZE_OPTIONS, type FocusPreferences } from "./focus";
 
 type Save = (next: SettingsData) => Promise<void>;
 type RecorderFor = (owner: string) => {
@@ -216,6 +217,43 @@ function UpdatesRow() {
         </button>
       )}
     </Row>
+  );
+}
+
+function FocusSettings() {
+  const [prefs, setPrefs] = useState<FocusPreferences | null>(null);
+  useEffect(() => {
+    loadPreferences()
+      .then(setPrefs)
+      .catch(() => setPrefs(DEFAULT_PREFERENCES));
+  }, []);
+  if (!prefs) return null;
+  const update = (patch: Partial<FocusPreferences>) => {
+    const next = { ...prefs, ...patch };
+    setPrefs(next);
+    savePreferences(next).catch((e) => console.error("focus preferences save failed", e));
+  };
+  return (
+    <>
+      <Card>
+        <Row id="focus-snooze" title="Snooze Duration" description="Choose how long blocked apps and websites stay snoozed.">
+          <Select labelledBy="focus-snooze" value={String(prefs.snoozeMs ?? 0)} options={SNOOZE_OPTIONS} onChange={(value) => update({ snoozeMs: Number(value) || null })} />
+        </Row>
+        <Row id="focus-sound" title="Play Sound" description="Play sounds for Focus notifications.">
+          <Switch labelledBy="focus-sound" checked={prefs.playSound} onChange={(playSound) => update({ playSound })} />
+        </Row>
+      </Card>
+      <Card>
+        <Row id="focus-allow-all" title="Allow all Websites" description="Allow all websites when a browser is allowed but no specific websites are listed.">
+          <Switch labelledBy="focus-allow-all" checked={prefs.allowAllWebsites} onChange={(allowAllWebsites) => update({ allowAllWebsites })} />
+        </Row>
+      </Card>
+      <Card>
+        <Row id="focus-restore" title="Restore Terminated Apps" description="Reopen apps Openray Focus closed when the session ends.">
+          <Switch labelledBy="focus-restore" checked={prefs.restoreApps} onChange={(restoreApps) => update({ restoreApps })} />
+        </Row>
+      </Card>
+    </>
   );
 }
 
@@ -649,6 +687,7 @@ export function SettingsWindow() {
                   }
                 />
               )}
+              {extensionPage?.id === "focus" && <FocusSettings />}
               {(page === "shortcuts" || extensionPage) &&
                 tableExtensions.map((extension) => (
                   <ExtensionTable

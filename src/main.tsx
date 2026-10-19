@@ -17,6 +17,9 @@ const views: Record<string, () => Promise<{ default: ComponentType }>> = {
   settings: () => import("./SettingsWindow").then((m) => ({ default: m.SettingsWindow })),
   notes: () => import("./NotesWindow").then((m) => ({ default: m.NotesWindow })),
   tooltip: () => import("./Tooltip").then((m) => ({ default: m.Tooltip })),
+  "focus-panel": () => import("./FocusWindows").then((m) => ({ default: m.FocusPanel })),
+  "focus-toast": () => import("./FocusWindows").then((m) => ({ default: m.FocusToast })),
+  "focus-block": () => import("./FocusWindows").then((m) => ({ default: m.FocusBlock })),
 };
 const View = lazy(views[windowLabel()] ?? (() => import("./App")));
 
