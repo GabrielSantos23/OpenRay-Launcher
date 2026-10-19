@@ -8,6 +8,7 @@ mod launcher;
 mod notes;
 mod store;
 mod translate;
+mod window_layout;
 
 use std::collections::HashMap;
 use store::{Settings, Store};
@@ -265,6 +266,11 @@ fn notes_show(app: AppHandle, request: serde_json::Value) {
 }
 
 #[tauri::command]
+fn window_layout(layout: String) -> Result<(), String> {
+    window_layout::apply(&layout)
+}
+
+#[tauri::command]
 fn notes_pending() -> Option<serde_json::Value> {
     notes::take_pending()
 }
@@ -479,6 +485,7 @@ pub fn run() {
             open_url,
             notes_show,
             notes_pending,
+            window_layout,
             tooltip_show,
             tooltip_present,
             tooltip_hide,

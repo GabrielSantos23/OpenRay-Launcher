@@ -66,6 +66,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
 | Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
 | Themes | `src/theme.ts` | Bundled theme data, `ThemeRoot` applies CSS variables in every window from settings, system appearance and accent |
+| Window Management | `src/extensions/window-management.ts`, `src-tauri/src/window_layout.rs` | Layout commands; target window lookup, work-area fractions, invisible-border compensation, display order and moves |
 | Launcher UI | `src/App.tsx` | Search input, list, footer, loader, keyboard |
 | Updater | `src/updater.ts`, `tauri-plugin-updater`, `.github/workflows/release.yml` | Periodic and manual checks against `latest.json` on the latest GitHub release (public key in `tauri.conf.json`), the `update-found` event between windows, install through the plugin; the workflow builds and signs releases with `tauri-action` |
 | FlowKey host (web) | `src/flowkey/*`, `src/extensions/flowkey.tsx` | Extension list and consent (`extensions.ts`), capability gate (`gate.ts`), native dispatcher (`natives.ts`), per-extension worker runtime (`runtime.ts`, `worker.ts`, `protocol.ts`), tree renderer (`FlowKeyView.tsx`, `Markdown.tsx`, `FlowKeyIcon.tsx`), web commands (`WebCommand.tsx`), dialogs, Settings panel |
@@ -88,6 +89,7 @@ The Rust core exposes Tauri commands:
 - `settings_get`, `settings_set` (validates hotkeys, saves, re-registers, emits `settings-changed`)
 - `notes_show` (hides the launcher, creates or shows and focuses the notes window, emits `notes-open` to an existing window or keeps the request for `notes_pending` when it creates one), `notes_pending`, `tooltip_show`, `tooltip_present`, `tooltip_hide`
 - `translate` (text, source, target → translated text and detected source language)
+- `window_layout` (layout id → moves and resizes the target window)
 - `hotkeys_suspend`, `login_item_get`, `login_item_set`, `open_settings`, `system_accent_color`
 
 - FlowKey host: `flowkey_list`, `flowkey_extensions_dir`, `flowkey_package_manifest`, `flowkey_install`, `flowkey_uninstall`, `flowkey_data_get`, `flowkey_data_set`, `flowkey_secret`, `flowkey_http`, `flowkey_oauth`, `flowkey_image`, `flowkey_media_current`, `flowkey_media_control`, `flowkey_fs`, `flowkey_default_app`, `flowkey_pick_path`, `flowkey_selected_text`, `flowkey_edit_clipboard_entry`, `copy_rich`, `read_clipboard_rich`

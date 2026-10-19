@@ -87,6 +87,11 @@
 - The duplicate-check preference and quicklink creation from Add Playing Song to Playlist are left out, because FlowKey has no quicklink launch context.
 - Current Track shows a HUD instead of updating the command subtitle.
 
+## Window Management
+
+- Windows of apps running as administrator can't be moved while Openray runs without elevation; the command shows an error.
+- Maximize fills the work area and doesn't use the native maximized state.
+
 ## Updates
 
 - Updates need a GitHub release built by `.github/workflows/release.yml` with the repository secret `TAURI_SIGNING_PRIVATE_KEY` (and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` when the key has one). Without a release, every check fails, the failure goes only to the console, and the launcher shows no row.
