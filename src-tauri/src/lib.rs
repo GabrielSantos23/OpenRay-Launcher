@@ -1,5 +1,6 @@
 mod apps;
 mod clipboard;
+mod file_search;
 mod flowkey;
 mod focus;
 mod registry;
@@ -26,9 +27,11 @@ async fn list_apps() -> Vec<apps::InstalledApp> {
 fn serve_app_icon(request: tauri::http::Request<Vec<u8>>, responder: tauri::UriSchemeResponder) {
     let uri = request.uri();
     let path = percent_encoding::percent_decode_str(uri.path().trim_start_matches('/')).decode_utf8_lossy().into_owned();
-    let size = uri.query().and_then(|q| q.strip_prefix("size=")).and_then(|s| s.parse().ok()).filter(|s| (16..=256).contains(s)).unwrap_or(32);
+    let query: HashMap<_, _> = url::form_urlencoded::parse(uri.query().unwrap_or("").as_bytes()).into_owned().collect();
+    let size = query.get("size").and_then(|s| s.parse().ok()).filter(|s| (16..=512).contains(s)).unwrap_or(32);
+    let thumbnail = query.contains_key("thumb");
     std::thread::spawn(move || {
-        let response = match apps::icon_png(path, size) {
+        let response = match apps::icon_png(path, size, thumbnail) {
             Ok(png) => tauri::http::Response::builder()
                 .header("Content-Type", "image/png")
                 .header("Cache-Control", "max-age=86400")
@@ -47,6 +50,21 @@ fn launch_app(path: String, as_admin: Option<bool>) -> Result<(), String> {
 #[tauri::command]
 fn show_in_explorer(path: String) -> Result<(), String> {
     apps::show_in_explorer(&path)
+}
+
+#[tauri::command]
+async fn file_search(app: AppHandle, query: String, kind: String) -> Result<file_search::Results, String> {
+    tauri::async_runtime::spawn_blocking(move || file_search::search(&app, &query, &kind)).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn file_reindex(app: AppHandle) {
+    file_search::reindex(&app)
+}
+
+#[tauri::command]
+async fn file_info(path: String) -> Result<file_search::FileInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || file_search::info(&path)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -541,6 +559,9 @@ pub fn run() {
             list_apps,
             launch_app,
             show_in_explorer,
+            file_search,
+            file_reindex,
+            file_info,
             frecency_visit,
             frecency_all,
             frecency_reset,

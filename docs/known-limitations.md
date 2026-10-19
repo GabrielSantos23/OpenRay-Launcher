@@ -94,6 +94,14 @@
 - Blocked apps are asked to close, not force-quit; an app that shows a save prompt stays open behind the overlay.
 - No Move to Taskbar, focus statistics, or typed durations.
 
+## File Search
+
+- Searches file and folder names only. No content search, no `.gitignore`/`.rayignore` support, no Search Scopes or Ignore Patterns settings, no hidden-files toggle; the index covers only the user folder.
+- The index lives in memory and is rebuilt by walking the folder (no file watcher, no NTFS scanner), so new files appear after the next refresh, at most a minute after opening the view.
+- Ranking is Openray's own approximation; the reference ranking was not measured.
+- Not yet: files in root search, fallback with typed text, Quick Look, Navigate Up/Down and folder sorting, Paste File, Open in Terminal, Show Properties, Rename, Duplicate, Copy To, Move To, Open With, Exclude From Index.
+- Recently Used reads the Windows Recent folder; when Windows keeps no recent items, the list shows the newest modified files instead.
+
 ## System Actions
 
 - Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Volume Mixer, active-app volume, sound device pickers, Set Volume with a typed value, Energy Saver, Night Light, HDR and camera mute.

@@ -60,22 +60,25 @@ pub fn packaged_apps() -> Vec<InstalledApp> {
     })
 }
 
-pub fn icon_png(path: String, size: i32) -> Result<Vec<u8>, String> {
+pub fn icon_png(path: String, size: i32, thumbnail: bool) -> Result<Vec<u8>, String> {
     with_com(move || unsafe {
         use windows::core::HSTRING;
         use windows::Win32::Foundation::SIZE;
         use windows::Win32::Graphics::Gdi::{
-            DeleteObject, GetDC, GetDIBits, ReleaseDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
+            DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
         };
-        use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_ICONONLY};
+        use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_ICONONLY, SIIGBF_RESIZETOFIT};
 
         let factory: IShellItemImageFactory = SHCreateItemFromParsingName(&HSTRING::from(path.as_str()), None).map_err(|e| e.to_string())?;
-        let bitmap = factory.GetImage(SIZE { cx: size, cy: size }, SIIGBF_ICONONLY).map_err(|e| e.to_string())?;
+        let bitmap = factory.GetImage(SIZE { cx: size, cy: size }, if thumbnail { SIIGBF_RESIZETOFIT } else { SIIGBF_ICONONLY }).map_err(|e| e.to_string())?;
+        let mut header = BITMAP::default();
+        GetObjectW(bitmap.into(), size_of::<BITMAP>() as i32, Some((&mut header as *mut BITMAP).cast()));
+        let (width, height) = if header.bmWidth > 0 && header.bmHeight != 0 { (header.bmWidth, header.bmHeight.abs()) } else { (size, size) };
         let mut info = BITMAPINFO {
             bmiHeader: BITMAPINFOHEADER {
                 biSize: size_of::<BITMAPINFOHEADER>() as u32,
-                biWidth: size,
-                biHeight: -size,
+                biWidth: width,
+                biHeight: -height,
                 biPlanes: 1,
                 biBitCount: 32,
                 biCompression: BI_RGB.0,
@@ -83,17 +86,17 @@ pub fn icon_png(path: String, size: i32) -> Result<Vec<u8>, String> {
             },
             ..Default::default()
         };
-        let mut pixels = vec![0u8; (size * size * 4) as usize];
+        let mut pixels = vec![0u8; (width * height * 4) as usize];
         let dc = GetDC(None);
-        let lines = GetDIBits(dc, bitmap, 0, size as u32, Some(pixels.as_mut_ptr().cast()), &mut info, DIB_RGB_COLORS);
+        let lines = GetDIBits(dc, bitmap, 0, height as u32, Some(pixels.as_mut_ptr().cast()), &mut info, DIB_RGB_COLORS);
         ReleaseDC(None, dc);
         let _ = DeleteObject(bitmap.into());
-        if lines != size {
-            return Err(format!("GetDIBits copied {lines} of {size} lines"));
+        if lines != height {
+            return Err(format!("GetDIBits copied {lines} of {height} lines"));
         }
         to_straight_rgba(&mut pixels);
         let mut png = Vec::new();
-        let mut encoder = png::Encoder::new(&mut png, size as u32, size as u32);
+        let mut encoder = png::Encoder::new(&mut png, width as u32, height as u32);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
         encoder.write_header().and_then(|mut w| w.write_image_data(&pixels)).map_err(|e| e.to_string())?;

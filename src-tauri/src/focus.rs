@@ -619,7 +619,7 @@ fn resolve_app(raw: &str) -> String {
     app_id(raw)
 }
 
-fn shortcut_target(path: &str) -> Option<String> {
+pub(crate) fn shortcut_target(path: &str) -> Option<String> {
     let path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
     std::thread::scope(|scope| {
         scope

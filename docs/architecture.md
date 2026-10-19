@@ -67,6 +67,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
 | Themes | `src/theme.ts` | Bundled theme data, `ThemeRoot` applies CSS variables in every window from settings, system appearance and accent |
 | Focus | `src/focus.ts`, `src/extensions/focus.tsx`, `src/FocusWindows.tsx`, `src-tauri/src/focus.rs` | Session state and timers, app and website rules, foreground watcher with UI Automation URL reading, block overlay, notification and panel windows, native panel menus; categories and preferences in `focus.json` |
+| File Search | `src/fileSearch.ts`, `src/extensions/file-search.tsx`, `src-tauri/src/file_search.rs` | In-memory name index of the user folder, ranked search with type filter, Recently Used from the Windows Recent folder, file metadata; thumbnails through `appicon` with `thumb=1` |
 | System Actions | `src/extensions/system-actions.ts`, `src-tauri/src/system_actions.rs` | Power, session, app quitting, Core Audio volume and microphone mute, media keys, dark mode and hidden-files registry toggles |
 | Window Management | `src/extensions/window-management.ts`, `src-tauri/src/window_layout.rs` | Layout commands; target window lookup, work-area fractions, invisible-border compensation, display order and moves |
 | Launcher UI | `src/App.tsx` | Search input, list, footer, loader, keyboard |
@@ -92,6 +93,7 @@ The Rust core exposes Tauri commands:
 - `notes_show` (hides the launcher, creates or shows and focuses the notes window, emits `notes-open` to an existing window or keeps the request for `notes_pending` when it creates one), `notes_pending`, `tooltip_show`, `tooltip_present`, `tooltip_hide`
 - `translate` (text, source, target → translated text and detected source language)
 - Focus: `focus_get`, `focus_start`, `focus_update`, `focus_pause`, `focus_resume`, `focus_restart`, `focus_complete`, `focus_cancel`, `focus_snooze`, `focus_close_tab`, `focus_block_info`, `focus_panel_menu`, `focus_panel_reset`, `focus_toast_hide`, `read_json_file`
+- File Search: `file_search` (query, type → ranked hits or Recently Used, index state), `file_reindex`, `file_info` (path → shell type name, size and dates); emits `file-index-updated` when an index build finishes
 - `system_action` (action id → runs one system action)
 - `window_layout` (layout id → moves and resizes the target window)
 - `hotkeys_suspend`, `login_item_get`, `login_item_set`, `open_settings`, `system_accent_color`

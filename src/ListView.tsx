@@ -239,11 +239,15 @@ export function ListView({
             </div>
           )}
           {visible.map((section) => (
-            <div key={section.title} role="group" aria-label={section.title}>
-              <div className="flex h-8 items-end gap-2 px-2 pb-[5px] text-11 font-semibold text-fg-60">
-                {section.title}
-                {section.showCount && <span className="font-medium text-fg-40">{section.items.length}</span>}
-              </div>
+            <div key={section.title} role="group" aria-label={section.title || "Results"}>
+              {section.title ? (
+                <div className="flex h-8 items-end gap-2 px-2 pb-[5px] text-11 font-semibold text-fg-60">
+                  {section.title}
+                  {section.showCount && <span className="font-medium text-fg-40">{section.items.length}</span>}
+                </div>
+              ) : (
+                <div className="h-2" />
+              )}
               <div className={layout === "grid" ? "grid gap-2" : ""} style={layout === "grid" ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}>
                 {section.items.map((item) => {
                   index += 1;
