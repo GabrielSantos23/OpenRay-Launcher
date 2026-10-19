@@ -35,7 +35,7 @@ export interface ActionContext {
 export function actionGroups(command: RegisteredCommand, context: ActionContext): Action[][] {
   const { favorites, setFavorites } = context;
   const [own = [], ...rest] = command.actions ?? [];
-  const primary: Action = { id: "primary", title: command.primaryActionTitle, icon: SquareMenu, shortcut: { key: "Enter" }, run: () => command.run?.() };
+  const primary: Action = { id: "primary", title: command.primaryActionTitle, icon: SquareMenu, shortcut: { key: "Enter" }, confirm: command.confirm, run: () => command.run?.() };
   const index = favorites.indexOf(command.key);
   const move = (offset: number) => {
     const next = [...favorites];

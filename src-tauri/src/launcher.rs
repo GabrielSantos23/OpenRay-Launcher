@@ -118,6 +118,14 @@ pub fn previous_window() -> HWND {
     HWND(PREVIOUS_FOREGROUND.load(Ordering::SeqCst) as _)
 }
 
+pub fn active_window() -> HWND {
+    if is_shown() {
+        previous_window()
+    } else {
+        unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) }
+    }
+}
+
 pub fn is_shown() -> bool {
     SHOWN.load(Ordering::SeqCst)
 }

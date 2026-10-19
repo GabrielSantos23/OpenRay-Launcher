@@ -4,8 +4,8 @@ use windows::Win32::Foundation::{HWND, LPARAM, RECT};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, HDC, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetAncestor, GetForegroundWindow, GetShellWindow, GetWindowRect, IsIconic, IsWindow, IsWindowVisible, IsZoomed, SetWindowPos, ShowWindow,
-    GA_ROOT, SWP_NOACTIVATE, SWP_NOZORDER, SW_MAXIMIZE, SW_RESTORE,
+    GetShellWindow, GetWindowRect, IsIconic, IsWindow, IsWindowVisible, IsZoomed, SetWindowPos, ShowWindow,
+    SWP_NOACTIVATE, SWP_NOZORDER, SW_MAXIMIZE, SW_RESTORE,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -114,7 +114,7 @@ fn displays() -> Vec<Display> {
 }
 
 fn target() -> Result<HWND, String> {
-    let hwnd = if launcher::is_shown() { launcher::previous_window() } else { unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) } };
+    let hwnd = launcher::active_window();
     let usable = !hwnd.is_invalid() && unsafe { IsWindow(Some(hwnd)).as_bool() && IsWindowVisible(hwnd).as_bool() && hwnd != GetShellWindow() };
     if usable {
         Ok(hwnd)

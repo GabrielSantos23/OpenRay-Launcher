@@ -31,6 +31,11 @@ describe("actionGroups", () => {
   const base = { frecency: {}, setFavorites: vi.fn(), resetRanking: vi.fn() };
   const titles = (groups: ReturnType<typeof actionGroups>) => groups.map((g) => g.map((a) => a.title));
 
+  it("carries the command's confirmation onto its primary action", () => {
+    const confirm = { title: "Restart Your Computer?", message: "Open apps will close.", confirmTitle: "Restart" };
+    expect(actionGroups({ ...cmd("r"), confirm }, { ...base, favorites: [] })[0][0].confirm).toBe(confirm);
+  });
+
   it("puts the primary and extension actions first, then favorites, then the rest", () => {
     const explorer = { id: "x", title: "Show in File Explorer", run: () => {} };
     const copy = { id: "c", title: "Copy Name", run: () => {} };

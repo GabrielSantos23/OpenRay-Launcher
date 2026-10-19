@@ -7,6 +7,7 @@ mod hud;
 mod launcher;
 mod notes;
 mod store;
+mod system_actions;
 mod translate;
 mod window_layout;
 
@@ -266,6 +267,11 @@ fn notes_show(app: AppHandle, request: serde_json::Value) {
 }
 
 #[tauri::command]
+fn system_action(app: AppHandle, action: String) -> Result<(), String> {
+    system_actions::run(&app, &action)
+}
+
+#[tauri::command]
 fn window_layout(layout: String) -> Result<(), String> {
     window_layout::apply(&layout)
 }
@@ -486,6 +492,7 @@ pub fn run() {
             notes_show,
             notes_pending,
             window_layout,
+            system_action,
             tooltip_show,
             tooltip_present,
             tooltip_hide,

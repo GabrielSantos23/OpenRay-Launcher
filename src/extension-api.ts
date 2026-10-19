@@ -46,6 +46,7 @@ export interface Command {
   keywords?: string[];
   kind: string;
   primaryActionTitle: string;
+  confirm?: Confirmation;
   actions?: Action[][];
   view?: ComponentType<ViewProps>;
   fallback?: (text: string) => Promise<void> | void;

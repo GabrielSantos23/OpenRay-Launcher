@@ -87,6 +87,11 @@
 - The duplicate-check preference and quicklink creation from Add Playing Song to Playlist are left out, because FlowKey has no quicklink launch context.
 - Current Track shows a HUD instead of updating the command subtitle.
 
+## System Actions
+
+- Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Volume Mixer, active-app volume, sound device pickers, Set Volume with a typed value, Energy Saver, Night Light, HDR and camera mute.
+- Quit All Apps only asks windows to close; apps with unsaved work show their own prompts.
+
 ## Window Management
 
 - Windows of apps running as administrator can't be moved while Openray runs without elevation; the command shows an error.

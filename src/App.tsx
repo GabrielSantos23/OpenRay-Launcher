@@ -179,7 +179,7 @@ export default function App() {
     if (command.view) {
       openView(command);
       invoke("show_launcher");
-    } else runAction(command, { id: "primary", title: command.primaryActionTitle, run: () => command.run?.() });
+    } else runAction(command, { id: "primary", title: command.primaryActionTitle, confirm: command.confirm, run: () => command.run?.() });
   };
 
   useEffect(() => {
@@ -377,7 +377,7 @@ export default function App() {
                   role="option"
                   aria-selected={isSelected}
                   onMouseMove={() => i !== selected && setSelected(i)}
-                  onClick={() => runAction(command, { id: "primary", title: command.primaryActionTitle, run: () => command.run?.() })}
+                  onClick={() => runAction(command, { id: "primary", title: command.primaryActionTitle, confirm: command.confirm, run: () => command.run?.() })}
                   className={`flex h-row cursor-default items-center gap-3 rounded-row px-2 text-13 ${isSelected ? "bg-list-selection" : ""}`}
                 >
                   <CommandIcon title={command.title} icon={command.icon} fallback={EXTENSION_ICONS.get(command.extensionId)} />

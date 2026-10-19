@@ -279,12 +279,12 @@ Built with the FlowKey CLI in `extensions/spotify-player` and bundled as a resou
 | System Actions | Dismiss Notifications | `backend/index.mjs` @987025, ext `system`, cmd `dismissNotifications` | — | CONFIRMED |  |  |
 | System Actions | Eject All Disks | `backend/index.mjs` @987025, ext `system`, cmd `ejectAllDisks` | — | NOT_APPLICABLE |  | macOS-only |
 | System Actions | Hide All Apps Except Frontmost | `backend/index.mjs` @987025, ext `system`, cmd `hideAllAppsExceptFrontmost` | — | NOT_APPLICABLE |  | macOS-only |
-| System Actions | Lock Screen | `backend/index.mjs` @987025, ext `system`, cmd `lockScreen` | — | CONFIRMED |  |  |
-| System Actions | Log Out | `backend/index.mjs` @987025, ext `system`, cmd `logOut` | — | CONFIRMED |  |  |
-| System Actions | Quit All Apps | `backend/index.mjs` @987025, ext `system`, cmd `quitAllApplications` | — | CONFIRMED |  |  |
-| System Actions | Quit All Apps Except Frontmost | `backend/index.mjs` @987025, ext `system`, cmd `quitAllApplicationsExceptFrontmost` | — | CONFIRMED |  |  |
-| System Actions | Quit the Active App | `backend/index.mjs` @987025, ext `system`, cmd `quitActiveApplication` | — | CONFIRMED |  |  |
-| System Actions | Restart | `backend/index.mjs` @987025, ext `system`, cmd `restart` | — | CONFIRMED |  |  |
+| System Actions | Lock Screen | `backend/index.mjs` @987025, ext `system`, cmd `lockScreen` | `LockWorkStation` | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live (would lock the session) |
+| System Actions | Log Out | `backend/index.mjs` @987025, ext `system`, cmd `logOut` | Confirmation, then `ExitWindowsEx(EWX_LOGOFF)` | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live. The reference runs it without a confirmation (backend handler); Openray asks first |
+| System Actions | Quit All Apps | `backend/index.mjs` @987025, ext `system`, cmd `quitAllApplications` | Confirmation, then `WM_CLOSE` to every visible, uncloaked, unowned, titled, non-tool top-level window outside Openray and the shell (Progman, WorkerW, Shell_TrayWnd) | IMPLEMENTED | `system_actions.rs` unit tests (2); ignored live round-trip test lists the windows and checks the shell is skipped | Not run live (would close the user's apps). Confirmation copy is an approximation; reference settings `vTt` not decoded |
+| System Actions | Quit All Apps Except Frontmost | `backend/index.mjs` @987025, ext `system`, cmd `quitAllApplicationsExceptFrontmost` | As Quit All Apps, keeping every window of the frontmost app's process | IMPLEMENTED | `system_actions.rs` unit tests (2) | Same as Quit All Apps |
+| System Actions | Quit the Active App | `backend/index.mjs` @987025, ext `system`, cmd `quitActiveApplication` | `WM_CLOSE` to the window that was active before the launcher opened (Alt+F4 equivalent) | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live |
+| System Actions | Restart | `backend/index.mjs` @987025, ext `system`, cmd `restart` | Confirmation, then `shutdown /r /t 0` | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live. Confirmation copy is an approximation |
 | System Actions | Manage Wi-Fi Connections | `backend/index.mjs` @987025, ext `system`, cmd `wifiNetworks` | — | CONFIRMED |  |  |
 | System Actions | Manage Bluetooth Devices | `backend/index.mjs` @987025, ext `system`, cmd `bluetoothDevices` | — | CONFIRMED |  |  |
 | System Actions | Volume Mixer | `backend/index.mjs` @987025, ext `system`, cmd `appVolume` | — | CONFIRMED |  |  |
@@ -293,30 +293,33 @@ Built with the FlowKey CLI in `extensions/spotify-player` and bundled as a resou
 | System Actions | Toggle Active App Mute | `backend/index.mjs` @987025, ext `system`, cmd `toggleMuteCurrentApp` | — | CONFIRMED |  |  |
 | System Actions | Turn Active App Volume Up | `backend/index.mjs` @987025, ext `system`, cmd `turnCurrentAppVolumeUp` | — | CONFIRMED |  |  |
 | System Actions | Turn Active App Volume Down | `backend/index.mjs` @987025, ext `system`, cmd `turnCurrentAppVolumeDown` | — | CONFIRMED |  |  |
-| System Actions | Set Volume (+ presets 0/25/50/75/100%) | `backend/index.mjs` @987025, ext `system`, cmd `setVolume` | — | CONFIRMED |  |  |
-| System Actions | Play / Pause | `backend/index.mjs` @987025, ext `system`, cmd `playPause` | — | CONFIRMED |  |  |
-| System Actions | Next Track | `backend/index.mjs` @987025, ext `system`, cmd `nextTrack` | — | CONFIRMED |  |  |
-| System Actions | Previous Track | `backend/index.mjs` @987025, ext `system`, cmd `previousTrack` | — | CONFIRMED |  |  |
-| System Actions | Show Desktop | `backend/index.mjs` @987025, ext `system`, cmd `showDesktop` | — | CONFIRMED |  |  |
-| System Actions | Show Screen Saver | `backend/index.mjs` @987025, ext `system`, cmd `showScreenSaver` | — | CONFIRMED |  |  |
-| System Actions | Shut Down | `backend/index.mjs` @987025, ext `system`, cmd `shutDown` | — | CONFIRMED |  |  |
-| System Actions | Sleep | `backend/index.mjs` @987025, ext `system`, cmd `sleep` | — | CONFIRMED |  |  |
-| System Actions | Hibernate | `backend/index.mjs` @987025, ext `system`, cmd `hibernate` | — | CONFIRMED |  |  |
-| System Actions | Sleep Displays | `backend/index.mjs` @987025, ext `system`, cmd `sleepDisplays` | — | CONFIRMED |  |  |
+| System Actions | Set Volume (+ presets 0/25/50/75/100%) | `backend/index.mjs` @987025, ext `system`, cmd `setVolume` | Presets 0/25/50/75/100% unmute and set the default output endpoint with `IAudioEndpointVolume::SetMasterVolumeLevelScalar` | IMPLEMENTED | `system_actions.rs` unit tests (2); ignored live round-trip test set 25% and restored | The Set Volume command with a typed value is not implemented |
+| System Actions | Play / Pause | `backend/index.mjs` @987025, ext `system`, cmd `playPause` | Sends the Play/Pause media key | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live |
+| System Actions | Next Track | `backend/index.mjs` @987025, ext `system`, cmd `nextTrack` | Sends the Next Track media key | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live |
+| System Actions | Previous Track | `backend/index.mjs` @987025, ext `system`, cmd `previousTrack` | Sends the Previous Track media key | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live |
+| System Actions | Show Desktop | `backend/index.mjs` @987025, ext `system`, cmd `showDesktop` | Hides the launcher, then sends Win+D | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live |
+| System Actions | Show Screen Saver | `backend/index.mjs` @987025, ext `system`, cmd `showScreenSaver` | Hides the launcher, then posts `SC_SCREENSAVE` | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live; does nothing when no screen saver is configured |
+| System Actions | Shut Down | `backend/index.mjs` @987025, ext `system`, cmd `shutDown` | Confirmation, then `shutdown /s /t 0` | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live. Confirmation copy is an approximation |
+| System Actions | Sleep | `backend/index.mjs` @987025, ext `system`, cmd `sleep` | Hides the launcher, then `SetSuspendState(false)` | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live |
+| System Actions | Hibernate | `backend/index.mjs` @987025, ext `system`, cmd `hibernate` | Hides the launcher, then `SetSuspendState(true)` | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live; fails silently when hibernation is off |
+| System Actions | Sleep Displays | `backend/index.mjs` @987025, ext `system`, cmd `sleepDisplays` | Hides the launcher, then broadcasts `SC_MONITORPOWER` (off) | IMPLEMENTED | `system_actions.rs` unit tests (2) | Not run live |
 | System Actions | Toggle WiFi | `backend/index.mjs` @987025, ext `system`, cmd `toggleWifi` | — | CONFIRMED |  |  |
 | System Actions | Toggle Airplane Mode | `backend/index.mjs` @987025, ext `system`, cmd `toggleAirplaneMode` | — | CONFIRMED |  |  |
 | System Actions | Toggle Bluetooth | `backend/index.mjs` @987025, ext `system`, cmd `toggleBluetooth` | — | CONFIRMED |  |  |
 | System Actions | Toggle Camera Mute | `backend/index.mjs` @987025, ext `system`, cmd `toggleCameraMute` | — | CONFIRMED |  |  |
 | System Actions | Toggle Energy Saver | `backend/index.mjs` @987025, ext `system`, cmd `toggleEnergySaver` | — | CONFIRMED |  |  |
-| System Actions | Toggle Hidden Files | `backend/index.mjs` @987025, ext `system`, cmd `toggleHiddenFiles` | — | CONFIRMED |  |  |
-| System Actions | Toggle Mute | `backend/index.mjs` @987025, ext `system`, cmd `toggleMute` | — | CONFIRMED |  |  |
+| System Actions | Toggle Hidden Files | `backend/index.mjs` @987025, ext `system`, cmd `toggleHiddenFiles` | Flips `Explorer\Advanced\Hidden` (1/2), then `SHChangeNotify` and a settings broadcast | IMPLEMENTED | `system_actions.rs` unit tests (2); ignored live round-trip test toggled twice and restored | Unknown whether open Explorer windows refresh without F5 |
+| System Actions | Toggle Mute | `backend/index.mjs` @987025, ext `system`, cmd `toggleMute` | Toggles mute on the default output endpoint | IMPLEMENTED | `system_actions.rs` unit tests (2); ignored live round-trip test toggled and restored | Reference availability flag `ig` not decoded; may be macOS-only |
 | System Actions | Toggle Stage Manager | `backend/index.mjs` @987025, ext `system`, cmd `toggleStageManager` | — | NOT_APPLICABLE |  | macOS-only |
 | System Actions | Toggle HDR | `backend/index.mjs` @987025, ext `system`, cmd `toggleHdr` | — | CONFIRMED |  |  |
 | System Actions | Toggle Night Light | `backend/index.mjs` @987025, ext `system`, cmd `toggleNightLight` | — | CONFIRMED |  |  |
-| System Actions | Toggle Microphone Mute | `backend/index.mjs` @987025, ext `system`, cmd `toggleMicrophoneMute` | — | CONFIRMED |  |  |
-| System Actions | Turn Volume Down | `backend/index.mjs` @987025, ext `system`, cmd `turnVolumeDown` | — | CONFIRMED |  |  |
-| System Actions | Turn Volume Up | `backend/index.mjs` @987025, ext `system`, cmd `turnVolumeUp` | — | CONFIRMED |  |  |
+| System Actions | Toggle Microphone Mute | `backend/index.mjs` @987025, ext `system`, cmd `toggleMicrophoneMute` | Mutes every active capture endpoint, or unmutes all when all are muted | IMPLEMENTED | `system_actions.rs` unit tests (2); ignored live round-trip test toggled twice and restored | — |
+| System Actions | Turn Volume Down | `backend/index.mjs` @987025, ext `system`, cmd `turnVolumeDown` | `IAudioEndpointVolume::VolumeStepDown` on the default output | IMPLEMENTED | `system_actions.rs` unit tests (2) | Step size is Windows' own; reference step unknown |
+| System Actions | Turn Volume Up | `backend/index.mjs` @987025, ext `system`, cmd `turnVolumeUp` | `IAudioEndpointVolume::VolumeStepUp` on the default output | IMPLEMENTED | `system_actions.rs` unit tests (2) | Step size is Windows' own; reference step unknown |
 | System Actions | Unhide All Hidden Apps | `backend/index.mjs` @987025, ext `system`, cmd `unhideAllHiddenApps` | — | NOT_APPLICABLE |  | macOS-only |
+| System Actions | Open Recycle Bin | `backend/index.mjs` @987025, ext `system`, cmd `openTrash` (Windows title) | Opens `shell:RecycleBinFolder` | IMPLEMENTED | — | Not run live |
+| System Actions | Empty Recycle Bin | `backend/index.mjs` @987025, ext `system`, cmd `emptyTrash` (Windows title), frontend handler | Confirmation, then `SHEmptyRecycleBinW`; an already empty bin counts as success | IMPLEMENTED | — | Not run live. Confirmation copy is an approximation |
+| System Actions | Toggle Dark Mode | `backend/index.mjs` @987025, ext `system`, cmd `toggleSystemAppearance` (Windows title and keywords) | Flips `AppsUseLightTheme` and `SystemUsesLightTheme`, then broadcasts `ImmersiveColorSet` | IMPLEMENTED | ignored live round-trip test toggled twice and restored | — |
 | Translator | Translate | `backend/index.mjs` @1006741, ext `translator`, cmd `translate`; view `TranslateView` in `main-window-BN8deh-D.js`; backend `POST backend.raycast.com/api/v1/translations` (Pro) | Built-in `translator` extension (`src/extensions/translate.tsx`): two-pane view, live translation with a 330 ms debounce through the free Google `translate_a/single?client=gtx` endpoint (Rust `translate` command), Detect Language with "<Language> (Detected)", swap (Ctrl+S, button), source/target dropdowns and submenus (Ctrl+Shift+P / Ctrl+P), Copy Translation (Ctrl+Enter), Paste (Ctrl+Alt+Enter), Copy Source Text (Ctrl+Shift+Enter), word and character counter, last languages remembered | TESTED | `src/translate.test.ts` (language list, restore, swap, counter); `cargo test translate` (response parsing); browser-pane render with live endpoint | Google endpoint instead of Raycast's Pro backend; placeholder "Speak now" (per screenshot) vs "Enter text…" in the 2.8.2.0 bundle; no dictation, text-to-speech, prefill from selected text, quick-translate root results, custom translate commands, translator settings or auto font shrinking; not yet compared live with Raycast (Pro-gated) |
 | Trial Nudges | Welcome to Pro | `backend/index.mjs` @1011134, ext `trial-nudges`, cmd `welcomePro` | — | NOT_APPLICABLE |  | Pro trial, account (excluded) |
 | Trial Nudges | Level up, sign in and start a 7-day free trial | `backend/index.mjs` @1011134, ext `trial-nudges`, cmd `startTrial` | — | NOT_APPLICABLE |  | Pro trial, account (excluded) |
