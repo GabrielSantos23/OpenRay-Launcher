@@ -3,6 +3,7 @@ mod apps;
 mod clipboard;
 mod file_search;
 mod flowkey;
+mod games;
 mod focus;
 mod registry;
 mod hotkey;
@@ -27,7 +28,19 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 #[tauri::command]
 async fn list_apps() -> Vec<apps::InstalledApp> {
-    apps::scan(&apps::start_menu_roots(), apps::packaged_apps())
+    let games = games::steam_games();
+    apps::scan(&apps::start_menu_roots(), apps::packaged_apps()).into_iter().filter(|a| !(a.path.to_lowercase().ends_with(".url") && games::is_steam_shortcut(&a.path, &games))).collect()
+}
+
+#[derive(serde::Serialize)]
+struct GameList {
+    games: Vec<games::Game>,
+    launchers: Vec<games::Launcher>,
+}
+
+#[tauri::command]
+async fn list_games() -> GameList {
+    GameList { games: games::steam_games(), launchers: games::launchers() }
 }
 
 fn serve_app_icon(request: tauri::http::Request<Vec<u8>>, responder: tauri::UriSchemeResponder) {
@@ -726,6 +739,7 @@ pub fn run() {
             system_toggle,
             app_uninstall,
             app_uninstaller,
+            list_games,
             app_volume_set,
             app_volume_active,
             sound_device_set,

@@ -44,6 +44,9 @@ Each feature below works today. The full per-feature status, with evidence and r
 - Indexes Start Menu shortcuts and Microsoft Store (MSIX) apps, with their real icons.
 - Run as Administrator, Show in File Explorer, Copy Path, and Uninstall Application (with a confirmation naming the uninstaller).
 
+### Games
+- Your installed Steam games show up in search with their icons, plus a Game Launcher view; open, show in File Explorer or uninstall through Steam.
+
 ### File Search
 - Searches file and folder names in your user folder, ranked by match quality and how recently a file changed.
 - Filter by type: Directory, File, Archive, Document, Image, Video, Audio, Text, Other.

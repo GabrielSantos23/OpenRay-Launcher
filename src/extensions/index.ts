@@ -5,6 +5,7 @@ import core from "./core";
 import emoji from "./emoji";
 import fileSearch from "./file-search";
 import focus from "./focus";
+import games from "./games";
 import navigation from "./navigation";
 import notes from "./notes";
 import quicklinks from "./quicklinks";
@@ -14,4 +15,4 @@ import translate from "./translate";
 import webSearches from "./web-searches";
 import windowManagement from "./window-management";
 
-export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, fileSearch, focus, navigation, notes, quicklinks, snippets, systemActions, translate, webSearches, windowManagement, core];
+export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, fileSearch, focus, games, navigation, notes, quicklinks, snippets, systemActions, translate, webSearches, windowManagement, core];
