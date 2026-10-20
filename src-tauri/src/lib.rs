@@ -231,9 +231,32 @@ async fn screenshots_list() -> Result<Vec<serde_json::Value>, String> {
     .map_err(|e| e.to_string())
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScreenshotFolder {
+    path: String,
+    default_path: String,
+    custom: bool,
+}
+
 #[tauri::command]
-fn screenshots_folder() -> String {
-    capture::folder().to_string_lossy().into_owned()
+fn screenshots_folder() -> ScreenshotFolder {
+    let custom = capture::CUSTOM_FOLDER.lock().unwrap_or_else(|e| e.into_inner()).is_some();
+    ScreenshotFolder { path: capture::folder().to_string_lossy().into_owned(), default_path: capture::default_folder().to_string_lossy().into_owned(), custom }
+}
+
+#[tauri::command]
+fn screenshots_set_folder(path: Option<String>, store: State<Store>) -> Result<ScreenshotFolder, String> {
+    let value = serde_json::json!({ "folder": path.unwrap_or_default() });
+    let folder = capture::custom_folder(&value);
+    if let Some(dir) = &folder {
+        std::fs::create_dir_all(dir).map_err(|e| format!("Can't use {}: {e}", dir.display()))?;
+    } else if value["folder"].as_str().is_some_and(|p| !p.trim().is_empty()) {
+        return Err("Choose a full folder path".into());
+    }
+    store.set_data("screenshots", &value)?;
+    *capture::CUSTOM_FOLDER.lock().unwrap_or_else(|e| e.into_inner()) = folder;
+    Ok(screenshots_folder())
 }
 
 #[tauri::command]
@@ -846,6 +869,7 @@ pub fn run() {
         .register_uri_scheme_protocol("flowkey", |ctx, request| flowkey::serve(ctx.app_handle(), request))
         .register_uri_scheme_protocol("extimg", |ctx, request| flowkey::serve_image(ctx.app_handle(), request))
         .setup(|app| {
+            screenshot::prepare(app.handle());
             std::thread::spawn(|| {
                 APPS.get(scan_apps);
                 SYSTEM_PAGES.get(settings_pages::system_pages);
@@ -855,6 +879,7 @@ pub fn run() {
             let store = Store::load(data_dir);
             let settings = store.settings();
             snippets::init(app.handle(), &store.data("snippets").unwrap_or_default());
+            *capture::CUSTOM_FOLDER.lock().unwrap_or_else(|e| e.into_inner()) = capture::custom_folder(&store.data("screenshots").unwrap_or_default());
             app.manage(store);
 
             if let Some(window) = app.get_webview_window(launcher::LABEL) {
@@ -946,6 +971,7 @@ pub fn run() {
             pin_close,
             screenshots_list,
             screenshots_folder,
+            screenshots_set_folder,
             image_text,
             image_copy,
             image_paste,

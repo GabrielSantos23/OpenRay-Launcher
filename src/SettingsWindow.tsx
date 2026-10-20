@@ -207,6 +207,49 @@ function FocusSettings() {
   );
 }
 
+interface ScreenshotFolder {
+  path: string;
+  defaultPath: string;
+  custom: boolean;
+}
+
+function ScreenshotSettings() {
+  const [folder, setFolder] = useState<ScreenshotFolder | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    invoke<ScreenshotFolder>("screenshots_folder").then(setFolder);
+  }, []);
+  if (!folder) return null;
+  const apply = (path: string | null) =>
+    invoke<ScreenshotFolder>("screenshots_set_folder", { path })
+      .then((next) => {
+        setFolder(next);
+        setError(null);
+      })
+      .catch((e) => setError(String(e)));
+  const choose = async () => {
+    const [path] = await invoke<string[]>("flowkey_pick_path", { directory: true, multiple: false });
+    if (path) await apply(path);
+  };
+  return (
+    <Card>
+      <Row id="screenshots-folder" title="Save Screenshots To" description={error ?? `${folder.path}${folder.custom ? "" : " (default)"}`}>
+        <button type="button" onClick={() => invoke("launch_app", { path: folder.path }).catch((e) => setError(String(e)))} className={TEXT_BUTTON}>
+          Open
+        </button>
+        {folder.custom && (
+          <button type="button" onClick={() => apply(null)} className={TEXT_BUTTON}>
+            Use Default
+          </button>
+        )}
+        <button type="button" aria-describedby="screenshots-folder" onClick={choose} className={TEXT_BUTTON}>
+          Change…
+        </button>
+      </Row>
+    </Card>
+  );
+}
+
 function GeneralPage({ settings, save, recorder }: { settings: SettingsData; save: Save; recorder: RecorderFor }) {
   const [openAtLogin, setOpenAtLogin] = useState<boolean | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -638,6 +681,7 @@ export function SettingsWindow() {
                 />
               )}
               {extensionPage?.id === "focus" && <FocusSettings />}
+              {extensionPage?.id === "screenshots" && <ScreenshotSettings />}
               {(page === "shortcuts" || extensionPage) &&
                 tableExtensions.map((extension) => (
                   <ExtensionTable

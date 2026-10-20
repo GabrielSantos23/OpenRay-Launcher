@@ -85,7 +85,7 @@ impl Frame {
         out.extend_from_slice(&0u32.to_le_bytes());
         out.extend_from_slice(&size.to_le_bytes());
         out.extend_from_slice(&[0u8; 16]);
-        out.extend(self.bgra.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2], 255]));
+        out.extend_from_slice(&self.bgra);
         out
     }
 }
@@ -174,17 +174,30 @@ pub fn windows() -> Vec<Rect> {
     list
 }
 
-pub fn folder() -> PathBuf {
-    let pictures = unsafe { SHGetKnownFolderPath(&FOLDERID_Pictures, KF_FLAG_DEFAULT, None) }
+fn pictures() -> PathBuf {
+    unsafe { SHGetKnownFolderPath(&FOLDERID_Pictures, KF_FLAG_DEFAULT, None) }
         .ok()
         .and_then(|p| unsafe { p.to_string() }.ok())
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(std::env::var("USERPROFILE").unwrap_or_default()).join("Pictures"));
-    pictures.join("Openray")
+        .unwrap_or_else(|| PathBuf::from(std::env::var("USERPROFILE").unwrap_or_default()).join("Pictures"))
+}
+
+pub static CUSTOM_FOLDER: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+pub fn default_folder() -> PathBuf {
+    pictures().join("Openray")
+}
+
+pub fn folder() -> PathBuf {
+    CUSTOM_FOLDER.lock().unwrap_or_else(|e| e.into_inner()).clone().unwrap_or_else(default_folder)
 }
 
 pub fn system_folder() -> PathBuf {
-    folder().parent().map(|p| p.join("Screenshots")).unwrap_or_default()
+    pictures().join("Screenshots")
+}
+
+pub fn custom_folder(value: &serde_json::Value) -> Option<PathBuf> {
+    value["folder"].as_str().map(str::trim).filter(|p| !p.is_empty()).map(PathBuf::from).filter(|p| p.is_absolute())
 }
 
 pub fn file_name(app: &str, random: &str) -> String {
@@ -306,6 +319,14 @@ mod tests {
         assert_eq!(file_name("my app?", "x"), "myapp_x.png");
         assert_eq!(file_name("", "x"), "Openray_x.png");
         assert_eq!(random_id().len(), 10);
+    }
+
+    #[test]
+    fn reads_the_saved_folder() {
+        assert_eq!(custom_folder(&serde_json::json!({ "folder": r"D:\Shots" })), Some(PathBuf::from(r"D:\Shots")));
+        assert_eq!(custom_folder(&serde_json::json!({ "folder": "relative" })), None);
+        assert_eq!(custom_folder(&serde_json::json!({ "folder": "  " })), None);
+        assert_eq!(custom_folder(&serde_json::Value::Null), None);
     }
 
     #[test]

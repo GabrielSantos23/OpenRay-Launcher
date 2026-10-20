@@ -7,7 +7,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
 use windows::Win32::Foundation::{COLORREF, HWND};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetForegroundWindow, GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, ShowWindow, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA, SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE,
+    GetForegroundWindow, GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA, SWP_NOACTIVATE,
     WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
 };
 
@@ -81,8 +81,10 @@ fn deliver(app: &AppHandle, frame: &Frame, app_name: &str) -> Result<(), String>
 pub fn start(app: &AppHandle, mode: String) -> Result<(), String> {
     let app_name = foreground_app();
     let previous = foreground_window().0 as isize;
-    crate::launcher::hide(app, false);
-    std::thread::sleep(HIDE_DELAY);
+    if crate::launcher::is_shown() {
+        crate::launcher::hide(app, false);
+        std::thread::sleep(HIDE_DELAY);
+    }
     let screen = capture::virtual_screen();
     let frame = capture::grab(screen)?;
     let relative = |r: Rect| Rect { x: r.x - screen.x, y: r.y - screen.y, ..r };
@@ -104,13 +106,21 @@ pub fn start(app: &AppHandle, mode: String) -> Result<(), String> {
             set_visible(hwnd, false);
             unsafe {
                 let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), screen.x, screen.y, screen.w, screen.h, SWP_NOACTIVATE);
-                let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
             }
         }
+        let _ = window.show();
         *PENDING.lock().unwrap_or_else(|e| e.into_inner()) = Some(start.clone());
         let _ = app.emit_to(OVERLAY, "capture-start", start);
     });
     Ok(())
+}
+
+pub fn prepare(app: &AppHandle) {
+    crate::open_window(app, OVERLAY, |_, window| {
+        if let Some(hwnd) = crate::launcher::hwnd(&window) {
+            set_visible(hwnd, false);
+        }
+    });
 }
 
 pub fn pending() -> Option<serde_json::Value> {
@@ -141,12 +151,11 @@ pub fn ready(app: &AppHandle) {
 }
 
 fn hide_overlay(app: &AppHandle) {
-    if let Some(hwnd) = app.get_webview_window(OVERLAY).as_ref().and_then(crate::launcher::hwnd) {
+    let Some(window) = app.get_webview_window(OVERLAY) else { return };
+    if let Some(hwnd) = crate::launcher::hwnd(&window) {
         set_visible(hwnd, false);
-        unsafe {
-            let _ = ShowWindow(hwnd, SW_HIDE);
-        }
     }
+    let _ = window.hide();
 }
 
 fn restore_focus(previous: isize) {
@@ -211,8 +220,10 @@ pub fn finish(app: &AppHandle, rect: Rect) -> Result<(), String> {
 pub fn direct(app: &AppHandle, kind: &str) -> Result<(), String> {
     let app_name = foreground_app();
     let target = foreground_window();
-    crate::launcher::hide(app, false);
-    std::thread::sleep(HIDE_DELAY);
+    if crate::launcher::is_shown() {
+        crate::launcher::hide(app, false);
+        std::thread::sleep(HIDE_DELAY);
+    }
     let screen = capture::virtual_screen();
     let rect = match kind {
         "fullscreen" => screen,

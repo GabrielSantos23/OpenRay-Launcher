@@ -165,7 +165,7 @@ function SearchScreenshots({ pop }: ViewProps) {
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={shots === null}
       emptyText="No Screenshots"
-      emptyDescription="Screenshots you take with Openray or Win+Print Screen show up here. Press Ctrl+N to capture a region."
+      emptyDescription="Screenshots you take with Openray or Win+Print Screen show up here. Press Ctrl+N to capture a region, or change the folder in Settings → Extensions → Screenshots."
       emptyActions={[[capture]]}
     />
   );
@@ -196,9 +196,9 @@ export default defineExtension({
       kind: "Command",
       primaryActionTitle: "Open Folder",
       run: async () => {
-        const folder = await invoke<string>("screenshots_folder");
-        await invoke("flowkey_fs", { op: "mkdir", path: folder });
-        await invoke("launch_app", { path: folder });
+        const { path } = await invoke<{ path: string }>("screenshots_folder");
+        await invoke("flowkey_fs", { op: "mkdir", path });
+        await invoke("launch_app", { path });
       },
     },
     ...TASKS.map(
