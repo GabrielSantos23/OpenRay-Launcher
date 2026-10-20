@@ -15,8 +15,10 @@ import {
   places,
   plainNumber,
 } from "../calculator";
-import { defineExtension, type InlineResult } from "../extension-api";
+import type { CalculationKind } from "../calculatorHistory";
+import { defineExtension, type Action, type InlineResult } from "../extension-api";
 import { copyAndClose, copyPasteActions, frontmostApp } from "../output";
+import { CalculatorHistory, saveCalculation } from "./calculator-history";
 
 const RATES_URL = "https://open.er-api.com/v6/latest/USD";
 const RATES_MAX_AGE_MS = 6 * 3_600_000;
@@ -89,18 +91,44 @@ function formatMoney(amount: number, code: string): string {
   }
 }
 
-async function answer(display: string, plain: string, input: InlineResult["input"], label: string, note?: string): Promise<InlineResult> {
+export interface CalculatorAnswer extends InlineResult {
+  kind: CalculationKind;
+  plain: string;
+}
+
+const remembered = (action: Action, save: () => Promise<void>): Action => ({
+  ...action,
+  run: async () => {
+    await action.run();
+    await save();
+  },
+});
+
+async function answer(kind: CalculationKind, display: string, plain: string, input: InlineResult["input"], label: string, note?: string): Promise<CalculatorAnswer> {
+  const save = () => saveCalculation(input.text, display, kind);
   return {
+    kind,
+    plain,
     section: "Calculator",
     input,
     output: { text: display, label },
     note,
     primaryActionTitle: "Copy Answer",
-    actions: [copyPasteActions(plain, await frontmostApp(), "Copy Answer")],
+    actions: [
+      [
+        ...copyPasteActions(plain, await frontmostApp(), "Copy Answer").map((action) => remembered(action, save)),
+        remembered({ id: "copy-question-and-answer", title: "Copy Question and Answer", icon: Clipboard, shortcut: { key: "c", alt: true, shift: true }, run: () => copyAndClose(`${input.text} = ${display}`) }, save),
+      ],
+    ],
   };
 }
 
-async function inline(query: string): Promise<InlineResult | null> {
+export async function calculate(query: string): Promise<CalculatorAnswer | null> {
+  const result = await inline(query);
+  return result && "kind" in result ? (result as CalculatorAnswer) : null;
+}
+
+async function inline(query: string): Promise<InlineResult | CalculatorAnswer | null> {
   const text = query.trim();
   if (!text) return null;
 
@@ -139,6 +167,7 @@ async function inline(query: string): Promise<InlineResult | null> {
       const value = parsed && convertCurrency(parsed, table.rates);
       if (parsed && value !== null) {
         return answer(
+          "unitConversion",
           formatMoney(value, parsed.to),
           value.toFixed(2),
           { text, label: currencyName(parsed.from) },
@@ -152,13 +181,13 @@ async function inline(query: string): Promise<InlineResult | null> {
   const place = parseTimeQuery(text, places(navigator.languages));
   if (place) {
     const { text: when, offset } = formatTimeIn(new Date(), place.timeZone);
-    return answer(when, when, { text, label: place.name }, offset);
+    return answer("dateTime", when, when, { text, label: place.name }, offset);
   }
 
   if (!isExpression(text)) return null;
   const value = evaluate(text);
   if (value === null || plainNumber(value) === text) return null;
-  return answer(formatNumber(value), plainNumber(value), { text, label: "Expression" }, numberToWords(value) ?? "Result");
+  return answer("math", formatNumber(value), plainNumber(value), { text, label: "Expression" }, numberToWords(value) ?? "Result");
 }
 
 export default defineExtension({
@@ -166,4 +195,15 @@ export default defineExtension({
   title: "Calculator",
   icon: { glyph: Calculator, tone: "orange" },
   inline,
+  commands: [
+    {
+      id: "history",
+      title: "Calculator History",
+      subtitle: "Calculator",
+      keywords: ["calculator", "math", "history", "calculations", "conversions"],
+      kind: "Command",
+      primaryActionTitle: "Open Command",
+      view: CalculatorHistory,
+    },
+  ],
 });

@@ -92,6 +92,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 
 ### Calculator and Translator
 - Math, units, currencies (live rates), time zones and color conversions.
+- **Calculator History** keeps the calculations you copy or paste for three months, with pins and search.
 - Translate between 133 languages, with language detection.
 
 ### Quicklinks and Web Searches

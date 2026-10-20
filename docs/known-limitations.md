@@ -36,7 +36,7 @@
 
 ## Built-in features
 
-- **Calculator.** Math, currency, time zones and colors only. No unit conversions, dates, history or syntax highlighting. Exchange rates come from open.er-api.com (free, no key, daily updates), cached for 6 hours; without network the last cached rates are used, and with none the currency card does not appear. The math card labels are unverified.
+- **Calculator.** Math, currency, time zones and colors only. No unit conversions, dates or syntax highlighting. Calculator History has no Show History or Pin Calculation action on the root card. Exchange rates come from open.er-api.com (free, no key, daily updates), cached for 6 hours; without network the last cached rates are used, and with none the currency card does not appear. The math card labels are unverified.
 - **Clipboard History.** Text, files and images are kept 7 days (pinned entries forever), the reference default. There is no retention setting, OCR, disabled-apps list, Paste and Keep Window Open, Paste as…, rename or tags. Delete All keeps pinned entries. Two copies of the same content within a second count as one, because one copy can raise several clipboard notifications. Paste Sequentially uses the reference defaults (60 s timeout, newline after text) without settings, ignores copies made in the 2 s around each of its pastes, and puts the newest history item back on the clipboard afterwards.
 - **Paste.** Paste actions restore focus to the previous window and send Ctrl+V. Apps that run elevated ignore the injected keys.
 - **Emoji.** Names come from Unicode only, so searches match fewer words than the reference. No skin tones or pinned emoji.
