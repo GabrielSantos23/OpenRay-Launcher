@@ -506,7 +506,9 @@ EndFragment:{end_fragment:010}
             if !VerQueryValueW(data.as_ptr() as _, &HSTRING::from(key), &mut ptr, &mut len).as_bool() || len == 0 {
                 return None;
             }
-            let text = String::from_utf16_lossy(std::slice::from_raw_parts(ptr as *const u16, len as usize - 1)).trim().to_string();
+            let chars = std::slice::from_raw_parts(ptr as *const u16, len as usize);
+            let end = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
+            let text = String::from_utf16_lossy(&chars[..end]).trim().to_string();
             (!text.is_empty()).then_some(text)
         }
     }
@@ -514,6 +516,10 @@ EndFragment:{end_fragment:010}
     pub fn window_app(hwnd: HWND) -> Option<(String, String)> {
         let mut pid = 0;
         unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+        process_app(pid)
+    }
+
+    pub fn process_app(pid: u32) -> Option<(String, String)> {
         if pid == 0 {
             return None;
         }
@@ -554,7 +560,7 @@ EndFragment:{end_fragment:010}
 }
 
 #[cfg(windows)]
-pub use win::{capture, listen, owner_app, read_clipboard_text, read_rich, send_copy, send_paste, window_app, write_files, write_image, write_rich, write_text};
+pub use win::{capture, listen, owner_app, process_app, read_clipboard_text, read_rich, send_copy, send_paste, window_app, write_files, write_image, write_rich, write_text};
 
 pub fn write_entry(history: &History, entry: &Entry) -> Result<(), String> {
     match &entry.content {

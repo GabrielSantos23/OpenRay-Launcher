@@ -135,13 +135,13 @@ fn toggle_hidden_files() -> Result<(), String> {
     Ok(())
 }
 
-fn process_of(hwnd: HWND) -> u32 {
+pub(crate) fn process_of(hwnd: HWND) -> u32 {
     let mut pid = 0;
     unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
     pid
 }
 
-fn app_windows() -> Vec<HWND> {
+pub(crate) fn app_windows() -> Vec<HWND> {
     unsafe extern "system" fn collect(hwnd: HWND, data: LPARAM) -> BOOL {
         let list = unsafe { &mut *(data.0 as *mut Vec<HWND>) };
         list.push(hwnd);

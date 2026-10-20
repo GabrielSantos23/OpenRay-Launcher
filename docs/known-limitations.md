@@ -109,6 +109,13 @@
 - Not yet: files in root search, fallback with typed text, Quick Look, Navigate Up/Down and folder sorting, Paste File, Open in Terminal, Show Properties, Rename, Duplicate, Copy To, Move To, Open With, Exclude From Index.
 - Recently Used reads the Windows Recent folder; when Windows keeps no recent items, the list shows the newest modified files instead.
 
+## Switch Windows
+
+- Not yet: Minimize to Tray and Hide Application (they need a way to bring hidden windows back), and the Navigation fallback setting.
+- Filtered results keep the window order instead of sorting by match score.
+- Windows on other virtual desktops are not listed.
+- Quit Application only asks the app's windows to close; Force Quit ends the process without saving.
+
 ## System Actions
 
 - Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Volume Mixer, active-app volume, sound device pickers, Set Volume with a typed value, Energy Saver, Night Light, HDR and camera mute.

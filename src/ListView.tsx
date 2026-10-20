@@ -37,6 +37,7 @@ interface ListViewProps {
   isLoading?: boolean;
   selectedId?: string;
   onSelectionChange?: (item: Item | undefined) => void;
+  tabCycles?: boolean;
 }
 
 export function filterSections(sections: ListSection[], query: string): ListSection[] {
@@ -81,6 +82,7 @@ export function ListView({
   isLoading = false,
   selectedId,
   onSelectionChange,
+  tabCycles = false,
 }: ListViewProps) {
   const [ownText, setOwnText] = useState("");
   const text = searchText ?? ownText;
@@ -98,13 +100,17 @@ export function ListView({
   const pendingId = useRef(selectedId);
 
   useEffect(() => {
+    pendingId.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
     if (!pendingId.current) return;
     const index = flat.findIndex((item) => item.id === pendingId.current);
     if (index >= 0) {
       setSelected(index);
       pendingId.current = undefined;
     }
-  }, [flat]);
+  }, [flat, selectedId]);
 
   useEffect(() => {
     onSelectionChange?.(current);
@@ -173,6 +179,9 @@ export function ListView({
       event.preventDefault();
       if (event.currentTarget === argumentRef.current) inputRef.current?.focus();
       else onBack();
+    } else if (event.key === "Tab" && tabCycles && !argument && flat.length > 0) {
+      event.preventDefault();
+      setSelected((active + (event.shiftKey ? flat.length - 1 : 1)) % flat.length);
     } else if (event.key === "Tab" && argument) {
       event.preventDefault();
       (event.currentTarget === argumentRef.current ? inputRef : argumentRef).current?.focus();

@@ -68,6 +68,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Themes | `src/theme.ts` | Bundled theme data, `ThemeRoot` applies CSS variables in every window from settings, system appearance and accent |
 | Focus | `src/focus.ts`, `src/extensions/focus.tsx`, `src/FocusWindows.tsx`, `src-tauri/src/focus.rs` | Session state and timers, app and website rules, foreground watcher with UI Automation URL reading, block overlay, notification and panel windows, native panel menus; categories and preferences in `focus.json` |
 | Snippets | `src/snippets.ts`, `src/extensions/snippets.tsx`, `src-tauri/src/snippets.rs` | Snippets in `snippets.json`; placeholder resolution in TypeScript; keyword tracking inside the low-level keyboard hook, erasing the keyword and asking the launcher (`snippet-expand`) to resolve it, then typing it with `snippet_type` |
+| Switch Windows | `src/extensions/navigation.tsx`, `src-tauri/src/window_switcher.rs` | Lists the open app windows (shared filter with Quit All Apps in `system_actions.rs`), resolving UWP frames to the hosted app, and switches, minimizes, closes, maximizes or quits them |
 | File Search | `src/fileSearch.ts`, `src/extensions/file-search.tsx`, `src-tauri/src/file_search.rs` | In-memory name index of the user folder, ranked search with type filter, Recently Used from the Windows Recent folder, file metadata; thumbnails through `appicon` with `thumb=1` |
 | System Actions | `src/extensions/system-actions.ts`, `src-tauri/src/system_actions.rs` | Power, session, app quitting, Core Audio volume and microphone mute, media keys, dark mode and hidden-files registry toggles |
 | Window Management | `src/extensions/window-management.ts`, `src-tauri/src/window_layout.rs` | Layout commands; target window lookup, work-area fractions, invisible-border compensation, display order and moves |
@@ -95,6 +96,7 @@ The Rust core exposes Tauri commands:
 - `translate` (text, source, target → translated text and detected source language)
 - Focus: `focus_get`, `focus_start`, `focus_update`, `focus_pause`, `focus_resume`, `focus_restart`, `focus_complete`, `focus_cancel`, `focus_snooze`, `focus_close_tab`, `focus_block_info`, `focus_panel_menu`, `focus_panel_reset`, `focus_toast_hide`, `read_json_file`
 - Snippets: `snippet_type` (text, cursor offset → types it into the foreground app); `data_set` with `snippets` also reloads the expansion keywords
+- Switch Windows: `window_list` (→ id, title, app name, exe path, minimized, maximized, in Z-order), `window_action` (id, `switch` | `minimize` | `close` | `toggle-maximize` | `quit` | `force-quit`)
 - File Search: `file_search` (query, type → ranked hits or Recently Used, index state), `file_reindex`, `file_info` (path → shell type name, size and dates); emits `file-index-updated` when an index build finishes
 - `system_action` (action id → runs one system action)
 - `window_layout` (layout id → moves and resizes the target window)

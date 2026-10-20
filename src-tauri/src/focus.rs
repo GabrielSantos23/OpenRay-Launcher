@@ -663,7 +663,7 @@ fn process_info(pid: u32) -> Option<(String, Option<String>)> {
     }
 }
 
-fn hosted_pid(hwnd: HWND, host_pid: u32) -> u32 {
+pub(crate) fn hosted_pid(hwnd: HWND, host_pid: u32) -> u32 {
     unsafe extern "system" fn find(child: HWND, data: LPARAM) -> windows::core::BOOL {
         let (host, found) = unsafe { &mut *(data.0 as *mut (u32, u32)) };
         let mut pid = 0;

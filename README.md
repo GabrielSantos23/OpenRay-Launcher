@@ -73,6 +73,10 @@ Each feature below works today. The full per-feature status, with evidence and r
 - Move a window between monitors.
 - Accounts for invisible window borders, so windows line up exactly.
 
+### Switch Windows
+- Search every open window by title or app name and jump to it. Tab cycles through the list, like Alt+Tab.
+- Minimize, close, maximize or restore a window, or quit and force quit its app, from the action panel.
+
 ### System Actions
 - Lock, sleep, hibernate, restart, shut down, log out, screen saver, sleep displays.
 - Volume up/down/presets, mute, microphone mute, play/pause, next/previous track.

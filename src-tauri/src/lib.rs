@@ -13,6 +13,7 @@ mod store;
 mod system_actions;
 mod translate;
 mod window_layout;
+mod window_switcher;
 
 use std::collections::HashMap;
 use store::{Settings, Store};
@@ -56,6 +57,16 @@ fn show_in_explorer(path: String) -> Result<(), String> {
 #[tauri::command]
 async fn file_search(app: AppHandle, query: String, kind: String) -> Result<file_search::Results, String> {
     tauri::async_runtime::spawn_blocking(move || file_search::search(&app, &query, &kind)).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn window_list() -> Vec<window_switcher::WindowEntry> {
+    window_switcher::list()
+}
+
+#[tauri::command]
+async fn window_action(app: AppHandle, id: isize, action: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || window_switcher::act(&app, id, &action)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -609,6 +620,8 @@ pub fn run() {
             notes_show,
             notes_pending,
             window_layout,
+            window_list,
+            window_action,
             system_action,
             focus_get,
             focus_start,
