@@ -42,14 +42,14 @@
 - **Emoji.** Names come from Unicode only, so searches match fewer words than the reference. No skin tones or pinned emoji.
 - **Notes.** Deleting a note is permanent and asks first; there is no Recently Deleted. No window auto-sizing, Find in Note, Export…, Copy Deeplink, images, zoom or notes settings. Markdown typed as one block (for example pasted plain text) stays plain text until it is retyped, because the live rules run per keystroke. The window size (440×762) and the right-edge spawn rule are estimates.
 - **Translator.** Translations come from Google's unofficial free endpoint (`translate.googleapis.com/translate_a/single?client=gtx`), not Raycast's Pro backend. It has no key and no published limits: it can rate-limit or change without notice, and text is sent to Google. Long text is sent as a form body, so there is no URL length limit, but no length cap is enforced. No dictation, text-to-speech, prefill from selected text, quick-translate results in root search, custom translate commands or translator settings. The text does not shrink to fit as in the reference. Source text is not kept between openings. The nav bar height (54 px) and the translation pane's left inset (38 px) are measured from one screenshot, not from the reference CSS.
-- **Quicklinks.** No icon picker, tags or `{selection}`; only the first argument gets a field. Favicons are fetched from Google's favicon service, and offline a link glyph shows.
+- **Quicklinks.** No icon picker, tags or `{selection}`; only the first argument gets a field. Import ignores icons and tags, and Export picks a folder instead of a file name. Favicons are fetched from Google's favicon service, and offline a link glyph shows.
 
 ## Launcher
 
 - **Position.** The default position rule is approximate: centered horizontally, with the top at 35.3% of the work area (`unk_341f…`). There is no drag-to-move or remembered position.
 - **Shown ex-style.** It keeps `WS_EX_TOOLWINDOW` (so it never appears in Alt+Tab) and Tauri's `WS_EX_ACCEPTFILES`. The reference drops TOOLWINDOW while shown.
 - **Show and hide.** Show latency was measured only on a debug build at 96 DPI.
-- **Missing UI.** There is no compact mode. Fallbacks are a fixed list (web searches and quicklinks with an argument) without a settings page. Arguments have a field only in Search Quicklinks, not inline in the root search.
+- **Missing UI.** There is no compact mode. Fallbacks are a fixed list (web searches, quicklinks with an argument, and Create Quicklink) without a settings page. Arguments have a field only in Search Quicklinks, not inline in the root search.
 - **Leaving a command.** Escape or Backspace on an empty search returns to the root search, which is cleared.
 - **Action panel.** Configure Command, Configure Extension, Treat as Application and Hide/Quit/Force Quit are not offered. The panel has no noise texture, and its radius and shadow are estimates.
 - **App actions.** Show in File Explorer selects the Start Menu shortcut, not its target; the reference behavior is unverified. Packaged apps have no Run as Administrator, Show in File Explorer or Copy Path.

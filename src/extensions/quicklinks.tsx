@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { Clipboard, CopyPlus, ExternalLink, Link, Link2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Clipboard, CopyPlus, Download, ExternalLink, Link, Link2, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { fail, Footer } from "../ActionHost";
 import { matchesShortcut } from "../actions";
@@ -8,7 +8,7 @@ import { GlyphTile } from "../icons";
 import { defineExtension, type Command, type IconSpec, type Item, type ViewProps } from "../extension-api";
 import { BackButton, ListView, Metadata } from "../ListView";
 import { copyAndClose } from "../output";
-import { displayLink, faviconUrl, fillLink, linkArguments, type Quicklink } from "../quicklinks";
+import { displayLink, exportQuicklinks, faviconUrl, fillLink, linkArguments, mergeQuicklinks, parseQuicklinkImport, type Quicklink } from "../quicklinks";
 import { showToast } from "../toast";
 
 const ICON: IconSpec = { glyph: Link2, tone: "purple" };
@@ -59,8 +59,8 @@ function useBrowsers(): BrowserOption[] {
   return browsers;
 }
 
-function QuicklinkForm({ initial, onDone, onBack }: { initial?: Quicklink; onDone: () => void; onBack: () => void }) {
-  const [link, setLink] = useState(initial?.link ?? "");
+function QuicklinkForm({ initial, initialLink, onDone, onBack }: { initial?: Quicklink; initialLink?: string; onDone: () => void; onBack: () => void }) {
+  const [link, setLink] = useState(initial?.link ?? initialLink ?? "");
   const [name, setName] = useState(initial?.name ?? "");
   const [appPath, setAppPath] = useState(initial?.appPath ?? "");
   const [errors, setErrors] = useState<{ link?: string; name?: string }>({});
@@ -314,6 +314,34 @@ function CreateQuicklink({ pop }: ViewProps) {
   return <QuicklinkForm onDone={pop} onBack={pop} />;
 }
 
+async function importQuicklinks() {
+  const [path] = await invoke<string[]>("flowkey_pick_path", { directory: false, multiple: false, extensions: ["json"] });
+  if (!path) return;
+  let incoming: ReturnType<typeof parseQuicklinkImport>;
+  try {
+    incoming = parseQuicklinkImport(await invoke<string>("read_json_file", { path }));
+  } catch {
+    throw new Error("JSON file not in the correct format");
+  }
+  const apps = await invoke<{ name: string; path: string }[]>("list_apps").catch(() => []);
+  const { list, added, skipped } = mergeQuicklinks(await loadQuicklinks(), incoming, apps, () => crypto.randomUUID());
+  await saveQuicklinks(list);
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  showToast({ variant: "success", title: "Import successful", message: [added > 0 && `${plural(added, "quicklink")} added`, skipped > 0 && `${plural(skipped, "duplicate")} skipped`].filter(Boolean).join(", ") || undefined });
+}
+
+async function exportAll() {
+  const list = await loadQuicklinks();
+  if (list.length === 0) throw new Error("There are no quicklinks to export");
+  const [folder] = await invoke<string[]>("flowkey_pick_path", { directory: true, multiple: false });
+  if (!folder) return;
+  const date = new Date().toLocaleDateString("en-CA");
+  const path = `${folder.replace(/\\$/, "")}\\Quicklinks ${date}.json`;
+  await invoke("flowkey_fs", { op: "writeText", path, content: exportQuicklinks(list) });
+  await invoke("show_in_explorer", { path });
+  showToast({ variant: "success", title: "Exported quicklinks" });
+}
+
 function quicklinkCommand(quicklink: Quicklink): Command {
   const args = linkArguments(quicklink.link);
   const icon = faviconUrl(quicklink.link) ?? ICON;
@@ -347,6 +375,7 @@ export default defineExtension({
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: CreateQuicklink,
+      fallbackView: (text) => (props: ViewProps) => <QuicklinkForm initialLink={text} onDone={props.pop} onBack={props.pop} />,
     },
     {
       id: "search",
@@ -356,6 +385,26 @@ export default defineExtension({
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SearchQuicklinks,
+    },
+    {
+      id: "import",
+      title: "Import Quicklinks",
+      subtitle: "Quicklinks",
+      icon: { glyph: Download, tone: "purple" },
+      keywords: ["link", "json", "import"],
+      kind: "Command",
+      primaryActionTitle: "Run Command",
+      run: importQuicklinks,
+    },
+    {
+      id: "export",
+      title: "Export Quicklinks",
+      subtitle: "Quicklinks",
+      icon: { glyph: Upload, tone: "purple" },
+      keywords: ["link", "json", "export", "backup"],
+      kind: "Command",
+      primaryActionTitle: "Run Command",
+      run: exportAll,
     },
   ],
   items: async () => (await loadQuicklinks()).map(quicklinkCommand),

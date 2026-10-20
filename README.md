@@ -97,6 +97,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 
 ### Quicklinks and Web Searches
 - Save links with `{argument}`, `{clipboard}` and date placeholders, and open them in a chosen browser.
+- Create a quicklink straight from a typed URL, and import or export quicklinks as JSON.
 - Google, DuckDuckGo and Bing searches.
 
 ### Emoji & Symbols

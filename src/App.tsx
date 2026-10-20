@@ -152,8 +152,8 @@ export default function App() {
     const text = query.trim();
     if (!text) return results;
     const fallbacks = enabled
-      .filter((c) => c.fallback)
-      .map((c): RegisteredCommand => ({ ...c, key: `fallback:${c.key}`, actions: undefined, view: undefined, run: () => c.fallback!(text) }));
+      .filter((c) => c.fallback || c.fallbackView)
+      .map((c): RegisteredCommand => ({ ...c, key: `fallback:${c.key}`, actions: undefined, view: c.fallbackView?.(text), run: c.fallback ? () => c.fallback!(text) : undefined }));
     return fallbacks.length ? [...results, { title: `Use “${text}” with...`, items: fallbacks }] : results;
   }, [enabled, query, frecency, favorites, aliases]);
 

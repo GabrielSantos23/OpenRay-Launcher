@@ -50,6 +50,7 @@ export interface Command {
   actions?: Action[][];
   view?: ComponentType<ViewProps>;
   fallback?: (text: string) => Promise<void> | void;
+  fallbackView?: (text: string) => ComponentType<ViewProps>;
   run?: () => Promise<void> | void;
 }
 

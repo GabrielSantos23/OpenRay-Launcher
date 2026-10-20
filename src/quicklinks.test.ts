@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayLink, faviconUrl, fillLink, linkArguments } from "./quicklinks";
+import { displayLink, exportQuicklinks, faviconUrl, fillLink, linkArguments, mergeQuicklinks, parseQuicklinkImport } from "./quicklinks";
 
 describe("quicklinks", () => {
   it("lists named arguments once, with defaults", () => {
@@ -24,5 +24,18 @@ describe("quicklinks", () => {
     expect(displayLink("https://x.com/{argument}?d={date}", { Query: "a b" })).toBe("https://x.com/a b?d={date}");
     expect(faviconUrl("https://www.github.com/x")).toBe("https://www.google.com/s2/favicons?domain=www.github.com&sz=64");
     expect(faviconUrl("C:\\Users")).toBeNull();
+  });
+
+  it("imports the reference shapes, skips duplicate links and round-trips exports", () => {
+    expect(parseQuicklinkImport('{"name":"A","url":"https://a.com","applicationID":"Firefox"}')).toEqual([{ name: "A", link: "https://a.com", openWith: "Firefox" }]);
+    expect(parseQuicklinkImport('{"quicklinks":[{"name":"B","link":"https://b.com"}]}')).toEqual([{ name: "B", link: "https://b.com" }]);
+    expect(() => parseQuicklinkImport('[{"link":"x"}]')).toThrow();
+    const apps = [{ name: "Firefox", path: "C:\ff.exe" }];
+    const existing = [{ id: "1", name: "Old", link: "https://a.com" }];
+    const incoming = parseQuicklinkImport('[{"name":"A","link":"https://a.com"},{"name":"C","link":" https://c.com ","openWith":"firefox"}]');
+    const { list, added, skipped } = mergeQuicklinks(existing, incoming, apps, () => "new");
+    expect([added, skipped]).toEqual([1, 1]);
+    expect(list[1]).toEqual({ id: "new", name: "C", link: "https://c.com", appPath: "C:\ff.exe", appName: "Firefox" });
+    expect(parseQuicklinkImport(exportQuicklinks(list))).toEqual([{ name: "Old", link: "https://a.com" }, { name: "C", link: "https://c.com", openWith: "Firefox" }]);
   });
 });

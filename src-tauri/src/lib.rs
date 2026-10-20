@@ -420,7 +420,8 @@ fn read_json_file(path: String) -> Result<String, String> {
     if !path.to_lowercase().ends_with(".json") {
         return Err("Choose a JSON file".into());
     }
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    Ok(text.strip_prefix('\u{feff}').map(str::to_string).unwrap_or(text))
 }
 
 #[tauri::command]

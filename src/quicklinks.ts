@@ -78,3 +78,45 @@ export function faviconUrl(link: string): string | null {
     return null;
   }
 }
+
+export interface QuicklinkImport {
+  name: string;
+  link: string;
+  openWith?: string;
+}
+
+export function parseQuicklinkImport(json: string): QuicklinkImport[] {
+  const data = JSON.parse(json);
+  const list = Array.isArray(data) ? data : Array.isArray(data?.quicklinks) ? data.quicklinks : [data];
+  return list.map((raw: Record<string, unknown>) => {
+    const text = (key: string) => (typeof raw?.[key] === "string" ? (raw[key] as string) : undefined);
+    const name = text("name");
+    if (name === undefined) throw new Error("Invalid quicklink import format");
+    const openWith = text("openWith") ?? text("applicationID");
+    return { name, link: text("link") ?? text("url") ?? "", ...(openWith ? { openWith } : {}) };
+  });
+}
+
+export function mergeQuicklinks(existing: Quicklink[], incoming: QuicklinkImport[], apps: { name: string; path: string }[], newId: () => string) {
+  const list = [...existing];
+  let added = 0;
+  let skipped = 0;
+  for (const item of incoming) {
+    if (list.some((q) => q.link === item.link)) {
+      skipped += 1;
+      continue;
+    }
+    const app = item.openWith ? apps.find((a) => a.name.toLowerCase() === item.openWith!.toLowerCase() || a.path === item.openWith) : undefined;
+    list.push({ id: newId(), name: item.name, link: item.link.trim(), ...(app ? { appPath: app.path, appName: app.name } : {}) });
+    added += 1;
+  }
+  return { list, added, skipped };
+}
+
+export function exportQuicklinks(list: Quicklink[]): string {
+  return JSON.stringify(
+    list.map((q) => (q.appName ? { name: q.name, link: q.link, openWith: q.appName } : { name: q.name, link: q.link })),
+    null,
+    2,
+  );
+}
