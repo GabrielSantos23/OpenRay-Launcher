@@ -69,7 +69,9 @@ Each feature below works today. The full per-feature status, with evidence and r
 - Built-in categories (Social, Messaging, Gaming, Streaming, News, Shopping), custom categories and JSON import.
 
 ### Window Management
-- Halves, thirds, two-thirds, maximize and center.
+- Halves, thirds, two-thirds, fourths, three-fourths, quarters and sixths.
+- Maximize, almost maximize, reasonable size, maximize height or width, center, restore and minimize.
+- Move to an edge, make larger or smaller, toggle always on top, and cycle through an app's windows.
 - Move a window between monitors.
 - Accounts for invisible window borders, so windows line up exactly.
 

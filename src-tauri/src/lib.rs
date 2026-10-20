@@ -390,8 +390,8 @@ fn system_action(app: AppHandle, action: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn window_layout(layout: String) -> Result<(), String> {
-    window_layout::apply(&layout)
+fn window_layout(app: AppHandle, layout: String) -> Result<(), String> {
+    window_layout::apply(&layout, launcher::monitor(&app))
 }
 
 #[tauri::command]

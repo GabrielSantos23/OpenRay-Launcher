@@ -118,6 +118,15 @@ pub fn previous_window() -> HWND {
     HWND(PREVIOUS_FOREGROUND.load(Ordering::SeqCst) as _)
 }
 
+pub(crate) fn set_previous_window(hwnd: HWND) {
+    PREVIOUS_FOREGROUND.store(hwnd.0 as isize, Ordering::SeqCst);
+}
+
+pub(crate) fn monitor(app: &AppHandle) -> Option<windows::Win32::Graphics::Gdi::HMONITOR> {
+    let hwnd = hwnd(&window(app)?)?;
+    Some(unsafe { windows::Win32::Graphics::Gdi::MonitorFromWindow(hwnd, windows::Win32::Graphics::Gdi::MONITOR_DEFAULTTONEAREST) })
+}
+
 pub fn active_window() -> HWND {
     if is_shown() {
         previous_window()

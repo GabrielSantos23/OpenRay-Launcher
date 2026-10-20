@@ -125,6 +125,9 @@
 
 - Windows of apps running as administrator can't be moved while Openray runs without elevation; the command shows an error.
 - Maximize fills the work area and doesn't use the native maximized state.
+- The per-command settings (Almost Maximize percentage, Make Smaller/Larger step size, Move Center Window, display Wrap and Keep Aspect Ratio) are not exposed; the reference defaults are used.
+- Restore remembers only the frame before the last layout command, and forgets it when Openray restarts.
+- Not yet: Resize Window and Move Window (typed arguments), gaps, custom commands and layouts, Save Current Layout, virtual desktops.
 
 ## Updates
 
