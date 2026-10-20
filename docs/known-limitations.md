@@ -94,6 +94,13 @@
 - Blocked apps are asked to close, not force-quit; an app that shows a save prompt stays open behind the overlay.
 - No Move to Taskbar, focus statistics, or typed durations.
 
+## Snippets
+
+- Expansion types the text with Unicode key events instead of pasting it, so very long snippets appear gradually, and apps that ignore injected Unicode input (some games, remote desktops) don't receive them.
+- Only typed characters are tracked: a mouse click inside the same window doesn't reset what was typed, and keys composed with dead keys (´ + a) are not recorded, so keywords should use plain characters.
+- Keywords never expand inside Openray's own windows.
+- Not yet: {argument} placeholders, date `format`/`offset` options, {selection}, {browser-tab}, {calculator}, tags, the Snippets settings (expansion on/off, expand within words, disabled apps, response time), Move Up/Down for pinned snippets, Export Snippet for one snippet.
+
 ## File Search
 
 - Searches file and folder names only. No content search, no `.gitignore`/`.rayignore` support, no Search Scopes or Ignore Patterns settings, no hidden-files toggle; the index covers only the user folder.

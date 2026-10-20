@@ -8,6 +8,7 @@ import { actionGroups, matchesShortcut } from "./actions";
 import type { Action, InlineResult, InlineSide, RegisteredCommand, ViewProps } from "./extension-api";
 import { builtInExtensions } from "./extensions";
 import { LAUNCH_EVENT, loadFlowKeyExtensions } from "./extensions/flowkey";
+import { expandSnippet } from "./extensions/snippets";
 import { FlowKeyDialog } from "./flowkey/Dialog";
 import { WINDOW_EVENT, type WindowSignal } from "./flowkey/FlowKeyView";
 import { loadCommands } from "./registry";
@@ -116,6 +117,7 @@ export default function App() {
         setLauncherVisible(true);
         inputRef.current?.focus();
       }),
+      listen<string>("snippet-expand", (event) => expandSnippet(event.payload).catch((e) => console.error("snippet expansion failed", e))),
     ];
     return () => {
       unlisteners.forEach((p) => p.then((off) => off()));

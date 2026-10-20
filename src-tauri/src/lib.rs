@@ -8,6 +8,7 @@ mod hotkey;
 mod hud;
 mod launcher;
 mod notes;
+mod snippets;
 mod store;
 mod system_actions;
 mod translate;
@@ -271,7 +272,16 @@ fn data_get(name: String, store: State<Store>) -> Result<serde_json::Value, Stri
 
 #[tauri::command]
 fn data_set(name: String, value: serde_json::Value, store: State<Store>) -> Result<(), String> {
-    store.set_data(&name, &value)
+    store.set_data(&name, &value)?;
+    if name == "snippets" {
+        snippets::load(&value);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn snippet_type(text: String, cursor_back: usize) {
+    snippets::type_text(&text, cursor_back)
 }
 
 #[tauri::command]
@@ -493,6 +503,7 @@ pub fn run() {
             app.manage(clipboard::History::load(data_dir.join("clipboard"), store::now_ms()));
             let store = Store::load(data_dir);
             let settings = store.settings();
+            snippets::init(app.handle(), &store.data("snippets").unwrap_or_default());
             app.manage(store);
 
             if let Some(window) = app.get_webview_window(launcher::LABEL) {
@@ -593,6 +604,7 @@ pub fn run() {
             clipboard_pin,
             data_get,
             data_set,
+            snippet_type,
             open_url,
             notes_show,
             notes_pending,

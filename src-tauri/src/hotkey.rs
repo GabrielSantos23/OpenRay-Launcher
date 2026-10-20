@@ -167,6 +167,9 @@ mod hook {
                         return LRESULT(1);
                     }
                 }
+                if down {
+                    crate::snippets::on_key(event.vkCode, event.scanCode);
+                }
             }
         }
         unsafe { CallNextHookEx(None, code, wparam, lparam) }

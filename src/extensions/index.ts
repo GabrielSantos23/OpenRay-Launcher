@@ -7,9 +7,10 @@ import fileSearch from "./file-search";
 import focus from "./focus";
 import notes from "./notes";
 import quicklinks from "./quicklinks";
+import snippets from "./snippets";
 import systemActions from "./system-actions";
 import translate from "./translate";
 import webSearches from "./web-searches";
 import windowManagement from "./window-management";
 
-export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, fileSearch, focus, notes, quicklinks, systemActions, translate, webSearches, windowManagement, core];
+export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, fileSearch, focus, notes, quicklinks, snippets, systemActions, translate, webSearches, windowManagement, core];
