@@ -87,6 +87,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 - Volume Mixer for each app's volume, plus commands to mute or change the volume of the active app.
 - Quit the active app, quit all apps, show desktop.
 - Open and empty the Recycle Bin, toggle dark mode, toggle hidden files.
+- Toggle Night Light, HDR and camera access.
 - Dangerous actions ask for confirmation first.
 
 ### Notes

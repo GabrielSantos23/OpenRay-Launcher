@@ -13,6 +13,7 @@ mod snippets;
 mod sound_devices;
 mod store;
 mod system_actions;
+mod toggles;
 mod translate;
 mod window_layout;
 mod window_switcher;
@@ -465,6 +466,11 @@ async fn sound_device_set(id: String, default: Option<bool>, volume: Option<f32>
 }
 
 #[tauri::command]
+async fn system_toggle(action: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || toggles::run(&action)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 fn system_action(app: AppHandle, action: String) -> Result<(), String> {
     system_actions::run(&app, &action)
 }
@@ -706,6 +712,7 @@ pub fn run() {
             window_list,
             sound_devices,
             app_volumes,
+            system_toggle,
             app_volume_set,
             app_volume_active,
             sound_device_set,

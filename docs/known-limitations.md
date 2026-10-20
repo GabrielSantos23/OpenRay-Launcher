@@ -118,10 +118,11 @@
 
 ## System Actions
 
-- Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Energy Saver, Night Light, HDR and camera mute.
+- Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Energy Saver (its Windows API is undocumented).
 - The sound device pickers change the default device through `IPolicyConfig`, an undocumented Windows interface that a future Windows update could change; format, enhancements and enable/disable are not offered.
 - Volume Mixer and the active-app commands only see audio sessions on the default output device.
 - Command arguments: one per command, and a command hotkey for an argument command does nothing until the launcher is open with the command selected.
+- Toggle Night Light edits an undocumented registry blob; on a Windows build with another layout it reports “Unknown Night Light format” and changes nothing. Toggle Camera Mute only flips the app-access privacy switch.
 - Quit All Apps only asks windows to close; apps with unsaved work show their own prompts.
 
 ## Window Management

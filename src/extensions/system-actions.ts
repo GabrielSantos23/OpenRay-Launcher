@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  CameraOff,
   Eye,
   Lock,
   Mic,
@@ -119,6 +120,31 @@ export default defineExtension({
         primaryActionTitle: "Run Command",
         confirm,
         run: () => invoke("system_action", { action: id }),
+      }),
+    ),
+    ...(
+      [
+        ["toggle-night-light", "Toggle Night Light", Moon, ["night light", "blue light", "night mode"]],
+        ["toggle-hdr", "Toggle HDR", Sparkles, ["hdr", "high dynamic range", "display"]],
+        ["toggle-camera-mute", "Toggle Camera Mute", CameraOff, ["mute camera", "webcam", "video mute", "camera off"]],
+      ] as const
+    ).map(
+      ([id, title, glyph, keywords]): Command => ({
+        id,
+        title,
+        icon: { glyph, tone: "red" },
+        subtitle: "System",
+        keywords: ["system", ...keywords],
+        kind: "Command",
+        primaryActionTitle: "Run Command",
+        run: async () => {
+          await invoke("hide_launcher", { restoreFocus: true });
+          try {
+            showHUD({ variant: "success", title: await invoke<string>("system_toggle", { action: id }) });
+          } catch (e) {
+            showHUD({ variant: "failure", title: e instanceof Error ? e.message : String(e) });
+          }
+        },
       }),
     ),
     {
