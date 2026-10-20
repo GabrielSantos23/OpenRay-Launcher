@@ -12,6 +12,8 @@ function windowLabel() {
   }
 }
 
+document.addEventListener("contextmenu", (event) => event.preventDefault());
+
 const views: Record<string, () => Promise<{ default: ComponentType }>> = {
   hud: () => import("./Hud").then((m) => ({ default: m.Hud })),
   settings: () => import("./SettingsWindow").then((m) => ({ default: m.SettingsWindow })),
