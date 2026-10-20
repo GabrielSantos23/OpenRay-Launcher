@@ -12,6 +12,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 pub const OVERLAY: &str = "capture";
+const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site";
 const HIDE_DELAY: Duration = Duration::from_millis(180);
 
 struct Session {
@@ -238,6 +239,7 @@ pub fn pin(app: &AppHandle, png: Vec<u8>, rect: Rect) -> Result<(), String> {
     tauri::async_runtime::spawn(async move {
         let built = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
             .title("Pinned Screenshot")
+            .additional_browser_args(BROWSER_ARGS)
             .decorations(false)
             .always_on_top(true)
             .skip_taskbar(true)

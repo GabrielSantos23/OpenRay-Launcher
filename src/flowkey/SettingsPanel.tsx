@@ -3,7 +3,7 @@ import { emit } from "@tauri-apps/api/event";
 import type { ExtensionManifest, PreferenceSchema } from "@flowkey-cli/native-sdk";
 import { useEffect, useState } from "react";
 import { Dropdown as Select } from "../Dropdown";
-import { Card, Row, Switch } from "../SettingsWindow";
+import { Card, Row, Switch } from "../controls";
 import { ask } from "./dialogs";
 import { CHANGED_EVENT, describeGrants, forgetCached, grantConsent, grantsFor, listExtensions, manifestIssues, newerVersion, pendingConsent, preferencesOf, REMOVED_EVENT, setPreferences, dataSet, type Failure } from "./extensions";
 import { grantsOf, NO_GRANTS } from "./gate";

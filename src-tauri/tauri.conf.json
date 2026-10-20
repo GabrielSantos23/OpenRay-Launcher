@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Openray",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "identifier": "dev.openray.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "launcher",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Openray",
         "width": 750,
         "height": 475,
@@ -30,6 +31,7 @@
       },
       {
         "label": "hud",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Openray HUD",
         "width": 232,
         "height": 46,
@@ -46,6 +48,7 @@
       },
       {
         "label": "settings",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Openray Settings",
         "width": 1370,
         "height": 836,
@@ -59,6 +62,7 @@
       },
       {
         "label": "notes",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Notes",
         "width": 440,
         "height": 762,
@@ -75,6 +79,7 @@
       },
       {
         "label": "tooltip",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Openray Tooltip",
         "width": 120,
         "height": 30,
@@ -92,6 +97,7 @@
       },
       {
         "label": "focus-panel",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Focus Session",
         "width": 265,
         "height": 40,
@@ -109,6 +115,7 @@
       },
       {
         "label": "focus-toast",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Focus Notification",
         "width": 392,
         "height": 66,
@@ -126,6 +133,7 @@
       },
       {
         "label": "capture",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Openray Capture",
         "width": 800,
         "height": 600,
@@ -142,6 +150,7 @@
       },
       {
         "label": "focus-block",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Focus Blocked",
         "width": 800,
         "height": 600,

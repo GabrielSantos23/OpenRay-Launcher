@@ -174,4 +174,6 @@
 ## Platform
 
 - Built and tested only on Windows 11 x64 at 96 DPI. Windows 10 is untested.
-- Startup time and idle memory were not measured.
+- Idle memory of a release build right after start, before the launcher opens, on this machine: 141 MB private for Openray plus its WebView2 processes (237 MB before 0.1.21). Startup time was not measured.
+- WebView2 runs with `--disable-gpu` (saves ~75 MB, the GPU process) and `--process-per-site` (all windows share one renderer, saves ~25 MB per extra window). Rendering is in software; a hang in one window's page affects the others.
+- App, Settings page and Steam game lists are cached: a newly installed app can take up to 20 seconds and one more launcher open to appear (uninstalling clears the cache at once).

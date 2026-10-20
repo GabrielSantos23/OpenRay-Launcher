@@ -1,6 +1,6 @@
 [package]
 name = "openray"
-version = "0.1.20"
+version = "0.1.21"
 edition = "2021"
 rust-version = "1.90"
 
@@ -63,6 +63,8 @@ windows = { version = "0.61", features = [
 ] }
 tauri-plugin-updater = "2"
 windows-core = "0.61"
+webview2-com = "0.39"
+webview-core = { package = "windows-core", version = "0.62" }
 rqrr = { version = "0.11", default-features = false }
 
 [dev-dependencies]

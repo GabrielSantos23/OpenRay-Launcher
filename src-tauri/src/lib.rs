@@ -1,4 +1,5 @@
 mod app_volume;
+mod cache;
 mod capture;
 mod apps;
 mod explorer;
@@ -33,10 +34,18 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
+static APPS: cache::Cached<Vec<apps::InstalledApp>> = cache::Cached::new(std::time::Duration::from_secs(20));
+static SYSTEM_PAGES: cache::Cached<Vec<settings_pages::SystemPage>> = cache::Cached::new(std::time::Duration::from_secs(600));
+static GAMES: cache::Cached<Vec<games::Game>> = cache::Cached::new(std::time::Duration::from_secs(60));
+
+fn scan_apps() -> Vec<apps::InstalledApp> {
+    let games = GAMES.get(games::steam_games);
+    apps::scan(&apps::start_menu_roots(), apps::packaged_apps()).into_iter().filter(|a| !(a.path.to_lowercase().ends_with(".url") && games::is_steam_shortcut(&a.path, &games))).collect()
+}
+
 #[tauri::command]
 async fn list_apps() -> Vec<apps::InstalledApp> {
-    let games = games::steam_games();
-    apps::scan(&apps::start_menu_roots(), apps::packaged_apps()).into_iter().filter(|a| !(a.path.to_lowercase().ends_with(".url") && games::is_steam_shortcut(&a.path, &games))).collect()
+    APPS.get(scan_apps)
 }
 
 #[derive(serde::Serialize)]
@@ -47,12 +56,12 @@ struct GameList {
 
 #[tauri::command]
 async fn list_system_pages() -> Vec<settings_pages::SystemPage> {
-    settings_pages::system_pages()
+    SYSTEM_PAGES.get(settings_pages::system_pages)
 }
 
 #[tauri::command]
 async fn list_games() -> GameList {
-    GameList { games: games::steam_games(), launchers: games::launchers() }
+    GameList { games: GAMES.get(games::steam_games), launchers: games::launchers() }
 }
 
 fn serve_app_icon(request: tauri::http::Request<Vec<u8>>, responder: tauri::UriSchemeResponder) {
@@ -697,7 +706,9 @@ async fn app_uninstaller(name: String, path: String) -> Result<Option<String>, S
 
 #[tauri::command]
 async fn app_uninstall(name: String, path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || uninstall::uninstall(&name, &path).map(str::to_string)).await.map_err(|e| e.to_string())?
+    let result = tauri::async_runtime::spawn_blocking(move || uninstall::uninstall(&name, &path).map(str::to_string)).await.map_err(|e| e.to_string())?;
+    APPS.clear();
+    result
 }
 
 #[tauri::command]
@@ -835,6 +846,10 @@ pub fn run() {
         .register_uri_scheme_protocol("flowkey", |ctx, request| flowkey::serve(ctx.app_handle(), request))
         .register_uri_scheme_protocol("extimg", |ctx, request| flowkey::serve_image(ctx.app_handle(), request))
         .setup(|app| {
+            std::thread::spawn(|| {
+                APPS.get(scan_apps);
+                SYSTEM_PAGES.get(settings_pages::system_pages);
+            });
             let data_dir = app.path().app_data_dir()?;
             app.manage(clipboard::History::load(data_dir.join("clipboard"), store::now_ms()));
             let store = Store::load(data_dir);

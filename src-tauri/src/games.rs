@@ -125,7 +125,7 @@ pub fn steam_games() -> Vec<Game> {
     games
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Launcher {
     name: &'static str,

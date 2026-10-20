@@ -148,7 +148,7 @@ pub fn parse(cache: &str) -> Vec<(InstalledApp, String)> {
     pages.into_values().collect()
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct SystemPage {
     name: String,
     path: String,

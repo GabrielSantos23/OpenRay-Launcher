@@ -102,5 +102,8 @@ describe("flowkey helpers", () => {
     expect(icon("Copy URL")).toBe(lucideIcon("link"));
     expect(icon("Restart test", "gauge")).toBe(lucideIcon("gauge"));
     expect(icon("Frobnicate")).toBeNull();
+    expect(lucideIcon("HeartOff")).toBe(lucideIcon("heart-off"));
+    expect(lucideIcon("Trash2")).toBe(lucideIcon("trash-2"));
+    expect(lucideIcon("no-such-icon")).toBeNull();
   });
 });

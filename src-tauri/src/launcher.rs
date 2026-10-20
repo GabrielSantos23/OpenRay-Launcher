@@ -65,6 +65,7 @@ pub fn init(window: &WebviewWindow) {
     set_dwm(hwnd, DWMWA_BORDER_COLOR, 0x003B_3B3Bu32);
     set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
     set_hidden_styles(hwnd, true);
+    set_memory_target(window, true);
     unsafe {
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
@@ -91,6 +92,17 @@ fn place(app: &AppHandle, window: &WebviewWindow, previous: HWND) {
     let y = area.position.y + (area.size.height as f64 * TOP_FRACTION).round() as i32;
     let max_y = area.position.y + area.size.height as i32 - size.height as i32;
     let _ = window.set_position(PhysicalPosition::new(x, y.min(max_y).max(area.position.y)));
+}
+
+pub(crate) fn set_memory_target(window: &WebviewWindow, low: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL};
+    use webview_core::Interface;
+    let _ = window.with_webview(move |webview| unsafe {
+        let Ok(core) = webview.controller().CoreWebView2() else { return };
+        if let Ok(core) = core.cast::<ICoreWebView2_19>() {
+            let _ = core.SetMemoryUsageTargetLevel(if low { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW } else { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL });
+        }
+    });
 }
 
 pub(crate) fn force_foreground(hwnd: HWND) {
@@ -149,6 +161,7 @@ pub fn show(app: &AppHandle) {
         }
         place(app, &window, previous);
     }
+    set_memory_target(&window, false);
     SHOWN.store(true, Ordering::SeqCst);
     set_hidden_styles(hwnd, false);
     force_foreground(hwnd);
@@ -163,6 +176,7 @@ pub fn hide(app: &AppHandle, restore_focus: bool) {
         return;
     }
     set_hidden_styles(hwnd, true);
+    set_memory_target(&window, true);
     let _ = app.emit_to(LABEL, "launcher-hidden", ());
     if restore_focus && owns_foreground(&window) {
         let previous = HWND(PREVIOUS_FOREGROUND.load(Ordering::SeqCst) as _);

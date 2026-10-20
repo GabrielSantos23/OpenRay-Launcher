@@ -1,5 +1,6 @@
-import { icons } from "lucide-react";
-import { useState } from "react";
+import type { LucideProps } from "lucide-react";
+import { lazy, Suspense, useState, type ComponentType } from "react";
+import names from "virtual:lucide-names";
 import { hostAllowed } from "./gate";
 import type { InstalledExtension } from "./runtime";
 
@@ -15,12 +16,32 @@ const LOCAL_IMAGE_ORIGINS = ["http://extimg.localhost/", "http://appicon.localho
 const IMAGE_FILE = /\.(png|jpe?g|gif|webp|ico|bmp|svg)$/i;
 const COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]+)$/i;
 
-function pascal(name: string): string {
-  return name.replace(/(^|[-_\s]+)([a-z0-9])/gi, (_, __, c: string) => c.toUpperCase());
+const NAMES = new Set(names);
+const LOADED = new Map<string, ComponentType<LucideProps>>();
+
+export function iconKey(name: string): string {
+  return name
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([a-zA-Z])([0-9])/g, "$1-$2")
+    .replace(/[_\s]+/g, "-")
+    .toLowerCase();
 }
 
-export function lucideIcon(name: string) {
-  return icons[pascal(name) as keyof typeof icons] ?? null;
+export function lucideIcon(name: string): ComponentType<LucideProps> | null {
+  const key = iconKey(name);
+  if (!NAMES.has(key)) return null;
+  let icon = LOADED.get(key);
+  if (!icon) {
+    const Lazy = lazy(() => import("./lucideLoaders").then((m) => m.loadIcon(key)));
+    icon = (props: LucideProps) => (
+      <Suspense fallback={<span className={props.className} />}>
+        <Lazy {...props} />
+      </Suspense>
+    );
+    LOADED.set(key, icon);
+  }
+  return icon;
 }
 
 export function safeColor(color?: string): string | undefined {

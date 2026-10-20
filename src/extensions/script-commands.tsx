@@ -9,7 +9,7 @@ import { GlyphTile } from "../icons";
 import { BackButton, ListView } from "../ListView";
 import { copyAndClose } from "../output";
 import { isEmojiIcon, lastLine, MODES, scriptFileName, scriptTemplate, TEMPLATES, type Script, type ScriptMode, type ScriptOutput, type ScriptTemplate } from "../scriptCommands";
-import { Checkbox } from "../SettingsWindow";
+import { Checkbox } from "../controls";
 import { showHUD, showToast } from "../toast";
 
 const ICON: IconSpec = { glyph: ScrollText, tone: "slate" };
