@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   Eye,
   Lock,
+  Mic,
   LogOut,
   MicOff,
   Monitor,
@@ -13,6 +14,7 @@ import {
   RotateCcw,
   SkipBack,
   SkipForward,
+  Speaker,
   Sparkles,
   SunMoon,
   Trash,
@@ -24,6 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { defineExtension, type Command, type Confirmation } from "../extension-api";
+import { InputDevices, OutputDevices } from "./sound-devices";
 
 interface Entry {
   id: string;
@@ -82,17 +85,39 @@ export default defineExtension({
   id: "system",
   title: "System Actions",
   icon: { glyph: Power, tone: "red" },
-  commands: ENTRIES.map(
-    ({ id, title, glyph, keywords = [], confirm }): Command => ({
-      id,
-      title,
-      icon: { glyph, tone: "red" },
+  commands: [
+    ...ENTRIES.map(
+      ({ id, title, glyph, keywords = [], confirm }): Command => ({
+        id,
+        title,
+        icon: { glyph, tone: "red" },
+        subtitle: "System",
+        keywords: ["system", ...keywords],
+        kind: "Command",
+        primaryActionTitle: "Run Command",
+        confirm,
+        run: () => invoke("system_action", { action: id }),
+      }),
+    ),
+    {
+      id: "set-sound-output-device",
+      title: "Set Sound Output Device",
+      icon: { glyph: Speaker, tone: "red" },
       subtitle: "System",
-      keywords: ["system", ...keywords],
+      keywords: ["system", "output device", "audio output", "playback device", "speakers", "headphones", "sound device"],
       kind: "Command",
-      primaryActionTitle: "Run Command",
-      confirm,
-      run: () => invoke("system_action", { action: id }),
-    }),
-  ),
+      primaryActionTitle: "Open Command",
+      view: OutputDevices,
+    },
+    {
+      id: "set-sound-input-device",
+      title: "Set Sound Input Device",
+      icon: { glyph: Mic, tone: "red" },
+      subtitle: "System",
+      keywords: ["system", "input device", "audio input", "recording device", "microphone", "mic", "sound device"],
+      kind: "Command",
+      primaryActionTitle: "Open Command",
+      view: InputDevices,
+    },
+  ],
 });

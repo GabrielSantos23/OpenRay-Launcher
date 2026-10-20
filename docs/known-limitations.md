@@ -118,7 +118,8 @@
 
 ## System Actions
 
-- Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Volume Mixer, active-app volume, sound device pickers, Set Volume with a typed value, Energy Saver, Night Light, HDR and camera mute.
+- Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Volume Mixer, active-app volume, Set Volume with a typed value, Energy Saver, Night Light, HDR and camera mute.
+- The sound device pickers change the default device through `IPolicyConfig`, an undocumented Windows interface that a future Windows update could change; format, enhancements and enable/disable are not offered.
 - Quit All Apps only asks windows to close; apps with unsaved work show their own prompts.
 
 ## Window Management

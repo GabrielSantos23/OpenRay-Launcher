@@ -9,6 +9,7 @@ mod hud;
 mod launcher;
 mod notes;
 mod snippets;
+mod sound_devices;
 mod store;
 mod system_actions;
 mod translate;
@@ -425,6 +426,29 @@ fn read_json_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn sound_devices(direction: String) -> Result<Vec<sound_devices::SoundDevice>, String> {
+    tauri::async_runtime::spawn_blocking(move || sound_devices::list(&direction)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn sound_device_set(id: String, default: Option<bool>, volume: Option<f32>, muted: Option<bool>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if default == Some(true) {
+            sound_devices::set_default(&id)?;
+        }
+        if let Some(volume) = volume {
+            sound_devices::set_volume(&id, volume)?;
+        }
+        if let Some(muted) = muted {
+            sound_devices::set_muted(&id, muted)?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 fn system_action(app: AppHandle, action: String) -> Result<(), String> {
     system_actions::run(&app, &action)
 }
@@ -664,6 +688,8 @@ pub fn run() {
             notes_pending,
             window_layout,
             window_list,
+            sound_devices,
+            sound_device_set,
             clipboard_paste_next,
             clipboard_reset_sequence,
             window_action,
