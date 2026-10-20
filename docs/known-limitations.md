@@ -142,6 +142,8 @@
 
 ## Screenshots
 
+- Print Screen and Alt+Print Screen are taken by Openray by default (Capture Region, Capture Active Window), so Windows' own Print Screen actions and other tools bound to it (ShareX, Snipping Tool) stop receiving them while Openray runs. Clear or change them in Settings → Extensions.
+- While the hotkey recorder is open, global hotkeys are paused; if Windows is set to open the Snipping Tool with Print Screen, pressing it there also opens the Snipping Tool.
 - Capture uses GDI, so DRM-protected video and some hardware-accelerated overlays come out black. The overlay freezes the screen first, so menus and tooltips open at that moment are included.
 - With monitors at different scale factors the overlay uses one scale for the whole virtual screen; selections stay pixel-accurate but the hint and loupe may look larger or smaller on one monitor.
 - Not yet: screen recording (video and GIF), scrolling capture, an annotation editor, uploads, capture delay and after-capture settings. Captures always save to `Pictures\Openray` and copy the image.

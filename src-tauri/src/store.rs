@@ -56,6 +56,17 @@ pub struct Settings {
     pub commands: HashMap<String, CommandPrefs>,
 }
 
+pub const DEFAULT_HOTKEYS: [(&str, &str); 2] = [("screenshots/region", "PrintScreen"), ("screenshots/window", "Alt+PrintScreen")];
+
+pub fn add_default_hotkeys(settings: &mut Settings) {
+    for (key, hotkey) in DEFAULT_HOTKEYS {
+        let taken = settings.hotkey.eq_ignore_ascii_case(hotkey) || settings.commands.values().any(|p| p.hotkey.eq_ignore_ascii_case(hotkey));
+        if !settings.commands.contains_key(key) && !taken {
+            settings.commands.insert(key.into(), CommandPrefs { hotkey: hotkey.into(), ..Default::default() });
+        }
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -113,7 +124,8 @@ impl Store {
     pub fn load(dir: PathBuf) -> Self {
         let _ = fs::create_dir_all(&dir);
         let settings_path = dir.join("settings.json");
-        let settings: Settings = read_json(&settings_path);
+        let mut settings: Settings = read_json(&settings_path);
+        add_default_hotkeys(&mut settings);
         if !settings_path.exists() {
             let _ = write_json(&settings_path, &settings);
         }
@@ -228,6 +240,20 @@ mod tests {
         settings.escape_key_behavior = EscapeKeyBehavior::CloseAndPopToRoot;
         store.set_settings(settings.clone()).unwrap();
         assert_eq!(Store::load(dir.path().to_path_buf()).settings(), settings);
+    }
+
+    #[test]
+    fn adds_print_screen_defaults_without_overriding_choices() {
+        let mut settings = Settings::default();
+        add_default_hotkeys(&mut settings);
+        assert_eq!(settings.commands["screenshots/region"].hotkey, "PrintScreen");
+        assert_eq!(settings.commands["screenshots/window"].hotkey, "Alt+PrintScreen");
+        let mut cleared = Settings::default();
+        cleared.commands.insert("screenshots/region".into(), CommandPrefs::default());
+        cleared.commands.insert("applications/x".into(), CommandPrefs { hotkey: "alt+printscreen".into(), ..Default::default() });
+        add_default_hotkeys(&mut cleared);
+        assert_eq!(cleared.commands["screenshots/region"].hotkey, "");
+        assert!(!cleared.commands.contains_key("screenshots/window"));
     }
 
     #[test]

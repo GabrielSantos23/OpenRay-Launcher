@@ -35,6 +35,14 @@ describe("hotkeyFromEvent", () => {
     expect(hotkeyFromEvent(event("KeyA"))).toBeNull();
     expect(hotkeyFromEvent(event("ControlLeft", { ctrlKey: true }))).toBeNull();
     expect(hotkeyFromEvent(event("CapsLock", { ctrlKey: true }))).toBeNull();
+    expect(hotkeyFromEvent(event("F1"))).toBeNull();
+  });
+
+  it("records Print Screen with or without modifiers", () => {
+    expect(hotkeyFromEvent(event("PrintScreen"))).toBe("PrintScreen");
+    expect(hotkeyFromEvent(event("PrintScreen", { altKey: true }))).toBe("Alt+PrintScreen");
+    expect(hotkeyFromEvent(event("F13"))).toBe("F13");
+    expect(hotkeyLabels("Alt+PrintScreen")).toEqual(["Alt", "PrtSc"]);
   });
 
   it("records arrows, navigation keys and numpad digits", () => {

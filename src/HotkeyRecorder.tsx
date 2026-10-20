@@ -65,6 +65,7 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
   const [saved, setSaved] = useState(false);
   const [triggerRef, rect] = useAnchorRect<HTMLButtonElement>(open);
   const contentRef = useRef<HTMLDivElement>(null);
+  const downCode = useRef("");
   const clearable = !!onClear && !!value;
 
   useEffect(() => {
@@ -96,13 +97,15 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
 
   function onKeyDown(event: React.KeyboardEvent) {
     event.preventDefault();
+    if (event.type === "keydown") downCode.current = event.code;
     event.stopPropagation();
     if (MODIFIER_KEYS.has(event.key)) {
       setHeld(heldModifiers(event));
       return;
     }
     const modifiers = heldModifiers(event);
-    if (modifiers.length === 0) {
+    const standalone = modifiers.length === 0 && hotkeyFromEvent(event);
+    if (modifiers.length === 0 && !standalone) {
       if (event.key === "Escape") close();
       else if (event.key === "Backspace" && clearable) onClear!().then(close);
       else if (event.key === "Enter" && result.state === "conflict" && result.conflict.overwritable) save(result.hotkey, true);
@@ -230,7 +233,11 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
             aria-label={`Record ${label}`}
             tabIndex={-1}
             onKeyDown={onKeyDown}
-            onKeyUp={(e) => setHeld(heldModifiers(e))}
+            onKeyUp={(e) => {
+              if (e.code === "PrintScreen" && downCode.current !== "PrintScreen") onKeyDown(e);
+              else setHeld(heldModifiers(e));
+              downCode.current = "";
+            }}
             style={{ left, width: POPOVER_WIDTH, height: POPOVER_HEIGHT, ...(above ? { bottom: window.innerHeight - rect.top + 10 } : { top: rect.bottom + 10 }) }}
             className="fixed z-40 rounded-panel border border-panel-border bg-panel text-13 shadow-panel outline-none"
           >

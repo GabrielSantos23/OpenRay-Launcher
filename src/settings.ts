@@ -91,7 +91,12 @@ const KEY_NAMES: Record<string, string> = {
   Insert: "Insert",
   Delete: "Delete",
   Backspace: "Backspace",
+  PrintScreen: "PrintScreen",
+  Pause: "Pause",
+  ScrollLock: "ScrollLock",
 };
+
+const STANDALONE = /^(PrintScreen|Pause|ScrollLock|F1[3-9]|F2[0-4])$/;
 
 interface KeyEventLike {
   code: string;
@@ -105,11 +110,11 @@ export function hotkeyFromEvent(event: KeyEventLike): string | null {
   const key =
     KEY_NAMES[event.code] ?? event.code.match(/^Key([A-Z])$/)?.[1] ?? event.code.match(/^Digit(\d)$/)?.[1] ?? event.code.match(/^(F\d{1,2})$/)?.[1] ?? event.code.match(/^(Numpad\d)$/)?.[1];
   const modifiers = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Win"].filter(Boolean);
-  if (!key || modifiers.length === 0) return null;
+  if (!key || (modifiers.length === 0 && !STANDALONE.test(key))) return null;
   return [...modifiers, key].join("+");
 }
 
-const KEY_GLYPHS: Record<string, string> = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Backspace: "⌫", PageUp: "PgUp", PageDown: "PgDn", Delete: "Del", Insert: "Ins" };
+const KEY_GLYPHS: Record<string, string> = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Backspace: "⌫", PageUp: "PgUp", PageDown: "PgDn", Delete: "Del", Insert: "Ins", PrintScreen: "PrtSc", ScrollLock: "ScrLk" };
 
 export function hotkeyLabels(hotkey: string): string[] {
   return hotkey.split("+").map((part) => KEY_GLYPHS[part.trim()] ?? part.trim());

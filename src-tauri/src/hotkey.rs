@@ -50,12 +50,19 @@ fn key_code(name: &str) -> Option<u32> {
         "ARROWRIGHT" | "RIGHT" => 0x27,
         "ARROWDOWN" | "DOWN" => 0x28,
         "INSERT" => 0x2D,
+        "PRINTSCREEN" | "PRTSC" | "SNAPSHOT" => 0x2C,
+        "PAUSE" => 0x13,
+        "SCROLLLOCK" => 0x91,
         "DELETE" => 0x2E,
         _ => match upper.strip_prefix("NUMPAD").and_then(|n| n.parse::<u32>().ok()) {
             Some(n) if n <= 9 => 0x60 + n,
             _ => return None,
         },
     })
+}
+
+pub fn standalone(vk: u32) -> bool {
+    matches!(vk, 0x2C | 0x13 | 0x91 | 0x7C..=0x87)
 }
 
 pub fn parse(text: &str) -> Result<Hotkey, String> {
@@ -72,7 +79,7 @@ pub fn parse(text: &str) -> Result<Hotkey, String> {
         }
     }
     let vk = vk.ok_or_else(|| format!("hotkey \"{text}\" has no key"))?;
-    if modifiers == Modifiers::default() {
+    if modifiers == Modifiers::default() && !standalone(vk) {
         return Err(format!("hotkey \"{text}\" needs at least one modifier"));
     }
     Ok(Hotkey { modifiers, vk })
@@ -268,6 +275,19 @@ mod tests {
         assert!(parse("Alt+Banana").is_err());
         assert!(parse("Alt+A+B").is_err());
         assert!(parse("Alt+F25").is_err());
+        assert!(parse("F1").is_err());
+    }
+
+    #[test]
+    fn accepts_print_screen_with_or_without_modifiers() {
+        assert_eq!(parse("PrintScreen").unwrap(), Hotkey { modifiers: Modifiers::default(), vk: 0x2C });
+        assert_eq!(parse("Alt+PrintScreen").unwrap(), Hotkey { modifiers: mods(false, true, false, false), vk: 0x2C });
+        assert_eq!(parse("F13").unwrap().vk, 0x7C);
+        assert_eq!(parse("Pause").unwrap().vk, 0x13);
+        let plain = parse("PrintScreen").unwrap();
+        let mut m = Matcher::default();
+        assert_eq!(m.on_key(&plain, 0x2C, true, mods(false, true, false, false)), Decision::PassThrough);
+        assert_eq!(m.on_key(&plain, 0x2C, true, Modifiers::default()), Decision::Fire);
     }
 
     #[test]
