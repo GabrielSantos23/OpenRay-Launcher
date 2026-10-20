@@ -1,6 +1,7 @@
 {
   "name": "openray",
   "private": true,
+  "license": "MIT",
   "version": "0.1.6",
   "type": "module",
   "scripts": {

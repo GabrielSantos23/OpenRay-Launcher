@@ -297,4 +297,6 @@ Issues and pull requests are welcome. Before opening a pull request:
 
 ## License
 
-No license has been chosen yet. Until a `LICENSE` file is added, the code is viewable on GitHub but all rights are reserved by the author.
+Openray is released under the [MIT License](LICENSE).
+
+Raycast is a trademark of Raycast Technologies Ltd. The MIT License covers Openray's own code only.
