@@ -1,9 +1,10 @@
 mod app_volume;
+mod capture;
 mod apps;
 mod explorer;
 mod menu_items;
 mod scripts;
-mod sharex;
+mod screenshot;
 mod clipboard;
 mod file_search;
 mod flowkey;
@@ -150,27 +151,98 @@ async fn script_run(path: String, arguments: Vec<String>) -> Result<scripts::Out
 }
 
 #[tauri::command]
-fn sharex_run(app: AppHandle, job: String, file: Option<String>) -> Result<(), String> {
-    sharex::run(&job, file.as_deref())?;
-    launcher::hide(&app, true);
-    Ok(())
+async fn capture_start(app: AppHandle, mode: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || screenshot::start(&app, mode)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn sharex_upload(app: AppHandle, file: String) -> Result<(), String> {
-    sharex::upload(&file)?;
-    launcher::hide(&app, true);
-    Ok(())
+fn capture_pixel(x: i32, y: i32) -> Option<String> {
+    screenshot::pixel(x, y)
 }
 
 #[tauri::command]
-fn sharex_installed() -> bool {
-    sharex::exe().is_ok()
+fn capture_pending() -> Option<serde_json::Value> {
+    screenshot::pending()
 }
 
 #[tauri::command]
-async fn sharex_screenshots() -> Result<Vec<sharex::Screenshot>, String> {
-    tauri::async_runtime::spawn_blocking(sharex::screenshots).await.map_err(|e| e.to_string())
+fn capture_ready(app: AppHandle) {
+    screenshot::ready(&app)
+}
+
+#[tauri::command]
+async fn capture_finish(app: AppHandle, rect: capture::Rect) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || screenshot::finish(&app, rect)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn capture_cancel(app: AppHandle) {
+    screenshot::cancel(&app)
+}
+
+#[tauri::command]
+async fn capture_direct(app: AppHandle, kind: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || screenshot::direct(&app, &kind)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn pin_file(app: AppHandle, path: String) -> Result<(), String> {
+    screenshot::pin_file(&app, &path)
+}
+
+#[tauri::command]
+fn pin_shown(app: AppHandle, label: String) {
+    screenshot::pin_shown(&app, &label)
+}
+
+#[tauri::command]
+fn pin_copy(label: String) -> Result<(), String> {
+    clipboard::write_image(&screenshot::pin_image(&label).ok_or("This pin is gone")?)
+}
+
+#[tauri::command]
+fn pin_close(app: AppHandle, label: String) {
+    screenshot::pin_closed(&label);
+    if let Some(window) = app.get_webview_window(&label) {
+        let _ = window.destroy();
+    }
+}
+
+#[tauri::command]
+async fn screenshots_list() -> Result<Vec<serde_json::Value>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        capture::screenshots(&[capture::folder(), capture::system_folder()])
+            .into_iter()
+            .map(|(path, modified, size)| {
+                serde_json::json!({ "name": path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), "path": path.to_string_lossy(), "modified": modified, "size": size, "video": false })
+            })
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn screenshots_folder() -> String {
+    capture::folder().to_string_lossy().into_owned()
+}
+
+#[tauri::command]
+async fn image_text(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let png = std::fs::read(&path).map_err(|e| e.to_string())?;
+        let mut reader = png::Decoder::new(std::io::Cursor::new(png)).read_info().map_err(|_| "Only PNG screenshots can be read".to_string())?;
+        let mut buffer = vec![0; reader.output_buffer_size()];
+        let info = reader.next_frame(&mut buffer).map_err(|e| e.to_string())?;
+        let channels = info.color_type.samples();
+        if info.bit_depth != png::BitDepth::Eight || channels < 3 {
+            return Err("This image format can't be read".into());
+        }
+        let bgra = buffer[..info.buffer_size()].chunks_exact(channels).flat_map(|p| [p[2], p[1], p[0], 255]).collect();
+        capture::recognize_text(&capture::Frame { rect: capture::Rect { x: 0, y: 0, w: info.width as i32, h: info.height as i32 }, bgra })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn copy_image_file(path: &str) -> Result<(), String> {
@@ -194,9 +266,14 @@ fn image_paste(app: AppHandle, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn sharex_paste_latest(app: AppHandle) -> Result<(), String> {
-    let latest = sharex::latest_image().ok_or("No screenshots found")?;
-    copy_image_file(&latest.path)?;
+fn image_edit(path: String) -> Result<(), String> {
+    apps::edit(&path)
+}
+
+#[tauri::command]
+fn screenshot_paste_latest(app: AppHandle) -> Result<(), String> {
+    let (latest, _, _) = capture::screenshots(&[capture::folder(), capture::system_folder()]).into_iter().next().ok_or("No screenshots found")?;
+    copy_image_file(&latest.to_string_lossy())?;
     paste_into_previous(&app);
     Ok(())
 }
@@ -753,6 +830,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| launcher::show(app)))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol("appicon", |_ctx, request, responder| serve_app_icon(request, responder))
+        .register_uri_scheme_protocol("capture", |_ctx, request| screenshot::serve(request))
         .register_uri_scheme_protocol("clipimg", |ctx, request| serve_clipboard_image(ctx.app_handle(), request))
         .register_uri_scheme_protocol("flowkey", |ctx, request| flowkey::serve(ctx.app_handle(), request))
         .register_uri_scheme_protocol("extimg", |ctx, request| flowkey::serve_image(ctx.app_handle(), request))
@@ -840,13 +918,24 @@ pub fn run() {
             run_execute,
             scripts_list,
             script_run,
-            sharex_run,
-            sharex_upload,
-            sharex_installed,
-            sharex_screenshots,
+            capture_start,
+            capture_ready,
+            capture_pending,
+            capture_pixel,
+            capture_finish,
+            capture_cancel,
+            capture_direct,
+            pin_file,
+            pin_shown,
+            pin_copy,
+            pin_close,
+            screenshots_list,
+            screenshots_folder,
+            image_text,
             image_copy,
             image_paste,
-            sharex_paste_latest,
+            image_edit,
+            screenshot_paste_latest,
             explorer_selection,
             menu_items_list,
             menu_items_invoke,

@@ -140,11 +140,13 @@
 - Script folders are added from Search Script Commands (Add Script Directory) or when creating a script; there is no settings page to remove one.
 - Interpreters (`python`, `node`, `bash`, …) must be on PATH.
 
-## ShareX
+## Screenshots
 
-- Screenshots, recordings and capture tools need ShareX installed (getsharex.com). Running a capture starts ShareX in the tray if it isn't running.
-- Search Screenshots lists the ShareX screenshots folder only; it does not search text inside images.
-- Paste Latest Screenshot pastes JPG and GIF files as files, not as images.
+- Capture uses GDI, so DRM-protected video and some hardware-accelerated overlays come out black. The overlay freezes the screen first, so menus and tooltips open at that moment are included.
+- With monitors at different scale factors the overlay uses one scale for the whole virtual screen; selections stay pixel-accurate but the hint and loupe may look larger or smaller on one monitor.
+- Not yet: screen recording (video and GIF), scrolling capture, an annotation editor, uploads, capture delay and after-capture settings. Captures always save to `Pictures\Openray` and copy the image.
+- Scan QR Code reads QR codes only. OCR needs the Windows OCR language pack for the text's language.
+- Search Screenshots lists `Pictures\Openray` and `Pictures\Screenshots`; it does not search text inside images.
 
 ## Quick Look and Menu Items
 

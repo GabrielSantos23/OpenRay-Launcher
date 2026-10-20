@@ -244,6 +244,21 @@ pub fn show_in_explorer(path: &str) -> Result<(), String> {
     std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{path}\"")).spawn().map(drop).map_err(|e| e.to_string())
 }
 
+pub fn edit(path: &str) -> Result<(), String> {
+    use windows::core::{w, HSTRING, PCWSTR};
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    if !Path::new(path).exists() {
+        return Err(format!("{path} no longer exists"));
+    }
+    let result = unsafe { ShellExecuteW(None, w!("edit"), &HSTRING::from(path), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL) };
+    if result.0 as isize > 32 {
+        Ok(())
+    } else {
+        open_with(path)
+    }
+}
+
 pub fn open_with(path: &str) -> Result<(), String> {
     if !Path::new(path).exists() {
         return Err(format!("{path} no longer exists"));

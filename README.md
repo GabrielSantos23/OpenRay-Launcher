@@ -56,9 +56,10 @@ Each feature below works today. The full per-feature status, with evidence and r
 - Put scripts with `@raycast.*` metadata (PowerShell, Batch, Python, Node and more) in a folder and they become commands, with arguments and silent, compact or full output.
 - Create Script Command writes a ready-to-edit template.
 
-### ShareX
-- Capture a region, window, monitor or scrolling page, record the screen or a GIF, pick colors, read text (OCR) and scan QR codes through ShareX.
-- Search Screenshots shows your ShareX captures in a grid: copy, paste, open in the ShareX editor, upload or pin to screen. Paste Latest Screenshot drops the newest one into the active app.
+### Screenshots
+- Built-in capture tools inspired by ShareX, no other app needed: capture a region (or click a window), the full screen, the active window or monitor, or repeat the last region. Each capture is saved to `Pictures\Openray` and copied to the clipboard.
+- Pick a color from the screen with a magnifier, copy text from any part of the screen (OCR), scan QR codes, measure with a ruler, and pin a region on top of everything.
+- Search Screenshots shows your captures and Windows screenshots in a grid: copy, paste, edit, pin, copy their text. Paste Latest Screenshot drops the newest one into the active app.
 
 ### More
 - Typing a link offers Open in Browser as the first result.

@@ -26,6 +26,7 @@
   --color-green: #59d499;
   --color-yellow: #ffc531;
   --color-focus-overlay: #050505;
+  --color-capture-dim: rgb(0 0 0 / 0.45);
   --color-loader: #ffffff;
   --color-accent: #4fa3f8;
   --color-titlebar: rgb(from var(--color-fg) r g b / 5%);

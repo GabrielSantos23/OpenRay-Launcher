@@ -12,7 +12,7 @@ import notes from "./notes";
 import quicklinks from "./quicklinks";
 import run from "./run";
 import scriptCommands from "./script-commands";
-import sharex from "./sharex";
+import screenshots from "./screenshots";
 import snippets from "./snippets";
 import systemActions from "./system-actions";
 import systemPages from "./system-pages";
@@ -21,4 +21,4 @@ import urls from "./urls";
 import webSearches from "./web-searches";
 import windowManagement from "./window-management";
 
-export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, fileSearch, focus, games, menuItems, navigation, notes, quicklinks, run, scriptCommands, sharex, snippets, systemActions, systemPages, translate, urls, webSearches, windowManagement, core];
+export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, fileSearch, focus, games, menuItems, navigation, notes, quicklinks, run, scriptCommands, screenshots, snippets, systemActions, systemPages, translate, urls, webSearches, windowManagement, core];

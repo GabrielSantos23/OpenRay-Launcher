@@ -22,8 +22,10 @@ const views: Record<string, () => Promise<{ default: ComponentType }>> = {
   "focus-panel": () => import("./FocusWindows").then((m) => ({ default: m.FocusPanel })),
   "focus-toast": () => import("./FocusWindows").then((m) => ({ default: m.FocusToast })),
   "focus-block": () => import("./FocusWindows").then((m) => ({ default: m.FocusBlock })),
+  capture: () => import("./CaptureOverlay").then((m) => ({ default: m.CaptureOverlay })),
 };
-const View = lazy(views[windowLabel()] ?? (() => import("./App")));
+const label = windowLabel();
+const View = lazy(label.startsWith("pin-") ? () => import("./PinWindow").then((m) => ({ default: m.PinWindow })) : (views[label] ?? (() => import("./App"))));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
