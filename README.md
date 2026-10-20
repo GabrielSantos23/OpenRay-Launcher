@@ -42,7 +42,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 
 ### Applications
 - Indexes Start Menu shortcuts and Microsoft Store (MSIX) apps, with their real icons.
-- Run as Administrator, Show in File Explorer, Copy Path.
+- Run as Administrator, Show in File Explorer, Copy Path, and Uninstall Application (with a confirmation naming the uninstaller).
 
 ### File Search
 - Searches file and folder names in your user folder, ranked by match quality and how recently a file changed.

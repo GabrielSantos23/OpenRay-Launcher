@@ -1,7 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { Clipboard, Folder, LayoutGrid, Shield } from "lucide-react";
+import { Clipboard, Folder, LayoutGrid, Shield, Trash2 } from "lucide-react";
 import { defineExtension, type Action } from "../extension-api";
-import { showToast } from "../toast";
+import { showHUD, showToast } from "../toast";
 
 interface InstalledApp {
   name: string;
@@ -14,7 +14,23 @@ function appActions(app: InstalledApp): Action[][] {
     showToast({ variant: "success", title: `Copied ${what} to clipboard` });
   };
   const copyName: Action = { id: "copy-name", title: "Copy Name", icon: Clipboard, keepOpen: true, run: copy(app.name, "name") };
-  if (app.path.startsWith("shell:AppsFolder\\")) return [[], [copyName]];
+  const uninstall: Action = {
+    id: "uninstall",
+    title: "Uninstall Application",
+    icon: Trash2,
+    destructive: true,
+    confirm: async () => {
+      const target = await invoke<string | null>("app_uninstaller", { name: app.name, path: app.path });
+      if (target === null) return { title: "No Uninstaller Found", message: `Windows has no uninstaller registered for ${app.name}. Open Settings › Installed apps to remove it there.`, confirmTitle: "Open Settings" };
+      return { title: `Uninstall ${app.name}?`, message: target ? `This starts the uninstaller registered for “${target}”.` : `${app.name} will be removed from this PC.`, confirmTitle: "Uninstall" };
+    },
+    run: async () => {
+      const result = await invoke<string>("app_uninstall", { name: app.name, path: app.path });
+      if (result === "removed") showHUD({ variant: "success", title: `Uninstalled ${app.name}` });
+      else if (result === "requested") showHUD({ variant: "success", title: `Uninstall requested for ${app.name}` });
+    },
+  };
+  if (app.path.startsWith("shell:AppsFolder\\")) return [[], [copyName], [uninstall]];
   return [
     [
       {
@@ -37,6 +53,7 @@ function appActions(app: InstalledApp): Action[][] {
       },
       copyName,
     ],
+    [uninstall],
   ];
 }
 

@@ -49,6 +49,7 @@
 - **Position.** The default position rule is approximate: centered horizontally, with the top at 35.3% of the work area (`unk_341f…`). There is no drag-to-move or remembered position.
 - **Shown ex-style.** It keeps `WS_EX_TOOLWINDOW` (so it never appears in Alt+Tab) and Tauri's `WS_EX_ACCEPTFILES`. The reference drops TOOLWINDOW while shown.
 - **Show and hide.** Show latency was measured only on a debug build at 96 DPI.
+- **Uninstall Application.** The uninstaller is found by matching the Start Menu shortcut against the Uninstall registry; a shortcut inside another program's folder resolves to that program, so read the confirmation before accepting.
 - **Missing UI.** There is no compact mode. Fallbacks are a fixed list (web searches, quicklinks with an argument, and Create Quicklink) without a settings page. Arguments have a field only in Search Quicklinks, not inline in the root search.
 - **Leaving a command.** Escape or Backspace on an empty search returns to the root search, which is cleared.
 - **Action panel.** Configure Command, Configure Extension, Treat as Application and Hide/Quit/Force Quit are not offered. The panel has no noise texture, and its radius and shadow are estimates.
@@ -118,7 +119,7 @@
 
 ## System Actions
 
-- Not yet: Dismiss Notifications, Wi-Fi, Bluetooth and airplane-mode toggles and managers, Energy Saver (its Windows API is undocumented).
+- Not yet: Wi-Fi, Bluetooth and airplane-mode toggles and managers, Energy Saver (its Windows API is undocumented).
 - The sound device pickers change the default device through `IPolicyConfig`, an undocumented Windows interface that a future Windows update could change; format, enhancements and enable/disable are not offered.
 - Volume Mixer and the active-app commands only see audio sessions on the default output device.
 - Command arguments: one per command, and a command hotkey for an argument command does nothing until the launcher is open with the command selected.

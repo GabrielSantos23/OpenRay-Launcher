@@ -14,6 +14,7 @@ mod sound_devices;
 mod store;
 mod system_actions;
 mod toggles;
+mod uninstall;
 mod translate;
 mod window_layout;
 mod window_switcher;
@@ -466,6 +467,16 @@ async fn sound_device_set(id: String, default: Option<bool>, volume: Option<f32>
 }
 
 #[tauri::command]
+async fn app_uninstaller(name: String, path: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || uninstall::describe(&name, &path)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn app_uninstall(name: String, path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || uninstall::uninstall(&name, &path).map(str::to_string)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn system_toggle(action: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || toggles::run(&action)).await.map_err(|e| e.to_string())?
 }
@@ -713,6 +724,8 @@ pub fn run() {
             sound_devices,
             app_volumes,
             system_toggle,
+            app_uninstall,
+            app_uninstaller,
             app_volume_set,
             app_volume_active,
             sound_device_set,

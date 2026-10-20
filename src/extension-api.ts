@@ -29,7 +29,7 @@ export interface Action {
   disabled?: boolean;
   keepOpen?: boolean;
   accessory?: string;
-  confirm?: Confirmation;
+  confirm?: Confirmation | (() => Promise<Confirmation>);
   submenu?: () => Action[] | Promise<Action[]>;
   run: () => Promise<void> | void;
 }

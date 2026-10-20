@@ -120,7 +120,16 @@ export function useActionHost(focusInput: () => void, placement?: PanelPlacement
       }
       return;
     }
-    if (action.confirm && !(await ask(action.confirm))) return;
+    if (action.confirm) {
+      let confirmation: Confirmation;
+      try {
+        confirmation = typeof action.confirm === "function" ? await action.confirm() : action.confirm;
+      } catch (e) {
+        fail(failTitle, e);
+        return;
+      }
+      if (!(await ask(confirmation))) return;
+    }
     setBusy((n) => n + 1);
     try {
       await action.run();
