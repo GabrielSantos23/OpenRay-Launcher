@@ -38,6 +38,7 @@ interface ListViewProps {
   selectedId?: string;
   onSelectionChange?: (item: Item | undefined) => void;
   tabCycles?: boolean;
+  emptyActions?: Action[][];
 }
 
 export function filterSections(sections: ListSection[], query: string): ListSection[] {
@@ -83,6 +84,7 @@ export function ListView({
   selectedId,
   onSelectionChange,
   tabCycles = false,
+  emptyActions,
 }: ListViewProps) {
   const [ownText, setOwnText] = useState("");
   const text = searchText ?? ownText;
@@ -137,17 +139,17 @@ export function ListView({
     setSelected(target.start + Math.min(active - rows[row].start, target.length - 1));
   }
 
-  const groups = current?.actions.filter((group) => group.length > 0) ?? [];
+  const groups = (current ? current.actions : (emptyActions ?? [])).filter((group) => group.length > 0);
   const primary = groups[0]?.[0];
 
   function runAction(action: Action) {
-    if (current) host.run(action, { failTitle: `${action.title.replace(/…$/, "")} failed` });
+    if (current || emptyActions) host.run(action, { failTitle: `${action.title.replace(/…$/, "")} failed` });
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (matchesShortcut(event, { key: "k", ctrl: true })) {
       event.preventDefault();
-      if (current) host.openPanel(current.title, groups);
+      if (groups.length) host.openPanel(current?.title ?? footerTitle, groups);
       return;
     }
     const plainEnter = event.key === "Enter" && !event.ctrlKey && !event.altKey && !event.shiftKey;
@@ -157,7 +159,7 @@ export function ListView({
       return;
     }
     const action = groups.flat().find((a) => a.shortcut && matchesShortcut(event, a.shortcut));
-    if (current && action) {
+    if (action) {
       event.preventDefault();
       runAction(action);
     } else if (event.key === "ArrowDown") {
@@ -299,7 +301,7 @@ export function ListView({
                       ) : (
                         <>
                           {item.icon}
-                          <span className="truncate font-medium">{item.title}</span>
+                          <span className={`truncate font-medium ${item.subtitle ? "max-w-[60%] shrink-0" : ""}`}>{item.title}</span>
                           {item.subtitle && <span className="truncate text-fg-60">{item.subtitle}</span>}
                           {item.accessory && <span className="ml-auto shrink-0 text-fg-60">{item.accessory}</span>}
                         </>
@@ -323,7 +325,7 @@ export function ListView({
         }
         primaryTitle={primary?.title}
         panelOpen={host.panelOpen}
-        onTogglePanel={() => (host.panelOpen ? host.closePanel() : current && host.openPanel(current.title, groups))}
+        onTogglePanel={() => (host.panelOpen ? host.closePanel() : groups.length && host.openPanel(current?.title ?? footerTitle, groups))}
       />
       {host.render(runAction)}
       <div aria-live="polite" className="sr-only">

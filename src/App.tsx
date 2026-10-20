@@ -150,9 +150,14 @@ export default function App() {
     [enabled, settings],
   );
   const sections = useMemo<Section[]>(() => {
-    const results = search(enabled, query, frecency, favorites, aliases);
+    const results = search(enabled.filter((c) => !c.query), query, frecency, favorites, aliases);
     const text = query.trim();
     if (!text) return results;
+    const matched = enabled
+      .filter((c) => c.query?.matches(text))
+      .map((c): RegisteredCommand => ({ ...c, key: `query:${c.key}`, subtitle: text, actions: undefined, run: () => c.query!.run(text) }));
+    if (matched.length && results[0]?.title === "Results") results[0] = { ...results[0], items: [...matched, ...results[0].items] };
+    else if (matched.length) results.unshift({ title: "Results", items: matched });
     const fallbacks = enabled
       .filter((c) => c.fallback || c.fallbackView)
       .map((c): RegisteredCommand => ({ ...c, key: `fallback:${c.key}`, actions: undefined, view: c.fallbackView?.(text), run: c.fallback ? () => c.fallback!(text) : undefined }));
@@ -219,7 +224,7 @@ export default function App() {
     ? [[installUpdate]]
     : isInline
     ? inlineResult!.actions
-    : current?.key.startsWith("fallback:")
+    : current?.key.startsWith("fallback:") || current?.key.startsWith("query:")
       ? [[{ id: "primary", title: current.primaryActionTitle, shortcut: { key: "Enter" }, run: () => current.run?.() }]]
       : current
         ? actionGroups(current, {
@@ -241,7 +246,7 @@ export default function App() {
   const panelTitle = isUpdate ? "New Update Available" : isInline ? inlineResult!.output.text || inlineResult!.output.label : (current?.title ?? "");
 
   function visit(command: RegisteredCommand) {
-    if (command.key.startsWith("fallback:")) return;
+    if (command.key.startsWith("fallback:") || command.key.startsWith("query:")) return;
     invoke<number>("frecency_visit", { key: command.key })
       .then((score) => setFrecency((f) => ({ ...f, [command.key]: score })))
       .catch((e) => console.error("frecency_visit failed", e));
@@ -251,8 +256,8 @@ export default function App() {
 
   function runAction(command: RegisteredCommand | undefined, action: Action) {
     if (command?.argument && action.id === "primary") {
-      const { run } = command.argument;
-      if (!argumentValue.trim()) return argumentRef.current?.focus();
+      const { run, optional } = command.argument;
+      if (!argumentValue.trim() && !optional) return argumentRef.current?.focus();
       host.run({ ...action, keepOpen: true, run: () => run(argumentValue) },{ failTitle: `Could not run ${command.title}`, onSuccess: () => visit(command) });
       return;
     }

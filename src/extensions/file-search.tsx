@@ -1,6 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Archive, Clipboard, Ellipsis, ExternalLink, File, FileSearch, FileText, Folder, Image, List, Music, PanelRight, RefreshCw, Trash2, Type, Video } from "lucide-react";
+import { Archive, Clipboard, Ellipsis, ExternalLink, Eye, File, FileSearch, FileText, Folder, Image, List, Music, PanelRight, RefreshCw, Trash2, Type, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fail } from "../ActionHost";
 import { formatBytes } from "../clipboardHistory";
@@ -52,15 +52,28 @@ function when(ms: number | null): string {
   return ms === null ? "—" : new Date(ms).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 }
 
+const TEXT_PREVIEW = /\.(txt|md|markdown|log|csv|tsv|json|jsonc|xml|ya?ml|toml|ini|cfg|conf|html?|css|scss|[cm]?jsx?|tsx?|py|rs|go|java|kt|c|h|cpp|hpp|cs|rb|php|swift|sh|ps1|bat|cmd|sql|lua|dart|vue)$/i;
+const TEXT_PREVIEW_LIMIT = 1_000_000;
+
 function Detail({ file, home }: { file: FileHit; home: string }) {
   const [info, setInfo] = useState<FileInfo | null>(null);
   const [error, setError] = useState(false);
+  const [text, setText] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
     setInfo(null);
     setError(false);
+    setText(null);
     invoke<FileInfo>("file_info", { path: file.path })
-      .then((result) => live && setInfo(result))
+      .then((result) => {
+        if (!live) return;
+        setInfo(result);
+        if (!result.dir && TEXT_PREVIEW.test(file.path) && (result.size ?? 0) <= TEXT_PREVIEW_LIMIT) {
+          invoke<{ content: string }>("flowkey_fs", { op: "readText", path: file.path })
+            .then((r) => live && setText(r.content.slice(0, 20_000)))
+            .catch(() => {});
+        }
+      })
       .catch(() => live && setError(true));
     return () => {
       live = false;
@@ -82,6 +95,8 @@ function Detail({ file, home }: { file: FileHit; home: string }) {
       <div className="flex min-h-0 flex-1 items-center justify-center p-4">
         {error ? (
           <p className="text-13 text-fg-60">This file is no longer available.</p>
+        ) : text !== null ? (
+          <pre className="size-full overflow-auto font-mono text-12 break-words whitespace-pre-wrap text-fg">{text}</pre>
         ) : (
           <img key={file.path} src={iconSrc(file.path, 256, true)} alt="" draggable={false} className="max-h-full max-w-full object-contain" />
         )}
@@ -231,11 +246,71 @@ function SearchFiles({ pop }: ViewProps) {
   );
 }
 
+function QuickLook({ pop }: ViewProps) {
+  const [paths, setPaths] = useState<string[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    invoke<string[]>("explorer_selection")
+      .then(setPaths)
+      .catch((e) => {
+        setPaths([]);
+        setError(String(e));
+      });
+  }, []);
+  const files = useMemo(() => (paths ?? []).map((path): FileHit => ({ path, name: path.split("\\").pop() || path, dir: false })), [paths]);
+  const home = useMemo(() => files[0]?.path.match(/^[a-z]:\\users\\[^\\]+/i)?.[0] ?? "", [files]);
+  const sections = useMemo(
+    () => [{ title: "Selection", items: files.map((file): Item => ({ id: file.path, title: file.name, icon: <FileIcon path={file.path} dir={false} />, actions: fileActions(file, () => {}, () => {}).slice(0, 2) })) }],
+    [files],
+  );
+  return (
+    <ListView
+      placeholder="Filter selection…"
+      sections={sections}
+      onBack={pop}
+      footerTitle="Quick Look"
+      footerIcon={<GlyphTile spec={ICON} small />}
+      isLoading={paths === null}
+      emptyText={error ?? "Nothing selected"}
+      emptyDescription={error ? "Open File Explorer, select a file and run Quick Look again." : undefined}
+      detail={(item) => {
+        const file = files.find((f) => f.path === item.id);
+        return file ? <Detail file={file} home={home} /> : null;
+      }}
+    />
+  );
+}
+
 export default defineExtension({
   id: "file-search",
   title: "File Search",
   icon: ICON,
+  items: async () => {
+    const count = await invoke<number | null>("file_index_status").catch(() => null);
+    if (count === null) return [];
+    return [
+      {
+        id: "indexing",
+        title: "File Search is indexing…",
+        subtitle: `Indexing ${count.toLocaleString("en-US")} files`,
+        keywords: ["files", "index", "search"],
+        kind: "Command",
+        primaryActionTitle: "Open File Search",
+        view: SearchFiles,
+      },
+    ];
+  },
   commands: [
+    {
+      id: "quick-look",
+      title: "Quick Look",
+      subtitle: "File Search",
+      icon: { glyph: Eye, tone: "blue" },
+      keywords: ["preview", "explorer", "selection", "peek"],
+      kind: "Command",
+      primaryActionTitle: "Quick Look",
+      view: QuickLook,
+    },
     {
       id: "search-files",
       title: "Search Files",

@@ -244,6 +244,14 @@ pub fn show_in_explorer(path: &str) -> Result<(), String> {
     std::process::Command::new("explorer.exe").raw_arg(format!("/select,\"{path}\"")).spawn().map(drop).map_err(|e| e.to_string())
 }
 
+pub fn open_with(path: &str) -> Result<(), String> {
+    if !Path::new(path).exists() {
+        return Err(format!("{path} no longer exists"));
+    }
+    use std::os::windows::process::CommandExt;
+    std::process::Command::new("rundll32.exe").raw_arg(format!("shell32.dll,OpenAs_RunDLL {path}")).spawn().map(drop).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

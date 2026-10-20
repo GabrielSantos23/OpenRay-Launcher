@@ -61,9 +61,10 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
 | Extension API | `src/extension-api.ts` | Types and `defineExtension` |
 | Icons | `src/icons.tsx` | `GlyphTile` (extension tiles from an `IconSpec`), `CommandIcon` (URL, tile or fallback), `OpenrayGlyph` |
-| Command arguments | `src/extension-api.ts`, `src/App.tsx` | A command's `argument` adds a field next to the root search text while it is selected; Tab moves between them and the primary action runs `argument.run(value)` (Set Volume) |
+| Command arguments | `src/extension-api.ts`, `src/App.tsx` | A command's `argument` adds a field next to the root search text while it is selected; Tab moves between them and the primary action runs `argument.run(value)` (Set Volume); `optional: true` lets it run empty (run commands, script arguments) |
+| Empty list actions | `src/ListView.tsx` | `emptyActions` gives an empty view its actions and Ctrl+K panel (Create Run Command, Create Quicklink, Add Script Directory) |
 | Fallback views | `src/extension-api.ts`, `src/App.tsx` | A command's `fallbackView(text)` returns a view that opens from the “Use … with...” section with the typed text (Create Quicklink) |
-| Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `notes`, `quicklinks`, `translator`, `web-searches`, `openray-core` |
+| Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `notes`, `quicklinks`, `translator`, `web-searches`, `windows-run`, `urls`, `script-commands`, `sharex`, `menu-items`, `openray-core` |
 | Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |
 | Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
 | Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
@@ -78,6 +79,12 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Sound devices | `src/extensions/sound-devices.tsx`, `src-tauri/src/sound_devices.rs` | Core Audio endpoint list with names and form factors, default switching through `IPolicyConfig`, endpoint volume and mute |
 | Switch Windows | `src/extensions/navigation.tsx`, `src-tauri/src/window_switcher.rs` | Lists the open app windows (shared filter with Quit All Apps in `system_actions.rs`), resolving UWP frames to the hosted app, and switches, minimizes, closes, maximizes or quits them |
 | File Search | `src/fileSearch.ts`, `src/extensions/file-search.tsx`, `src-tauri/src/file_search.rs` | In-memory name index of the user folder, ranked search with type filter, Recently Used from the Windows Recent folder, file metadata; thumbnails through `appicon` with `thumb=1` |
+| Run | `src/run.ts`, `src/extensions/run.tsx`, `src-tauri/src/run.rs` | Windows Run catalog (PATH, App Paths, `.cpl`, `.msc`, environment variables), path completion, RunMRU history read/write/delete, ShellExecuteEx with `runas` or `cmd /k`; run commands in `run-commands.json` |
+| URL | `src/urls.ts`, `src/extensions/urls.ts` | Link detection; a command's `query` (`matches`, `run`) puts it first in Results while the search text matches |
+| Script Commands | `src/scriptCommands.ts`, `src/extensions/script-commands.tsx`, `src-tauri/src/scripts.rs` | `@raycast.*` metadata parsing, interpreter by extension, hidden runs with captured output; folders in `script-commands.json`; templates in TypeScript |
+| ShareX | `src/screenshots.ts`, `src/extensions/sharex.tsx`, `src-tauri/src/sharex.rs` | ShareX install and screenshots folder lookup, `ShareX.exe -silent -<Task> [file]` command line, screenshot listing; PNG to clipboard as image (`image_copy`, `image_paste`) |
+| Quick Look | `src/extensions/file-search.tsx`, `src-tauri/src/explorer.rs` | File Explorer selection through IShellWindows / IFolderView, shown with the Search Files info panel |
+| Menu Items | `src/extensions/menu-items.tsx`, `src-tauri/src/menu_items.rs` | Win32 menu bar walk of the previous foreground window, `WM_COMMAND` to run an item |
 | System Actions | `src/extensions/system-actions.ts`, `src-tauri/src/system_actions.rs` | Power, session, app quitting, Core Audio volume and microphone mute, media keys, dark mode and hidden-files registry toggles |
 | Window Management | `src/extensions/window-management.ts`, `src-tauri/src/window_layout.rs` | Layout commands; target window lookup, work-area fractions and relative frames (sizes, edge moves, grow/shrink), invisible-border compensation, display order and moves, Restore from an in-memory frame per window, minimize, always on top and app-window cycling (these update the launcher's previous window so focus returns to the right place) |
 | Launcher UI | `src/App.tsx` | Search input, list, footer, loader, keyboard |
@@ -113,6 +120,12 @@ The Rust core exposes Tauri commands:
 - Sound devices: `sound_devices` (output | input → id, name, state, form factor, default, volume, mute), `sound_device_set` (id + default/volume/muted)
 - Switch Windows: `window_list` (→ id, title, app name, exe path, minimized, maximized, in Z-order), `window_action` (id, `switch` | `minimize` | `close` | `toggle-maximize` | `quit` | `force-quit`)
 - File Search: `file_search` (query, type → ranked hits or Recently Used, index state), `file_reindex`, `file_info` (path → shell type name, size and dates); emits `file-index-updated` when an index build finishes
+- File Search: `file_index_status` (→ files counted so far while an index build runs, else null); Quick Look: `explorer_selection` (→ selected paths of the front File Explorer window)
+- Run: `run_catalog`, `run_complete` (text → path entries), `run_history`, `run_forget`, `run_split`, `run_execute` (command, arguments, admin, shell; hides the launcher)
+- Script Commands: `scripts_list` (directories → scripts), `script_run` (path, arguments → stdout, stderr, exit code); `open_with` (Windows “Open with” dialog)
+- ShareX: `sharex_run` (task name, optional file), `sharex_upload`, `sharex_installed`, `sharex_screenshots`, `sharex_paste_latest`; `image_copy`, `image_paste`
+- Menu Items: `menu_items_list` (→ app name and items with id, path, shortcut, checked), `menu_items_invoke` (id)
+- Data files `run-commands` and `script-commands` added to `data_get`/`data_set`
 - `system_action` (action id → runs one system action)
 - `window_layout` (layout id → moves, resizes, minimizes, pins or cycles the target window; `minimize-on-display` uses the launcher's monitor)
 - `hotkeys_suspend`, `login_item_get`, `login_item_set`, `open_settings`, `system_accent_color`

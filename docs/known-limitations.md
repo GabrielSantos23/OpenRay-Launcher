@@ -109,7 +109,7 @@
 - Searches file and folder names only. No content search, no `.gitignore`/`.rayignore` support, no Search Scopes or Ignore Patterns settings, no hidden-files toggle; the index covers only the user folder.
 - The index lives in memory and is rebuilt by walking the folder (no file watcher, no NTFS scanner), so new files appear after the next refresh, at most a minute after opening the view.
 - Ranking is Openray's own approximation; the reference ranking was not measured.
-- Not yet: files in root search, fallback with typed text, Quick Look, Navigate Up/Down and folder sorting, Paste File, Open in Terminal, Show Properties, Rename, Duplicate, Copy To, Move To, Open With, Exclude From Index.
+- Not yet: files in root search, fallback with typed text, Navigate Up/Down and folder sorting, Paste File, Open in Terminal, Show Properties, Rename, Duplicate, Copy To, Move To, Open With, Exclude From Index.
 - Recently Used reads the Windows Recent folder; when Windows keeps no recent items, the list shows the newest modified files instead.
 
 ## Switch Windows
@@ -127,6 +127,29 @@
 - Command arguments: one per command, and a command hotkey for an argument command does nothing until the launcher is open with the command selected.
 - Toggle Night Light edits an undocumented registry blob; on a Windows build with another layout it reports “Unknown Night Light format” and changes nothing. Toggle Camera Mute only flips the app-access privacy switch.
 - Quit All Apps only asks windows to close; apps with unsaved work show their own prompts.
+
+## Run
+
+- Run in Shell always uses `cmd /k`; the reference lets you pick the shell.
+- Running a command adds it to the Windows Run history (RunMRU), the same list Win+R shows.
+- PATH executables and environment variables are read when Openray starts; changes made later appear after a restart.
+
+## Script Commands
+
+- Only the first `@raycast.argument` is asked for. Inline mode runs like compact (no refresh in the root list), and output appears when the script ends, not while it runs.
+- Script folders are added from Search Script Commands (Add Script Directory) or when creating a script; there is no settings page to remove one.
+- Interpreters (`python`, `node`, `bash`, …) must be on PATH.
+
+## ShareX
+
+- Screenshots, recordings and capture tools need ShareX installed (getsharex.com). Running a capture starts ShareX in the tray if it isn't running.
+- Search Screenshots lists the ShareX screenshots folder only; it does not search text inside images.
+- Paste Latest Screenshot pastes JPG and GIF files as files, not as images.
+
+## Quick Look and Menu Items
+
+- Quick Look shows the preview inside the launcher. With File Explorer tabs, the selection is read from the first tab of the front window.
+- Search Menu Items reads only classic Win32 menu bars (msinfo32, Notepad++, older apps). WinUI, ribbon and browser menus are not read.
 
 ## Window Management
 

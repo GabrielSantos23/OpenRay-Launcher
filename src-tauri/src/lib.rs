@@ -1,11 +1,16 @@
 mod app_volume;
 mod apps;
+mod explorer;
+mod menu_items;
+mod scripts;
+mod sharex;
 mod clipboard;
 mod file_search;
 mod flowkey;
 mod games;
 mod focus;
 mod registry;
+mod run;
 mod hotkey;
 mod hud;
 mod launcher;
@@ -78,6 +83,11 @@ fn show_in_explorer(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_with(path: String) -> Result<(), String> {
+    apps::open_with(&path)
+}
+
+#[tauri::command]
 async fn file_search(app: AppHandle, query: String, kind: String) -> Result<file_search::Results, String> {
     tauri::async_runtime::spawn_blocking(move || file_search::search(&app, &query, &kind)).await.map_err(|e| e.to_string())
 }
@@ -90,6 +100,124 @@ fn window_list() -> Vec<window_switcher::WindowEntry> {
 #[tauri::command]
 async fn window_action(app: AppHandle, id: isize, action: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || window_switcher::act(&app, id, &action)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn file_index_status() -> Option<usize> {
+    file_search::status()
+}
+
+#[tauri::command]
+async fn run_catalog() -> Result<Vec<run::Entry>, String> {
+    tauri::async_runtime::spawn_blocking(run::catalog).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn run_complete(text: String) -> Vec<run::Entry> {
+    run::complete(&text)
+}
+
+#[tauri::command]
+fn run_history() -> Vec<String> {
+    run::history()
+}
+
+#[tauri::command]
+fn run_forget(command: String) -> Result<(), String> {
+    run::forget(&command)
+}
+
+#[tauri::command]
+fn run_split(text: String) -> (String, String) {
+    run::split(&text)
+}
+
+#[tauri::command]
+fn run_execute(app: AppHandle, command: String, arguments: String, admin: bool, shell: bool) -> Result<(), String> {
+    run::execute(&command, &arguments, admin, shell)?;
+    launcher::hide(&app, false);
+    Ok(())
+}
+
+#[tauri::command]
+async fn scripts_list(directories: Vec<String>) -> Result<Vec<scripts::Script>, String> {
+    tauri::async_runtime::spawn_blocking(move || scripts::list(&directories)).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn script_run(path: String, arguments: Vec<String>) -> Result<scripts::Output, String> {
+    tauri::async_runtime::spawn_blocking(move || scripts::run(&path, &arguments)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn sharex_run(app: AppHandle, job: String, file: Option<String>) -> Result<(), String> {
+    sharex::run(&job, file.as_deref())?;
+    launcher::hide(&app, true);
+    Ok(())
+}
+
+#[tauri::command]
+fn sharex_upload(app: AppHandle, file: String) -> Result<(), String> {
+    sharex::upload(&file)?;
+    launcher::hide(&app, true);
+    Ok(())
+}
+
+#[tauri::command]
+fn sharex_installed() -> bool {
+    sharex::exe().is_ok()
+}
+
+#[tauri::command]
+async fn sharex_screenshots() -> Result<Vec<sharex::Screenshot>, String> {
+    tauri::async_runtime::spawn_blocking(sharex::screenshots).await.map_err(|e| e.to_string())
+}
+
+fn copy_image_file(path: &str) -> Result<(), String> {
+    if path.to_lowercase().ends_with(".png") {
+        clipboard::write_image(&std::fs::read(path).map_err(|e| e.to_string())?)
+    } else {
+        clipboard::write_files(&[path.to_string()])
+    }
+}
+
+#[tauri::command]
+fn image_copy(path: String) -> Result<(), String> {
+    copy_image_file(&path)
+}
+
+#[tauri::command]
+fn image_paste(app: AppHandle, path: String) -> Result<(), String> {
+    copy_image_file(&path)?;
+    paste_into_previous(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn sharex_paste_latest(app: AppHandle) -> Result<(), String> {
+    let latest = sharex::latest_image().ok_or("No screenshots found")?;
+    copy_image_file(&latest.path)?;
+    paste_into_previous(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn explorer_selection() -> Result<Vec<String>, String> {
+    explorer::selected_files(launcher::previous_window())
+}
+
+#[tauri::command]
+fn menu_items_list() -> (String, Vec<menu_items::MenuItem>) {
+    let hwnd = launcher::previous_window();
+    let app = clipboard::window_app(hwnd).map(|(name, _)| name).unwrap_or_default();
+    (app, menu_items::list(hwnd))
+}
+
+#[tauri::command]
+fn menu_items_invoke(app: AppHandle, id: u32) -> Result<(), String> {
+    let hwnd = launcher::previous_window();
+    launcher::hide(&app, false);
+    menu_items::invoke(hwnd, id)
 }
 
 #[tauri::command]
@@ -700,8 +828,28 @@ pub fn run() {
             list_apps,
             launch_app,
             show_in_explorer,
+            open_with,
             file_search,
             file_reindex,
+            file_index_status,
+            run_catalog,
+            run_complete,
+            run_history,
+            run_forget,
+            run_split,
+            run_execute,
+            scripts_list,
+            script_run,
+            sharex_run,
+            sharex_upload,
+            sharex_installed,
+            sharex_screenshots,
+            image_copy,
+            image_paste,
+            sharex_paste_latest,
+            explorer_selection,
+            menu_items_list,
+            menu_items_invoke,
             file_info,
             frecency_visit,
             frecency_all,

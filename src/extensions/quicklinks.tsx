@@ -278,6 +278,7 @@ function SearchQuicklinks({ pop, selectId }: ViewProps & { selectId?: string }) 
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={list === null}
       emptyText="No Quicklinks yet. Press Ctrl+N to create one."
+      emptyActions={[[{ id: "create", title: "Create Quicklink", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing("new") }]]}
       selectedId={selectId}
       onSelectionChange={setCurrent}
       argument={

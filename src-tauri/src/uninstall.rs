@@ -20,7 +20,7 @@ pub struct Entry {
     pub command: String,
 }
 
-fn text(key: HKEY, name: &str) -> String {
+pub(crate) fn text(key: HKEY, name: &str) -> String {
     let name = HSTRING::from(name);
     let mut size = 0u32;
     unsafe {

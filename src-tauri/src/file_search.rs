@@ -43,6 +43,7 @@ struct Index {
 }
 
 static INDEX: LazyLock<Mutex<Index>> = LazyLock::new(Default::default);
+static PROGRESS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 #[derive(Serialize)]
 pub struct FileHit {
@@ -100,6 +101,7 @@ fn build(root: &Path) -> Vec<Entry> {
             if meta.is_dir() && attributes & REPARSE_POINT == 0 {
                 stack.push(path.clone());
             }
+            PROGRESS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             entries.push(Entry {
                 path: path.to_string_lossy().into(),
                 name: name.to_lowercase().into(),
@@ -116,6 +118,7 @@ fn refresh(app: &AppHandle, force: bool) -> (Arc<Vec<Entry>>, bool, bool) {
     let stale = index.built.is_none_or(|built| built.elapsed() > REFRESH_AFTER);
     if (force || stale) && !index.building {
         index.building = true;
+        PROGRESS.store(0, std::sync::atomic::Ordering::Relaxed);
         let app = app.clone();
         std::thread::spawn(move || {
             let entries = build(&home());
@@ -128,6 +131,10 @@ fn refresh(app: &AppHandle, force: bool) -> (Arc<Vec<Entry>>, bool, bool) {
         });
     }
     (index.entries.clone(), index.built.is_none(), index.building)
+}
+
+pub fn status() -> Option<usize> {
+    INDEX.lock().unwrap().building.then(|| PROGRESS.load(std::sync::atomic::Ordering::Relaxed))
 }
 
 pub fn reindex(app: &AppHandle) {

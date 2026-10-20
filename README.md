@@ -48,6 +48,22 @@ Each feature below works today. The full per-feature status, with evidence and r
 ### Games
 - Your installed Steam games show up in search with their icons, plus a Game Launcher view; open, show in File Explorer or uninstall through Steam.
 
+### Run
+- An improved Win+R: Open Run lists your Run history, programs on PATH, Control Panel applets, consoles, environment variables and path completions; run as administrator or in a shell.
+- Execute Run Command straight from the search bar, and save run commands with aliases that show up in search.
+
+### Script Commands
+- Put scripts with `@raycast.*` metadata (PowerShell, Batch, Python, Node and more) in a folder and they become commands, with arguments and silent, compact or full output.
+- Create Script Command writes a ready-to-edit template.
+
+### ShareX
+- Capture a region, window, monitor or scrolling page, record the screen or a GIF, pick colors, read text (OCR) and scan QR codes through ShareX.
+- Search Screenshots shows your ShareX captures in a grid: copy, paste, open in the ShareX editor, upload or pin to screen. Paste Latest Screenshot drops the newest one into the active app.
+
+### More
+- Typing a link offers Open in Browser as the first result.
+- Quick Look previews the file selected in File Explorer; Search Menu Items runs menu commands of classic Windows apps.
+
 ### File Search
 - Searches file and folder names in your user folder, ranked by match quality and how recently a file changed.
 - Filter by type: Directory, File, Archive, Document, Image, Video, Audio, Text, Other.
