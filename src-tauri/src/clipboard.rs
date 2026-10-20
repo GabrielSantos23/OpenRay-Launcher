@@ -4,6 +4,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
 pub const RETENTION_MS: u64 = 7 * 86_400_000;
@@ -94,6 +95,12 @@ impl History {
             (None, Some(_)) => std::cmp::Ordering::Greater,
             (None, None) => b.updated_at.cmp(&a.updated_at),
         });
+        entries
+    }
+
+    pub fn recent(&self) -> Vec<Entry> {
+        let mut entries = self.entries.lock().unwrap().clone();
+        entries.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
         entries
     }
 
@@ -559,6 +566,47 @@ EndFragment:{end_fragment:010}
     }
 }
 
+static SUPPRESS_UNTIL: AtomicU64 = AtomicU64::new(0);
+
+pub fn suppress_for(now_ms: u64, duration_ms: u64) {
+    SUPPRESS_UNTIL.store(now_ms + duration_ms, Ordering::SeqCst);
+}
+
+pub fn suppressed(now_ms: u64) -> bool {
+    now_ms < SUPPRESS_UNTIL.load(Ordering::SeqCst)
+}
+
+#[derive(Default)]
+pub struct PasteSequence {
+    offset: usize,
+    last_ms: Option<u64>,
+    top_id: Option<String>,
+}
+
+impl PasteSequence {
+    pub fn next(&mut self, recent: &[Entry], now_ms: u64, timeout_ms: u64) -> Option<Entry> {
+        if self.last_ms.is_some_and(|last| now_ms.saturating_sub(last) > timeout_ms) {
+            self.offset = 0;
+        }
+        let top = recent.first().map(|e| e.id.clone());
+        if top.is_some() && top != self.top_id {
+            self.offset = 0;
+            self.top_id = top;
+        }
+        self.last_ms = Some(now_ms);
+        let Some(entry) = recent.get(self.offset) else {
+            self.offset = 0;
+            return None;
+        };
+        self.offset += 1;
+        Some(entry.clone())
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
 #[cfg(windows)]
 pub use win::{capture, listen, owner_app, process_app, read_clipboard_text, read_rich, send_copy, send_paste, window_app, write_files, write_image, write_rich, write_text};
 
@@ -578,6 +626,34 @@ mod tests {
 
     fn text(t: &str) -> Captured {
         Captured::Text(t.into())
+    }
+
+    #[test]
+    fn paste_sequence_walks_back_and_restarts_on_timeout_or_new_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let history = History::load(dir.path().to_path_buf(), 0);
+        for (i, t) in ["a", "b", "c"].iter().enumerate() {
+            history.record(text(t), String::new(), String::new(), 10 + i as u64).unwrap();
+        }
+        history.set_pinned(&history.recent()[2].id, true, 20).unwrap();
+        let mut sequence = PasteSequence::default();
+        let pasted = |e: Option<Entry>| match e.map(|e| e.content) {
+            Some(Content::Text { text }) => text,
+            other => format!("{other:?}"),
+        };
+        assert_eq!(pasted(sequence.next(&history.recent(), 1_000, 60_000)), "c");
+        assert_eq!(pasted(sequence.next(&history.recent(), 2_000, 60_000)), "b");
+        assert_eq!(pasted(sequence.next(&history.recent(), 3_000, 60_000)), "a");
+        assert_eq!(pasted(sequence.next(&history.recent(), 4_000, 60_000)), "None");
+        assert_eq!(pasted(sequence.next(&history.recent(), 5_000, 60_000)), "c");
+        assert_eq!(pasted(sequence.next(&history.recent(), 70_000, 60_000)), "c");
+        assert_eq!(pasted(sequence.next(&history.recent(), 71_000, 60_000)), "b");
+        history.record(text("d"), String::new(), String::new(), 72_000).unwrap();
+        assert_eq!(pasted(sequence.next(&history.recent(), 73_000, 60_000)), "d");
+        sequence.reset();
+        assert_eq!(pasted(sequence.next(&history.recent(), 74_000, 60_000)), "d");
+        suppress_for(100, 50);
+        assert!(suppressed(120) && !suppressed(150));
     }
 
     #[test]

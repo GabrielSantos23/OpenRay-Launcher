@@ -13,9 +13,11 @@ import {
   Image,
   Link,
   List,
+  ListOrdered,
   Pin,
   PinOff,
   Pipette,
+  RotateCcw,
   Trash2,
   Type,
 } from "lucide-react";
@@ -311,6 +313,32 @@ export default defineExtension({
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: ClipboardHistory,
+    },
+    {
+      id: "paste-sequentially",
+      title: "Paste Sequentially",
+      icon: { glyph: ListOrdered, tone: ICON.tone },
+      subtitle: "Clipboard History",
+      keywords: ["clipboard", "paste", "sequence", "next"],
+      kind: "Command",
+      primaryActionTitle: "Run Command",
+      run: async () => {
+        if (!(await invoke<boolean>("clipboard_paste_next"))) showHUD({ variant: "failure", title: "No clipboard item found to paste." });
+      },
+    },
+    {
+      id: "reset-paste-sequence",
+      title: "Reset Paste Sequence",
+      icon: { glyph: RotateCcw, tone: ICON.tone },
+      subtitle: "Clipboard History",
+      keywords: ["clipboard", "paste", "sequence"],
+      kind: "Command",
+      primaryActionTitle: "Run Command",
+      run: async () => {
+        await invoke("clipboard_reset_sequence");
+        await invoke("hide_launcher", { restoreFocus: true });
+        showHUD({ variant: "success", title: "Paste sequence reset" });
+      },
     },
   ],
 });

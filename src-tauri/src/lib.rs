@@ -251,6 +251,45 @@ fn clipboard_paste(app: AppHandle, id: String, history: State<clipboard::History
     Ok(())
 }
 
+static PASTE_SEQUENCE: std::sync::Mutex<Option<clipboard::PasteSequence>> = std::sync::Mutex::new(None);
+const PASTE_SEQUENCE_TIMEOUT_MS: u64 = 60_000;
+
+#[tauri::command]
+fn clipboard_paste_next(app: AppHandle, history: State<clipboard::History>) -> Result<bool, String> {
+    let recent = history.recent();
+    let now = store::now_ms();
+    let next = PASTE_SEQUENCE.lock().unwrap().get_or_insert_with(Default::default).next(&recent, now, PASTE_SEQUENCE_TIMEOUT_MS);
+    let Some(entry) = next else {
+        launcher::hide(&app, true);
+        return Ok(false);
+    };
+    clipboard::suppress_for(now, 2_000);
+    match &entry.content {
+        clipboard::Content::Text { text } => clipboard::write_text(&format!("{text}\n"))?,
+        _ => clipboard::write_entry(&history, &entry)?,
+    }
+    launcher::hide(&app, true);
+    let handle = app.clone();
+    let top = recent.into_iter().next();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        clipboard::send_paste();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if let Some(top) = top {
+            clipboard::suppress_for(store::now_ms(), 1_000);
+            let _ = clipboard::write_entry(&handle.state::<clipboard::History>(), &top);
+        }
+    });
+    Ok(true)
+}
+
+#[tauri::command]
+fn clipboard_reset_sequence() {
+    if let Some(sequence) = PASTE_SEQUENCE.lock().unwrap().as_mut() {
+        sequence.reset();
+    }
+}
+
 fn clipboard_changed(app: &AppHandle, result: Result<(), String>) -> Result<(), String> {
     result?;
     app.emit_to(launcher::LABEL, "clipboard-changed", ()).map_err(|e| e.to_string())
@@ -428,6 +467,9 @@ fn serve_clipboard_image(app: &AppHandle, request: tauri::http::Request<Vec<u8>>
 fn start_clipboard_listener(app: &AppHandle) -> Result<(), String> {
     let handle = app.clone();
     clipboard::listen(Box::new(move || {
+        if clipboard::suppressed(store::now_ms()) {
+            return;
+        }
         let Some(captured) = clipboard::capture() else { return };
         let (name, path) = clipboard::owner_app().unwrap_or_default();
         let history = handle.state::<clipboard::History>();
@@ -621,6 +663,8 @@ pub fn run() {
             notes_pending,
             window_layout,
             window_list,
+            clipboard_paste_next,
+            clipboard_reset_sequence,
             window_action,
             system_action,
             focus_get,

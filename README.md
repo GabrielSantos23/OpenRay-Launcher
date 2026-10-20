@@ -55,6 +55,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 - Keeps text, images, files, links, emails and colors. Respects apps that ask not to be recorded, such as password managers.
 - Pin entries, filter by type, delete recent entries, preview images and colors.
 - Paste straight into the app you were using.
+- **Paste Sequentially** pastes your recent copies one after another, newest first.
 
 ### Snippets
 - Save text and give it a **keyword**: type the keyword in any app and Openray replaces it with the snippet.
