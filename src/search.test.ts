@@ -37,7 +37,9 @@ describe("matchScore", () => {
   });
 
   it("matches keywords", () => {
-    expect(matchScore("console", "Windows Terminal", ["wt", "console"])).toBe(100);
+    expect(matchScore("console", "Windows Terminal", ["wt", "console"])).toBe(70);
+    expect(matchScore("energia", "Configurações de energia")).toBeGreaterThan(matchScore("energia", "Bluetooth", ["energia"]));
+    expect(matchScore("bx", "Volume", ["box"])).toBe(0);
   });
 
   it("matches multi-word queries in any order by word prefix", () => {

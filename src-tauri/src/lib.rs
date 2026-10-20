@@ -10,6 +10,7 @@ mod hotkey;
 mod hud;
 mod launcher;
 mod notes;
+mod settings_pages;
 mod snippets;
 mod sound_devices;
 mod store;
@@ -36,6 +37,11 @@ async fn list_apps() -> Vec<apps::InstalledApp> {
 struct GameList {
     games: Vec<games::Game>,
     launchers: Vec<games::Launcher>,
+}
+
+#[tauri::command]
+async fn list_system_pages() -> Vec<settings_pages::SystemPage> {
+    settings_pages::system_pages()
 }
 
 #[tauri::command]
@@ -740,6 +746,7 @@ pub fn run() {
             app_uninstall,
             app_uninstaller,
             list_games,
+            list_system_pages,
             app_volume_set,
             app_volume_active,
             sound_device_set,

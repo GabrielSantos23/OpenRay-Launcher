@@ -70,6 +70,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Themes | `src/theme.ts` | Bundled theme data, `ThemeRoot` applies CSS variables in every window from settings, system appearance and accent |
 | Focus | `src/focus.ts`, `src/extensions/focus.tsx`, `src/FocusWindows.tsx`, `src-tauri/src/focus.rs` | Session state and timers, app and website rules, foreground watcher with UI Automation URL reading, block overlay, notification and panel windows, native panel menus; categories and preferences in `focus.json` |
 | Snippets | `src/snippets.ts`, `src/extensions/snippets.tsx`, `src-tauri/src/snippets.rs` | Snippets in `snippets.json`; placeholder resolution in TypeScript; keyword tracking inside the low-level keyboard hook, erasing the keyword and asking the launcher (`snippet-expand`) to resolve it, then typing it with `snippet_type` |
+| System pages | `src/extensions/system-pages.ts`, `src-tauri/src/settings_pages.rs`, `apps::control_panel_items` | Settings search cache parsing, PageID → ms-settings table, All Control Panel Items enumeration |
 | Games | `src/extensions/games.tsx`, `src-tauri/src/games.rs` | Steam library and manifest parsing, cached icons, Game Launcher view and game items in root search |
 | Uninstall | `src-tauri/src/uninstall.rs` | Uninstall registry lookup for Start Menu apps, `Remove-AppxPackage` for Store apps, Settings fallback; actions may build their confirmation asynchronously (`Action.confirm` as a function) |
 | Toggles | `src-tauri/src/toggles.rs` | Night Light (CloudStore blob), HDR (Display Config advanced color), camera consent switch |
@@ -104,6 +105,7 @@ The Rust core exposes Tauri commands:
 - Focus: `focus_get`, `focus_start`, `focus_update`, `focus_pause`, `focus_resume`, `focus_restart`, `focus_complete`, `focus_cancel`, `focus_snooze`, `focus_close_tab`, `focus_block_info`, `focus_panel_menu`, `focus_panel_reset`, `focus_toast_hide`, `read_json_file`
 - Snippets: `snippet_type` (text, cursor offset → types it into the foreground app); `data_set` with `snippets` also reloads the expansion keywords
 - Clipboard History: `clipboard_paste_next` (→ false when nothing is left to paste), `clipboard_reset_sequence`
+- System pages: `list_system_pages` (→ Settings pages and Control Panel items with name, path, keywords, kind)
 - Games: `list_games` (→ Steam games with install dir, icon, launch and uninstall links, plus launchers); `list_apps` hides Steam `.url` shortcuts for detected games
 - Uninstall: `app_uninstaller` (name, path → registered uninstaller name, "" for a Store package, or null), `app_uninstall` (→ removed | requested | settings)
 - Toggles: `system_toggle` (toggle-night-light | toggle-hdr | toggle-camera-mute → HUD text)

@@ -119,6 +119,36 @@ fn to_straight_rgba(pixels: &mut [u8]) {
     }
 }
 
+pub fn control_panel_items() -> Vec<InstalledApp> {
+    with_com(|| unsafe {
+        use windows::core::w;
+        use windows::Win32::System::Com::CoTaskMemFree;
+        use windows::Win32::UI::Shell::{BHID_EnumItems, IEnumShellItems, IShellItem, SHCreateItemFromParsingName, SIGDN, SIGDN_DESKTOPABSOLUTEPARSING, SIGDN_NORMALDISPLAY};
+        let display = |item: &IShellItem, kind: SIGDN| {
+            item.GetDisplayName(kind).ok().map(|text| {
+                let value = text.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(text.0 as _));
+                value
+            })
+        };
+        let mut items = Vec::new();
+        let Ok(folder) = SHCreateItemFromParsingName::<_, _, IShellItem>(w!(r"shell:::{26EE0668-A00A-44D7-9371-BEB064C98683}\0"), None) else { return items };
+        let Ok(children) = folder.BindToHandler::<_, IEnumShellItems>(None, &BHID_EnumItems) else { return items };
+        loop {
+            let mut batch = [None];
+            let mut fetched = 0;
+            if children.Next(&mut batch, Some(&mut fetched)).is_err() || fetched == 0 {
+                break;
+            }
+            let Some(item) = batch[0].take() else { break };
+            if let (Some(name), Some(id)) = (display(&item, SIGDN_NORMALDISPLAY), display(&item, SIGDN_DESKTOPABSOLUTEPARSING)) {
+                items.push(InstalledApp { name, path: format!("shell:{id}") });
+            }
+        }
+        items
+    })
+}
+
 pub fn start_menu_roots() -> Vec<PathBuf> {
     ["ProgramData", "APPDATA"]
         .iter()
@@ -168,7 +198,7 @@ pub fn launch(path: &str, as_admin: bool) -> Result<(), String> {
     use windows::Win32::UI::Shell::ShellExecuteW;
     use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY, SW_SHOWNORMAL};
 
-    if !path.starts_with(APPS_FOLDER) && !Path::new(path).exists() {
+    if !path.starts_with("shell:") && !path.starts_with("ms-settings:") && !Path::new(path).exists() {
         return Err(format!("{path} no longer exists"));
     }
     unsafe {

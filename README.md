@@ -42,6 +42,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 
 ### Applications
 - Indexes Start Menu shortcuts and Microsoft Store (MSIX) apps, with their real icons.
+- Finds Windows Settings pages and Control Panel items in your Windows language (try “sound” or “power”).
 - Run as Administrator, Show in File Explorer, Copy Path, and Uninstall Application (with a confirmation naming the uninstaller).
 
 ### Games

@@ -33,7 +33,8 @@ export function matchScore(query: string, title: string, keywords: string[] = []
   const q = query.trim().toLowerCase();
   if (!q) return 1;
   const candidates = [title, ...keywords];
-  const whole = Math.max(...candidates.map((c) => scoreText(q, c)));
+  const keyword = Math.max(0, ...keywords.map((k) => scoreText(q, k)));
+  const whole = Math.max(scoreText(q, title), keyword >= 50 ? keyword - 30 : 0);
   if (whole > 0) return whole;
   const tokens = q.split(/\s+/);
   if (tokens.length < 2) return 0;
