@@ -51,6 +51,7 @@ export interface Command {
   view?: ComponentType<ViewProps>;
   fallback?: (text: string) => Promise<void> | void;
   fallbackView?: (text: string) => ComponentType<ViewProps>;
+  argument?: { placeholder: string; run: (value: string) => Promise<void> | void };
   run?: () => Promise<void> | void;
 }
 

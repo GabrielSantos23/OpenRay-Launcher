@@ -80,10 +80,12 @@ export default function App() {
   const [view, setView] = useState<{ key: string; Component: ComponentType<ViewProps> } | null>(null);
   const [inline, setInline] = useState<{ query: string; result: InlineResult } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const argumentRef = useRef<HTMLInputElement>(null);
+  const [argumentValue, setArgumentValue] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const keepSelected = useRef<string | null>(null);
   const [settings] = useSettings();
-  const host = useActionHost(() => inputRef.current?.focus());
+  const host = useActionHost(() => (argumentRef.current ?? inputRef.current)?.focus());
   const update = useAvailableUpdate();
 
   const refresh = useCallback(async () => {
@@ -245,7 +247,15 @@ export default function App() {
       .catch((e) => console.error("frecency_visit failed", e));
   }
 
+  useEffect(() => setArgumentValue(""), [current?.key, query]);
+
   function runAction(command: RegisteredCommand | undefined, action: Action) {
+    if (command?.argument && action.id === "primary") {
+      const { run } = command.argument;
+      if (!argumentValue.trim()) return argumentRef.current?.focus();
+      host.run({ ...action, keepOpen: true, run: () => run(argumentValue) },{ failTitle: `Could not run ${command.title}`, onSuccess: () => visit(command) });
+      return;
+    }
     if (command && action.id === "primary" && command.view) {
       openView(command);
       return;
@@ -259,6 +269,11 @@ export default function App() {
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter" && event.currentTarget === argumentRef.current && current) {
+      event.preventDefault();
+      runSelected({ id: "primary", title: current.primaryActionTitle, run: () => {} });
+      return;
+    }
     if (matchesShortcut(event, { key: "k", ctrl: true })) {
       event.preventDefault();
       if (groups.length) host.openPanel(panelTitle, groups);
@@ -277,6 +292,12 @@ export default function App() {
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setSelected(Math.max(active - 1, 0));
+    } else if (event.key === "Tab" && current?.argument) {
+      event.preventDefault();
+      (event.currentTarget === argumentRef.current ? inputRef : argumentRef).current?.focus();
+    } else if (event.currentTarget === argumentRef.current && (event.key === "Escape" || (event.key === "Backspace" && !argumentValue))) {
+      event.preventDefault();
+      inputRef.current?.focus();
     } else if (event.key === "Escape") {
       event.preventDefault();
       if (query && settings?.escapeKeyBehavior !== "close-and-pop-to-root") {
@@ -332,8 +353,23 @@ export default function App() {
           aria-expanded="true"
           aria-controls="results"
           aria-activedescendant={isUpdate ? "option-update" : isInline ? "option-inline" : current ? `option-${active}` : undefined}
-          className="h-full min-w-0 flex-1 bg-transparent text-18 text-fg caret-fg outline-none placeholder:text-fg-40"
+          style={current?.argument ? { width: `${Math.max(query.length, 1) + 1}ch` } : undefined}
+          className={`h-full min-w-0 bg-transparent text-18 text-fg caret-fg outline-none placeholder:text-fg-40 ${current?.argument ? "max-w-[60%] shrink" : "flex-1"}`}
         />
+        {current?.argument && (
+          <input
+            ref={argumentRef}
+            spellCheck={false}
+            value={argumentValue}
+            onChange={(e) => setArgumentValue(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={current.argument.placeholder}
+            aria-label={current.argument.placeholder}
+            style={{ width: `${Math.max(argumentValue.length, current.argument.placeholder.length) + 2}ch` }}
+            className="h-6 max-w-[200px] min-w-0 rounded-[5px] bg-control px-2 text-13 text-fg caret-fg outline-none placeholder:text-fg-60 focus:bg-control-hover"
+          />
+        )}
+        {current?.argument && <span className="flex-1" />}
         <Loader active={loading > 0 || host.busy} />
       </header>
 

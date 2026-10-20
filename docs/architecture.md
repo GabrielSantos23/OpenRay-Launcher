@@ -61,6 +61,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
 | Extension API | `src/extension-api.ts` | Types and `defineExtension` |
 | Icons | `src/icons.tsx` | `GlyphTile` (extension tiles from an `IconSpec`), `CommandIcon` (URL, tile or fallback), `OpenrayGlyph` |
+| Command arguments | `src/extension-api.ts`, `src/App.tsx` | A command's `argument` adds a field next to the root search text while it is selected; Tab moves between them and the primary action runs `argument.run(value)` (Set Volume) |
 | Fallback views | `src/extension-api.ts`, `src/App.tsx` | A command's `fallbackView(text)` returns a view that opens from the “Use … with...” section with the typed text (Create Quicklink) |
 | Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `notes`, `quicklinks`, `translator`, `web-searches`, `openray-core` |
 | Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |

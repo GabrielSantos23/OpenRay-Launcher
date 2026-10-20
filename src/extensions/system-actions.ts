@@ -26,7 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { defineExtension, type Command, type Confirmation } from "../extension-api";
-import { showHUD } from "../toast";
+import { showHUD, showToast } from "../toast";
 import { VolumeMixer } from "./app-volume";
 import { InputDevices, OutputDevices } from "./sound-devices";
 
@@ -83,6 +83,26 @@ const ENTRIES: Entry[] = [
   { id: "toggle-hidden-files", title: "Toggle Hidden Files", glyph: Eye },
 ];
 
+export function parseVolume(text: string): number | null {
+  const value = text.trim().toLowerCase().replace(/%$/, "").trim();
+  return /^\d+(\.\d+)?$/.test(value) ? Math.min(100, Math.round(Number(value))) : null;
+}
+
+async function setVolume(text: string) {
+  const volume = parseVolume(text);
+  if (volume === null) {
+    showToast({ variant: "failure", title: "Invalid volume", message: "Enter a number between 0 and 100." });
+    return;
+  }
+  await invoke("hide_launcher", { restoreFocus: true });
+  try {
+    await invoke("system_action", { action: `set-volume-${volume}` });
+    showHUD({ variant: "success", title: `Volume set to ${volume}%` });
+  } catch {
+    showHUD({ variant: "failure", title: `Unable to set volume to ${volume}%` });
+  }
+}
+
 export default defineExtension({
   id: "system",
   title: "System Actions",
@@ -101,6 +121,16 @@ export default defineExtension({
         run: () => invoke("system_action", { action: id }),
       }),
     ),
+    {
+      id: "set-volume",
+      title: "Set Volume",
+      icon: { glyph: Volume2, tone: "red" },
+      subtitle: "System",
+      keywords: ["system", "sound", "audio"],
+      kind: "Command",
+      primaryActionTitle: "Run Command",
+      argument: { placeholder: "Volume (0-100)", run: setVolume },
+    },
     {
       id: "volume-mixer",
       title: "Volume Mixer",

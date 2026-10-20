@@ -82,7 +82,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 
 ### System Actions
 - Lock, sleep, hibernate, restart, shut down, log out, screen saver, sleep displays.
-- Volume up/down/presets, mute, microphone mute, play/pause, next/previous track.
+- Volume up/down/presets or a typed value, mute, microphone mute, play/pause, next/previous track.
 - Pick the sound output or input device, and set each device's volume or mute it.
 - Volume Mixer for each app's volume, plus commands to mute or change the volume of the active app.
 - Quit the active app, quit all apps, show desktop.
