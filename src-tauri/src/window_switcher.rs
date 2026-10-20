@@ -19,7 +19,7 @@ pub struct WindowEntry {
     maximized: bool,
 }
 
-fn app_pid(hwnd: HWND) -> u32 {
+pub(crate) fn app_pid(hwnd: HWND) -> u32 {
     let pid = system_actions::process_of(hwnd);
     let hosted = clipboard::process_app(pid).is_some_and(|(_, path)| path.to_lowercase().ends_with("\\applicationframehost.exe"));
     if hosted {

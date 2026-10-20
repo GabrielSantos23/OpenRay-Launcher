@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Cable, Copy, Headphones, Headset, Mic, MicOff, Monitor, RefreshCw, Settings, Speaker, Volume2, VolumeX, type LucideIcon } from "lucide-react";
+import { Cable, Copy, Headphones, Headset, Mic, MicOff, Monitor, RefreshCw, Settings, Speaker, Volume1, Volume2, VolumeX, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fail } from "../ActionHost";
 import type { Action, IconSpec, Item, ViewProps } from "../extension-api";
@@ -7,7 +7,7 @@ import { GlyphTile } from "../icons";
 import { ListView } from "../ListView";
 import { showToast } from "../toast";
 
-type Direction = "output" | "input";
+export type Direction = "output" | "input";
 
 interface SoundDevice {
   id: string;
@@ -41,7 +41,38 @@ export function sortDevices(devices: SoundDevice[]): SoundDevice[] {
   return [...devices].sort((a, b) => Number(b.state === "active" && b.isDefault) - Number(a.state === "active" && a.isDefault) || a.name.localeCompare(b.name));
 }
 
-function VolumeLevel({ device, direction }: { device: SoundDevice; direction: Direction }) {
+export function volumeStep(volume: number, up: boolean): number {
+  const fifths = volume / 5;
+  return Math.min(100, Math.max(0, up ? (Math.floor(fifths) + 1) * 5 : (Math.ceil(fifths) - 1) * 5));
+}
+
+interface VolumeTarget {
+  name: string;
+  volume: number;
+  isMuted: boolean;
+}
+
+export function volumeActions(direction: Direction, target: VolumeTarget, change: (values: { volume?: number; muted?: boolean }, failTitle: string) => () => Promise<void>): Action[][] {
+  const mute = !target.isMuted;
+  const icons = SETUP[direction];
+  return [
+    [{ id: "toggle-mute", title: target.isMuted ? "Unmute" : "Mute", icon: target.isMuted ? icons.unmuted : icons.muted, shortcut: { key: "m", ctrl: true }, keepOpen: true, run: change({ muted: mute }, `Unable to ${mute ? "mute" : "unmute"} ${target.name}`) }],
+    [
+      { id: "increase-volume", title: "Increase Volume", icon: Volume2, shortcut: { key: "=" }, keepOpen: true, run: change({ volume: volumeStep(target.volume, true) }, `Unable to set ${target.name} volume`) },
+      { id: "decrease-volume", title: "Decrease Volume", icon: Volume1, shortcut: { key: "-" }, keepOpen: true, run: change({ volume: volumeStep(target.volume, false) }, `Unable to set ${target.name} volume`) },
+    ],
+    LEVELS.map((level) => ({
+      id: `set-volume-${level}`,
+      title: `Set Volume to ${level}%`,
+      icon: level ? icons.unmuted : icons.muted,
+      accessory: !target.isMuted && Math.round(target.volume) === level ? "Current" : undefined,
+      keepOpen: true,
+      run: change({ volume: level }, `Unable to set ${target.name} volume`),
+    })),
+  ];
+}
+
+export function VolumeLevel({ device, direction }: { device: VolumeTarget; direction: Direction }) {
   const Icon = device.isMuted ? SETUP[direction].muted : SETUP[direction].unmuted;
   return (
     <span className="flex items-center gap-2 text-12 text-fg-60">
@@ -91,18 +122,7 @@ function SoundDevices({ pop, direction }: ViewProps & { direction: Direction }) 
             },
           ]);
         }
-        const mute = !device.isMuted;
-        groups.push(
-          [{ id: "toggle-mute", title: device.isMuted ? "Unmute" : "Mute", icon: device.isMuted ? setup.unmuted : setup.muted, keepOpen: true, run: change(device, { muted: mute }, `Unable to ${mute ? "mute" : "unmute"} ${device.name}`) }],
-          LEVELS.map((level) => ({
-            id: `set-volume-${level}`,
-            title: `Set Volume to ${level}%`,
-            icon: level ? setup.unmuted : setup.muted,
-            accessory: !device.isMuted && Math.round(device.volume) === level ? "Current" : undefined,
-            keepOpen: true,
-            run: change(device, { volume: level }, `Unable to set ${device.name} volume`),
-          })),
-        );
+        groups.push(...volumeActions(direction, device, (values, failTitle) => change(device, values, failTitle)));
       }
       groups.push([
         {

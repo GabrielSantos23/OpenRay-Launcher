@@ -353,3 +353,9 @@ Not yet investigated:
 - **View.** `main-window-BN8deh-D.js` `SoundDevicesView`: “Search devices…”, sections Available, Disabled, Disconnected (one untitled list while searching), default device first then by name; rows show a form-factor icon, the name, a blue Default tag and a volume accessory (percent, bar, speaker or mic icon). Empty: “No output devices found”.
 - **Actions.** Set as Output/Input Device (toast “Output Device set to …”), Mute/Unmute (primary on the default device), Increase/Decrease Volume, Set Volume to N%, Set Format, Set Audio Enhancements (Off, Device Default Effects, Voice Clarity), Listen to This Device (input), Enable/Disable Device, Copy Device Name, Allow/Deny Microphone Access (input), Refresh Devices, Open Sound Settings (`ms-settings:sound`).
 - **Unknowns.** The volume step size and preset levels (`VD`) and the roles set as default were not read; Openray uses 0/25/50/75/100% and all three roles.
+
+## Raycast Volume Mixer (2.8.2)
+
+- **Commands.** `backend/index.mjs` @987025: `appVolume` “Volume Mixer” (Windows only), `toggleMuteCurrentApp`, `turnCurrentAppVolumeUp`, `turnCurrentAppVolumeDown`. Handlers: HUD “<App> muted/unmuted”, “<App> volume set to N%”, failure “The active app has no audio session”; `icn` steps the volume to the next multiple of 5.
+- **View.** `main-window-BN8deh-D.js` `AppVolumeMixerView`: “Search apps…”, sections Playing and Idle (playing first, System Sounds last, then by name), rows with the app icon, name and volume accessory; empty “No apps are playing audio”.
+- **Volume actions** (`WD`, shared with the sound device pickers): Mute/Unmute (Ctrl+M, primary in the mixer), Increase Volume (“+”/“=”), Decrease Volume (“-”), Set Volume to 0, 25, 50, 75, 100% (`VD`); arrow Right/Left also step while the search is empty.

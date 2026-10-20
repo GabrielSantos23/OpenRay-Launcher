@@ -84,6 +84,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 - Lock, sleep, hibernate, restart, shut down, log out, screen saver, sleep displays.
 - Volume up/down/presets, mute, microphone mute, play/pause, next/previous track.
 - Pick the sound output or input device, and set each device's volume or mute it.
+- Volume Mixer for each app's volume, plus commands to mute or change the volume of the active app.
 - Quit the active app, quit all apps, show desktop.
 - Open and empty the Recycle Bin, toggle dark mode, toggle hidden files.
 - Dangerous actions ask for confirmation first.

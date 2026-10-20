@@ -1,3 +1,4 @@
+mod app_volume;
 mod apps;
 mod clipboard;
 mod file_search;
@@ -426,6 +427,21 @@ fn read_json_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn app_volumes() -> Result<Vec<app_volume::AppAudio>, String> {
+    tauri::async_runtime::spawn_blocking(app_volume::list).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn app_volume_set(id: String, volume: Option<f32>, muted: Option<bool>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || app_volume::set(&id, volume, muted)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn app_volume_active(action: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || app_volume::change_active(&action)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn sound_devices(direction: String) -> Result<Vec<sound_devices::SoundDevice>, String> {
     tauri::async_runtime::spawn_blocking(move || sound_devices::list(&direction)).await.map_err(|e| e.to_string())?
 }
@@ -689,6 +705,9 @@ pub fn run() {
             window_layout,
             window_list,
             sound_devices,
+            app_volumes,
+            app_volume_set,
+            app_volume_active,
             sound_device_set,
             clipboard_paste_next,
             clipboard_reset_sequence,

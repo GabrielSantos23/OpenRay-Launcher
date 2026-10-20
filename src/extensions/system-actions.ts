@@ -26,6 +26,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { defineExtension, type Command, type Confirmation } from "../extension-api";
+import { showHUD } from "../toast";
+import { VolumeMixer } from "./app-volume";
 import { InputDevices, OutputDevices } from "./sound-devices";
 
 interface Entry {
@@ -97,6 +99,41 @@ export default defineExtension({
         primaryActionTitle: "Run Command",
         confirm,
         run: () => invoke("system_action", { action: id }),
+      }),
+    ),
+    {
+      id: "volume-mixer",
+      title: "Volume Mixer",
+      icon: { glyph: Volume2, tone: "red" },
+      subtitle: "System",
+      keywords: ["system", "app volume", "set app volume", "mute app", "audio mixer"],
+      kind: "Command",
+      primaryActionTitle: "Open Command",
+      view: VolumeMixer,
+    },
+    ...(
+      [
+        ["toggle-active-app-mute", "Toggle Active App Mute", VolumeX, "mute", ["mute current app", "mute foreground app", "mute active app"]],
+        ["turn-active-app-volume-up", "Turn Active App Volume Up", Volume2, "up", ["current app volume up", "foreground app volume", "active app volume"]],
+        ["turn-active-app-volume-down", "Turn Active App Volume Down", Volume1, "down", ["current app volume down", "foreground app volume", "active app volume"]],
+      ] as const
+    ).map(
+      ([id, title, glyph, action, keywords]): Command => ({
+        id,
+        title,
+        icon: { glyph, tone: "red" },
+        subtitle: "System",
+        keywords: ["system", ...keywords],
+        kind: "Command",
+        primaryActionTitle: "Run Command",
+        run: async () => {
+          await invoke("hide_launcher", { restoreFocus: true });
+          try {
+            showHUD({ variant: "success", title: await invoke<string>("app_volume_active", { action }) });
+          } catch (e) {
+            showHUD({ variant: "failure", title: e instanceof Error ? e.message : String(e) });
+          }
+        },
       }),
     ),
     {
