@@ -24,6 +24,7 @@ export interface Settings {
 }
 
 export const DEFAULT_HOTKEY = "Alt+Space";
+export const START_MENU_HOTKEY = "Win";
 
 const NO_PREFS: CommandPrefs = { alias: "", hotkey: "", disabled: false };
 

@@ -6,6 +6,8 @@
 
 ## Global hotkey
 
+- Replace Start Menu: Win+key chords are replayed to Windows, so Openray command hotkeys that use Win do not fire while it is on. Ctrl+Esc and clicking the Start button still open Start.
+
 - **Mechanism.** Openray uses a WH_KEYBOARD_LL hook (`src-tauri/src/hotkey.rs`), like the reference.
   - The hook only decides and returns; a dispatcher thread does the work. Doing work inside the hook made Windows drop it after the first press.
   - For Alt and Win chords, an unassigned key (0xE8) is injected so that releasing the modifier does not open the menu bar or Start menu.

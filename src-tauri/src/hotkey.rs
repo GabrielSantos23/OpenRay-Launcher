@@ -61,6 +61,8 @@ fn key_code(name: &str) -> Option<u32> {
     })
 }
 
+pub const START_MENU: u32 = 0x5B;
+
 pub fn standalone(vk: u32) -> bool {
     matches!(vk, 0x2C | 0x13 | 0x91 | 0x7C..=0x87)
 }
@@ -77,6 +79,9 @@ pub fn parse(text: &str) -> Result<Hotkey, String> {
             _ if vk.is_none() => vk = Some(key_code(part).ok_or_else(|| format!("unknown key \"{part}\" in hotkey \"{text}\""))?),
             _ => return Err(format!("hotkey \"{text}\" has more than one non-modifier key")),
         }
+    }
+    if vk.is_none() && modifiers == (Modifiers { win: true, ..Default::default() }) {
+        return Ok(Hotkey { modifiers: Modifiers::default(), vk: START_MENU });
     }
     let vk = vk.ok_or_else(|| format!("hotkey \"{text}\" has no key"))?;
     if modifiers == Modifiers::default() && !standalone(vk) {
@@ -117,12 +122,12 @@ impl Matcher {
 }
 
 mod hook {
-    use super::{Decision, Hotkey, Matcher, Modifiers};
+    use super::{Decision, Hotkey, Matcher, Modifiers, START_MENU};
     use std::sync::mpsc::{channel, Sender};
     use std::sync::{Mutex, OnceLock};
     use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-    use windows::Win32::UI::Input::KeyboardAndMouse::{keybd_event, GetAsyncKeyState, KEYEVENTF_KEYUP};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{keybd_event, GetAsyncKeyState, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP};
     use windows::Win32::UI::WindowsAndMessaging::{
         CallNextHookEx, GetMessageW, SetWindowsHookExW, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
     };
@@ -133,7 +138,56 @@ mod hook {
     struct State {
         bindings: Vec<(String, Hotkey, Matcher)>,
         suspended: bool,
+        win: WinTap,
         fired: Sender<(String, Hotkey)>,
+    }
+
+    #[derive(Default, PartialEq)]
+    enum WinTap {
+        #[default]
+        Idle,
+        Pending,
+        Combo,
+    }
+
+    fn is_win(vk: u32) -> bool {
+        vk == 0x5B || vk == 0x5C
+    }
+
+    fn inject(vk: u32, scan: u32, extended: bool) {
+        let flags = if extended { KEYEVENTF_EXTENDEDKEY } else { Default::default() };
+        unsafe { keybd_event(vk as u8, scan as u8, flags, MARKER) };
+    }
+
+    fn start_menu(state: &mut State, event: &KBDLLHOOKSTRUCT, down: bool) -> bool {
+        let Some(id) = state.bindings.iter().find(|(_, h, _)| h.vk == START_MENU && h.modifiers == Modifiers::default()).map(|(id, _, _)| id.clone()) else {
+            state.win = WinTap::Idle;
+            return false;
+        };
+        let vk = event.vkCode;
+        match (is_win(vk), down, &state.win) {
+            (true, true, WinTap::Idle) => {
+                state.win = WinTap::Pending;
+                true
+            }
+            (true, true, WinTap::Pending) => true,
+            (true, false, WinTap::Pending) => {
+                state.win = WinTap::Idle;
+                let _ = state.fired.send((id, Hotkey { modifiers: Modifiers::default(), vk: START_MENU }));
+                true
+            }
+            (true, false, WinTap::Combo) => {
+                state.win = WinTap::Idle;
+                false
+            }
+            (false, true, WinTap::Pending) => {
+                state.win = WinTap::Combo;
+                inject(0x5B, 0x5B, true);
+                inject(vk, event.scanCode, event.flags.0 & 1 != 0);
+                true
+            }
+            _ => false,
+        }
     }
 
     static STATE: OnceLock<Mutex<State>> = OnceLock::new();
@@ -170,7 +224,11 @@ mod hook {
             if event.dwExtraInfo != MARKER {
                 let down = wparam.0 as u32 == WM_KEYDOWN || wparam.0 as u32 == WM_SYSKEYDOWN;
                 if let Some(state) = STATE.get() {
-                    if decide(&mut state.lock().unwrap(), event.vkCode, down) {
+                    let mut state = state.lock().unwrap();
+                    if !state.suspended && start_menu(&mut state, event, down) {
+                        return LRESULT(1);
+                    }
+                    if decide(&mut state, event.vkCode, down) {
                         return LRESULT(1);
                     }
                 }
@@ -197,7 +255,7 @@ mod hook {
     pub fn install(on_fire: Box<dyn Fn(String) + Send>) -> Result<(), String> {
         let (fired, fired_rx) = channel::<(String, Hotkey)>();
         STATE
-            .set(Mutex::new(State { bindings: Vec::new(), suspended: false, fired }))
+            .set(Mutex::new(State { bindings: Vec::new(), suspended: false, win: WinTap::Idle, fired }))
             .map_err(|_| "keyboard hook already installed".to_string())?;
         std::thread::Builder::new()
             .name("openray-hotkey-dispatch".into())
@@ -254,6 +312,12 @@ mod tests {
 
     fn mods(ctrl: bool, alt: bool, shift: bool, win: bool) -> Modifiers {
         Modifiers { ctrl, alt, shift, win }
+    }
+
+    #[test]
+    fn win_alone_means_replace_start_menu() {
+        assert_eq!(parse("Win").unwrap(), Hotkey { modifiers: Modifiers::default(), vk: START_MENU });
+        assert!(parse("Ctrl").is_err());
     }
 
     #[test]

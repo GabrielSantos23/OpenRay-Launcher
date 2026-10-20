@@ -17,6 +17,7 @@ import {
   Command,
   Puzzle,
   X,
+  LayoutGrid,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Extension, RegisteredCommand } from "./extension-api";
@@ -32,6 +33,7 @@ import { HotkeyRecorder, type HotkeyConflict } from "./HotkeyRecorder";
 import {
   commandPrefs,
   DEFAULT_HOTKEY,
+  START_MENU_HOTKEY,
   hotkeyOwner,
   LAUNCHER_OWNER,
   useSettings,
@@ -283,7 +285,15 @@ function GeneralPage({ settings, save, recorder }: { settings: SettingsData; sav
         <Switch labelledBy="show-in-tray" checked={settings.showInTray} onChange={(showInTray) => save({ ...settings, showInTray })} />
       </Row>
       <Row id="openray-hotkey" title="Openray Hotkey">
-        <HotkeyRecorder variant="button" label="Openray Hotkey" value={settings.hotkey} {...recorder(LAUNCHER_OWNER)} />
+        {settings.hotkey === START_MENU_HOTKEY ? null : (
+          <>
+            <button type="button" onClick={() => save({ ...settings, hotkey: START_MENU_HOTKEY })} className={`${TEXT_BUTTON} flex items-center gap-1.5`}>
+              Replace Start Menu
+              <LayoutGrid aria-hidden="true" className="size-3" />
+            </button>
+            <HotkeyRecorder variant="button" label="Openray Hotkey" value={settings.hotkey} {...recorder(LAUNCHER_OWNER)} />
+          </>
+        )}
         <button
           type="button"
           aria-label="Reset hotkey to Alt+Space"
