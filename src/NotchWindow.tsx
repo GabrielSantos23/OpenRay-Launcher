@@ -21,13 +21,15 @@ import {
   type NotchWidget,
 } from "./notch";
 
-const OPEN_DELAY_MS = 150;
-const CLOSE_DELAY_MS = 400;
+const OPEN_DELAY_MS = 90;
+const CLOSE_DELAY_MS = 250;
 const VOLUME_SHOW_MS = 1500;
 const MEDIA_POLL_MS = 1000;
 const BATTERY_POLL_MS = 60_000;
 const VOLUME_SEGMENTS = 36;
 const CLIPBOARD_SHOWN = 6;
+const SHAPE_SETTLE_MS = 620;
+const NOTCH_WINDOW = { width: 720, height: 224 };
 
 type Tab = "nook" | "tray" | "widgets";
 
@@ -350,18 +352,39 @@ export function NotchWindow() {
   const mode: NotchMode = expanded ? "expanded" : volume ? "volume" : "collapsed";
   const playing = !!media?.playing && !!media.title;
   const size = notchSize(mode, playing);
+  const collapsedSize = notchSize("collapsed", playing);
+  const previous = useRef(size);
+  const growing = size.width * size.height >= previous.current.width * previous.current.height;
 
   useEffect(() => {
-    run(invoke("notch_resize", { ...size }), "notch_resize");
-  }, [size.width, size.height, size.radius]);
+    previous.current = size;
+    const settle = () => invoke("notch_shape", { width: size.width, height: size.height, regionWidth: size.width + 2, regionHeight: size.height + 2 });
+    run(invoke("notch_shape", { width: size.width, height: size.height, regionWidth: NOTCH_WINDOW.width, regionHeight: NOTCH_WINDOW.height }), "notch_shape");
+    const timer = window.setTimeout(() => run(settle(), "notch_shape"), SHAPE_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [size.width, size.height]);
 
-  return <div className="notch-surface h-screen w-screen overflow-hidden bg-notch text-fg select-none">{content()}</div>;
+  const tabs: { id: Tab; label: string; glyph: ReactNode }[] = [
+    { id: "nook", label: "Nook", glyph: <Music aria-hidden="true" className="size-3.5" /> },
+    { id: "tray", label: "Tray", glyph: <ClipboardList aria-hidden="true" className="size-3.5" /> },
+    ...(widgets.length ? [{ id: "widgets" as Tab, label: "Widgets", glyph: <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" /> }] : []),
+  ];
+  const expandedSize = notchSize("expanded", playing);
+  const volumeSize = notchSize("volume", playing);
 
-  function content() {
-    if (mode === "volume" && volume) return <VolumeView volume={volume} />;
-    if (mode === "collapsed") {
-      return (
-        <div className="flex h-full items-center justify-between px-3" aria-label="Openray notch">
+  return (
+    <div className="notch-surface flex h-screen w-screen justify-center text-fg select-none">
+      <div
+        className="notch-shape relative shrink-0 overflow-hidden bg-notch"
+        data-closing={growing ? undefined : ""}
+        style={{ width: size.width, height: size.height, borderBottomLeftRadius: size.radius, borderBottomRightRadius: size.radius }}
+      >
+        <div
+          className="notch-layer flex items-center justify-between px-3"
+          data-shown={mode === "collapsed" ? "" : undefined}
+          aria-hidden={mode !== "collapsed"}
+          style={{ width: collapsedSize.width, height: collapsedSize.height }}
+        >
           {playing && media && (
             <>
               <Artwork media={media} className="size-5 rounded-[5px]" />
@@ -369,56 +392,52 @@ export function NotchWindow() {
             </>
           )}
         </div>
-      );
-    }
-    return expandedView();
-  }
-
-  function expandedView() {
-
-  const tabs: { id: Tab; label: string; glyph: ReactNode }[] = [
-    { id: "nook", label: "Nook", glyph: <Music aria-hidden="true" className="size-3.5" /> },
-    { id: "tray", label: "Tray", glyph: <ClipboardList aria-hidden="true" className="size-3.5" /> },
-    ...(widgets.length ? [{ id: "widgets" as Tab, label: "Widgets", glyph: <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" /> }] : []),
-  ];
-
-  return (
-    <div className="flex h-full flex-col gap-3 px-4 pt-2.5 pb-4">
-      <header className="flex h-7 shrink-0 items-center justify-between">
-        <div role="tablist" aria-label="Notch sections" className="flex items-center gap-1">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-12 font-medium outline-offset-1 focus-visible:outline-2 focus-visible:outline-accent ${tab === t.id ? "bg-control text-fg" : "text-fg-60 hover:text-fg"}`}
-            >
-              {t.glyph}
-              {t.label}
-            </button>
-          ))}
+        <div className="notch-layer" data-shown={mode === "volume" ? "" : undefined} aria-hidden={mode !== "volume"} style={{ width: volumeSize.width, height: volumeSize.height }}>
+          {volume && <VolumeView volume={volume} />}
         </div>
-        <div className="flex items-center gap-2">
-          <BatteryChip battery={battery} />
-          <IconButton label="Open Openray settings" onClick={() => run(invoke("open_settings"), "open_settings")}>
-            <Settings className="size-4" />
-          </IconButton>
-        </div>
-      </header>
-      <div role="tabpanel" aria-label={tabs.find((t) => t.id === tab)?.label} className="min-h-0 flex-1">
-        {tab === "nook" && (
-          <div className="grid h-full grid-cols-[1.35fr_1fr_0.75fr] items-center gap-5">
-            <NowPlaying media={media} />
-            <CalendarStrip focus={focus} />
-            <Captures />
+        <div
+          className="notch-layer flex flex-col gap-3 px-4 pt-2.5 pb-4"
+          data-shown={mode === "expanded" ? "" : undefined}
+          aria-hidden={mode !== "expanded"}
+          inert={mode !== "expanded"}
+          style={{ width: expandedSize.width, height: expandedSize.height }}
+        >
+          <header className="flex h-7 shrink-0 items-center justify-between">
+            <div role="tablist" aria-label="Notch sections" className="flex items-center gap-1">
+              {tabs.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-12 font-medium outline-offset-1 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent ${tab === t.id ? "bg-control text-fg" : "text-fg-60 hover:text-fg"}`}
+                >
+                  {t.glyph}
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <BatteryChip battery={battery} />
+              <IconButton label="Open Openray settings" onClick={() => run(invoke("open_settings"), "open_settings")}>
+                <Settings className="size-4" />
+              </IconButton>
+            </div>
+          </header>
+          <div key={tab} role="tabpanel" aria-label={tabs.find((t) => t.id === tab)?.label} className="notch-panel min-h-0 flex-1">
+            {tab === "nook" && (
+              <div className="grid h-full grid-cols-[1.35fr_1fr_0.75fr] items-center gap-5">
+                <NowPlaying media={media} />
+                <CalendarStrip focus={focus} />
+                <Captures />
+              </div>
+            )}
+            {tab === "tray" && <Tray entries={clipboard} />}
+            {tab === "widgets" && <Widgets widgets={widgets} />}
           </div>
-        )}
-        {tab === "tray" && <Tray entries={clipboard} />}
-        {tab === "widgets" && <Widgets widgets={widgets} />}
+        </div>
       </div>
     </div>
   );
-}
 }

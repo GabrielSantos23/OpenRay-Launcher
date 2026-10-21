@@ -185,9 +185,9 @@
 
 ## Notch
 
-- Only the primary monitor gets a notch. Expanding and collapsing resize the window in one step; there is no shape animation.
+- Only the primary monitor gets a notch. While the shape animates, the whole 720×224 window takes clicks for about 0.6 s.
 - The notch volume HUD appears next to the Windows volume flyout; Openray does not hide the system flyout. There is no brightness HUD.
-- Fullscreen detection checks whether the foreground window covers the whole primary monitor, every 500 ms. Exclusive-mode games that do not own the foreground window are not detected.
+- Fullscreen detection checks every 500 ms whether the foreground window covers the whole primary monitor without being a maximized framed window. Exclusive-mode games that do not own the foreground window are not detected, and a framed window that is not maximized but sized to the whole monitor counts as fullscreen.
 - The week strip shows dates only. Openray does not read a calendar, so there are no events.
 - Media comes from the current Windows media session (SMTC). Apps that do not publish one, and the Spotify Web API, are not shown.
 - FlowKey notch widgets use a `notch` command field that the published `@flowkey-cli/native-sdk` 0.5.2 does not declare yet; Openray validates it itself until the SDK change is published.

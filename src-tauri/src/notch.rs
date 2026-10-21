@@ -11,22 +11,26 @@ use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager as
 use windows::Storage::Streams::DataReader;
 use windows::Win32::Foundation::{POINT, RECT};
 use windows::Win32::Graphics::Dwm::{DWMWA_BORDER_COLOR, DWMWA_TRANSITIONS_FORCEDISABLED, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND};
-use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, GetMonitorInfoW, MonitorFromWindow, SetWindowRgn, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+use windows::Win32::Graphics::Gdi::{CreateRectRgn, GetMonitorInfoW, MonitorFromWindow, SetWindowRgn, MONITORINFO, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetCursorPos, GetForegroundWindow, GetShellWindow, GetWindowLongPtrW, GetWindowRect, SetWindowLongPtrW, SetWindowPos, ShowWindow, GWL_EXSTYLE,
+    GetClassNameW, GetCursorPos, GetForegroundWindow, GetShellWindow, GetWindowLongPtrW, GetWindowRect, IsZoomed, SetWindowLongPtrW, SetWindowPos, ShowWindow, GWL_EXSTYLE, GWL_STYLE, WS_CAPTION, WS_THICKFRAME,
     HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_HIDE, SW_SHOWNOACTIVATE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
 pub const LABEL: &str = "notch";
 const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
-const TICK: Duration = Duration::from_millis(100);
+const TICK: Duration = Duration::from_millis(30);
+const VOLUME_EVERY_TICKS: u32 = 3;
 const FULLSCREEN_EVERY: Duration = Duration::from_millis(500);
 const AUDIO_REFRESH_EVERY: Duration = Duration::from_secs(5);
 
 static WATCHING: AtomicBool = AtomicBool::new(false);
 static SHOW_IN_FULLSCREEN: AtomicBool = AtomicBool::new(false);
 static ART: Mutex<Option<(String, Option<String>)>> = Mutex::new(None);
+static SHAPE: Mutex<(i32, i32)> = Mutex::new((0, 0));
+pub const WIDTH: f64 = 720.0;
+pub const HEIGHT: f64 = 224.0;
 
 pub fn apply(app: &AppHandle, settings: &Settings) {
     SHOW_IN_FULLSCREEN.store(settings.notch_show_in_fullscreen, Ordering::SeqCst);
@@ -43,33 +47,42 @@ pub fn apply(app: &AppHandle, settings: &Settings) {
 }
 
 fn init(window: &WebviewWindow) {
-    let Some(hwnd) = hwnd(window) else { return };
-    make_popup(hwnd, 1, 1);
+    let (Some(hwnd), Ok(Some(monitor))) = (hwnd(window), window.primary_monitor()) else { return };
+    let scale = monitor.scale_factor();
+    let (w, h) = ((WIDTH * scale).round() as i32, (HEIGHT * scale).round() as i32);
+    make_popup(hwnd, w, h);
     set_dwm(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND);
     set_dwm(hwnd, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE);
     set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
     unsafe {
         let ex = (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32 & !WS_EX_APPWINDOW.0) | (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST).0;
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex as isize);
+        let x = monitor.position().x + (monitor.size().width as i32 - w) / 2;
+        let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), x, monitor.position().y, w, h, SWP_NOACTIVATE);
+        SetWindowRgn(hwnd, Some(CreateRectRgn(0, 0, 0, 0)), false);
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
 }
 
-pub fn resize(app: &AppHandle, width: f64, height: f64, radius: f64) {
+pub fn shape(app: &AppHandle, width: f64, height: f64, region_width: f64, region_height: f64) {
     let Some(window) = app.get_webview_window(LABEL) else { return };
-    let (Some(hwnd), Ok(Some(monitor))) = (hwnd(&window), window.primary_monitor()) else { return };
-    let scale = monitor.scale_factor();
-    let (w, h, r) = ((width * scale).round() as i32, (height * scale).round() as i32, (radius * scale).round() as i32);
-    let x = monitor.position().x + (monitor.size().width as i32 - w) / 2;
+    let Some(hwnd) = hwnd(&window) else { return };
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let full = (WIDTH * scale).round() as i32;
+    let px = |v: f64| (v * scale).round() as i32;
+    *SHAPE.lock().unwrap_or_else(|e| e.into_inner()) = (px(width), px(height));
+    let (rw, rh) = (px(region_width).min(full), px(region_height));
     unsafe {
-        let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), x, monitor.position().y, w, h, SWP_NOACTIVATE);
-        let region = CreateRoundRectRgn(0, -r, w + 1, h + 1, r * 2, r * 2);
-        SetWindowRgn(hwnd, Some(region), true);
+        SetWindowRgn(hwnd, Some(CreateRectRgn((full - rw) / 2, 0, (full + rw) / 2, rh)), true);
     }
 }
 
 pub fn covers(window: (i32, i32, i32, i32), monitor: (i32, i32, i32, i32)) -> bool {
     window.0 <= monitor.0 && window.1 <= monitor.1 && window.2 >= monitor.2 && window.3 >= monitor.3
+}
+
+pub fn is_fullscreen(window: (i32, i32, i32, i32), monitor: (i32, i32, i32, i32), maximized: bool, framed: bool) -> bool {
+    covers(window, monitor) && !(maximized && framed)
 }
 
 fn fullscreen_on_primary() -> bool {
@@ -89,7 +102,8 @@ fn fullscreen_on_primary() -> bool {
             return false;
         }
         let m = info.rcMonitor;
-        covers((rect.left, rect.top, rect.right, rect.bottom), (m.left, m.top, m.right, m.bottom))
+        let framed = GetWindowLongPtrW(foreground, GWL_STYLE) as u32 & (WS_CAPTION.0 | WS_THICKFRAME.0) != 0;
+        is_fullscreen((rect.left, rect.top, rect.right, rect.bottom), (m.left, m.top, m.right, m.bottom), IsZoomed(foreground).as_bool(), framed)
     }
 }
 
@@ -97,7 +111,14 @@ fn cursor_inside(window: &WebviewWindow) -> bool {
     let Some(hwnd) = hwnd(window) else { return false };
     let mut cursor = POINT::default();
     let mut rect = RECT::default();
-    unsafe { GetCursorPos(&mut cursor).is_ok() && GetWindowRect(hwnd, &mut rect).is_ok() && cursor.x >= rect.left && cursor.x < rect.right && cursor.y >= rect.top && cursor.y < rect.bottom }
+    let (w, h) = *SHAPE.lock().unwrap_or_else(|e| e.into_inner());
+    unsafe {
+        if GetCursorPos(&mut cursor).is_err() || GetWindowRect(hwnd, &mut rect).is_err() {
+            return false;
+        }
+    }
+    let left = (rect.left + rect.right - w) / 2;
+    cursor.x >= left && cursor.x < left + w && cursor.y >= rect.top && cursor.y < rect.top + h
 }
 
 fn watch(app: &AppHandle) {
@@ -111,7 +132,9 @@ fn watch(app: &AppHandle) {
         let mut audio = None;
         let mut audio_at = Instant::now() - AUDIO_REFRESH_EVERY;
         let mut volume: Option<(u32, bool)> = None;
+        let mut tick = 0u32;
         while let Some(window) = app.get_webview_window(LABEL) {
+            tick = tick.wrapping_add(1);
             let inside = !hidden && cursor_inside(&window);
             if inside != hovered {
                 hovered = inside;
@@ -136,7 +159,7 @@ fn watch(app: &AppHandle) {
                 audio_at = Instant::now();
                 audio = crate::system_actions::speaker_volume().ok();
             }
-            let level = audio.as_ref().and_then(|a| unsafe { Some(((a.GetMasterVolumeLevelScalar().ok()? * 100.0).round() as u32, a.GetMute().ok()?.as_bool())) });
+            let level = if tick % VOLUME_EVERY_TICKS != 0 { volume } else { audio.as_ref().and_then(|a| unsafe { Some(((a.GetMasterVolumeLevelScalar().ok()? * 100.0).round() as u32, a.GetMute().ok()?.as_bool())) }) };
             if level.is_some() && volume.is_some() && level != volume && !hidden {
                 let (percent, muted) = level.unwrap_or_default();
                 let _ = app.emit_to(LABEL, "notch-volume", serde_json::json!({ "percent": percent, "muted": muted }));
@@ -202,8 +225,8 @@ fn battery() -> Option<Battery> {
 }
 
 #[tauri::command]
-pub fn notch_resize(app: AppHandle, width: f64, height: f64, radius: f64) {
-    resize(&app, width, height, radius)
+pub fn notch_shape(app: AppHandle, width: f64, height: f64, region_width: f64, region_height: f64) {
+    shape(&app, width, height, region_width, region_height)
 }
 
 #[tauri::command]
@@ -227,6 +250,17 @@ mod tests {
         assert!(covers((-8, -8, 1928, 1088), monitor));
         assert!(!covers((0, 0, 1920, 1040), monitor));
         assert!(!covers((1920, 0, 3840, 1080), monitor));
+    }
+
+    #[test]
+    fn maximized_framed_windows_are_not_fullscreen() {
+        let monitor = (0, 0, 1920, 1080);
+        let maximized = (-8, -8, 1928, 1088);
+        assert!(!is_fullscreen(maximized, monitor, true, true));
+        assert!(is_fullscreen((0, 0, 1920, 1080), monitor, false, false));
+        assert!(is_fullscreen((0, 0, 1920, 1080), monitor, true, false));
+        assert!(is_fullscreen((0, 0, 1920, 1080), monitor, false, true));
+        assert!(!is_fullscreen((0, 0, 1920, 1040), monitor, false, false));
     }
 
     #[test]

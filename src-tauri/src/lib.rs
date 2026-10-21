@@ -992,7 +992,7 @@ pub fn run() {
             show_hud,
             hud_present,
             hud_hide,
-            notch::notch_resize,
+            notch::notch_shape,
             notch::notch_media,
             notch::notch_battery,
             quit_app,

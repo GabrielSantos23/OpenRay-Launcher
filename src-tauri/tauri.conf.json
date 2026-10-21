@@ -153,8 +153,9 @@
         "label": "notch",
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Openray Notch",
-        "width": 200,
-        "height": 32,
+        "width": 720,
+        "height": 224,
+        "transparent": true,
         "focus": false,
         "shadow": false,
         "decorations": false,
@@ -165,7 +166,7 @@
         "minimizable": false,
         "visible": false,
         "create": false,
-        "backgroundColor": "#000000"
+        "backgroundColor": "#00000000"
       },
       {
         "label": "focus-block",

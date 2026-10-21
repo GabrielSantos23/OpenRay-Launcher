@@ -29,6 +29,8 @@
   --color-capture-dim: rgb(0 0 0 / 0.45);
   --color-notch: #000000;
   --color-notch-fg: #ffffff;
+  --ease-notch-spring: linear(0, 0.044, 0.15, 0.286, 0.43, 0.568, 0.689, 0.792, 0.873, 0.935, 0.979, 1.008, 1.026, 1.036, 1.038, 1.037, 1.033, 1.028, 1.022, 1.017, 1.012, 1.008, 1.005, 1.003, 1);
+  --ease-notch-close: cubic-bezier(0.32, 0.72, 0, 1);
   --color-loader: #ffffff;
   --color-accent: #4fa3f8;
   --color-titlebar: rgb(from var(--color-fg) r g b / 5%);
@@ -113,6 +115,67 @@ body,
   --color-fg-40: rgb(from var(--color-notch-fg) r g b / 40%);
   --color-control: rgb(from var(--color-notch-fg) r g b / 10%);
   --color-control-hover: rgb(from var(--color-notch-fg) r g b / 16%);
+}
+
+html:has(.notch-surface),
+html:has(.notch-surface) body {
+  background: transparent;
+}
+
+.notch-shape {
+  transition-property: width, height, border-radius;
+  transition-duration: 550ms;
+  transition-timing-function: var(--ease-notch-spring);
+}
+
+.notch-shape[data-closing] {
+  transition-duration: 380ms;
+  transition-timing-function: var(--ease-notch-close);
+}
+
+.notch-layer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.94);
+  transform-origin: top center;
+  transition:
+    opacity 140ms ease-out,
+    transform 200ms var(--ease-notch-close);
+}
+
+.notch-layer[data-shown] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) scale(1);
+  transition:
+    opacity 260ms ease-out 90ms,
+    transform 450ms var(--ease-notch-spring) 40ms;
+}
+
+.notch-panel {
+  animation: notch-panel-in 220ms ease-out;
+}
+
+@keyframes notch-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notch-shape,
+  .notch-layer,
+  .notch-layer[data-shown] {
+    transition-duration: 0ms;
+    transition-delay: 0ms;
+  }
+  .notch-panel {
+    animation: none;
+  }
 }
 
 .notch-eq {
