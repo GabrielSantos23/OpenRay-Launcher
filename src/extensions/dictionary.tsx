@@ -3,7 +3,23 @@ import { BookOpen, BookText, Clipboard, ClipboardPaste, ExternalLink, PanelRight
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fail, Footer, Loader, useActionHost } from "../ActionHost";
 import { matchesShortcut } from "../actions";
-import { definitionText, guessUrl, parseEntries, parseSuggestions, remember, suggestionUrl, type Entry, type Suggestion } from "../dictionary";
+import {
+  definitionText,
+  guessUrl,
+  loadDictionary,
+  parseEntries,
+  parseOpenSearch,
+  parseSearch,
+  parseSuggestions,
+  parseWikitext,
+  remember,
+  saveDictionary,
+  suggestionUrl,
+  wiktionaryUrl,
+  type DictionaryLanguage,
+  type Entry,
+  type Suggestion,
+} from "../dictionary";
 import { defineExtension, type Action, type IconSpec, type ViewProps } from "../extension-api";
 import { GlyphTile } from "../icons";
 import { BackButton, ListView, type ListSection } from "../ListView";
@@ -11,7 +27,6 @@ import { copyAndClose, frontmostApp, pasteTitle, type AppInfo } from "../output"
 import { showToast } from "../toast";
 
 const ICON: IconSpec = { glyph: BookOpen, tone: "orange" };
-const STORE = "dictionary";
 const LIMIT = 8;
 const DEBOUNCE_MS = 200;
 const RETRY_MS = 600;
@@ -31,9 +46,19 @@ async function getJson(url: string, attempts = 3): Promise<unknown> {
   }
 }
 
-async function suggest(text: string): Promise<Suggestion[]> {
+async function suggest(text: string, language: DictionaryLanguage): Promise<Suggestion[]> {
+  if (language === "pt") {
+    const results = parseOpenSearch(text, await getJson(wiktionaryUrl({ action: "opensearch", search: text.trim(), limit: String(LIMIT), namespace: "0" })));
+    return results.length ? results : parseSearch(text, await getJson(wiktionaryUrl({ action: "query", list: "search", srsearch: text.trim(), srlimit: String(LIMIT) })));
+  }
   const results = parseSuggestions(text, await getJson(suggestionUrl(text, LIMIT)), false);
   return results.length ? results : parseSuggestions(text, await getJson(guessUrl(text, LIMIT)), true);
+}
+
+async function define(word: string, language: DictionaryLanguage): Promise<Entry[]> {
+  if (language === "en") return parseEntries(await invoke<unknown>("dictionary_define", { word }));
+  const body = (await getJson(wiktionaryUrl({ action: "parse", page: word, prop: "wikitext", redirects: "1" }))) as { parse?: { title?: string; wikitext?: string } };
+  return body.parse?.wikitext ? parseWikitext(body.parse.title ?? word, body.parse.wikitext) : [];
 }
 
 function footer(title: string) {
@@ -45,7 +70,7 @@ function footer(title: string) {
   );
 }
 
-function Definition({ word, app, onBack }: { word: string; app: AppInfo | null; onBack: () => void }) {
+function Definition({ word, language, app, onBack }: { word: string; language: DictionaryLanguage; app: AppInfo | null; onBack: () => void }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [error, setError] = useState<string>();
   const [attempt, setAttempt] = useState(0);
@@ -59,13 +84,13 @@ function Definition({ word, app, onBack }: { word: string; app: AppInfo | null; 
   useEffect(() => {
     setEntries(null);
     setError(undefined);
-    invoke<unknown>("dictionary_define", { word })
-      .then((body) => setEntries(parseEntries(body)))
+    define(word, language)
+      .then(setEntries)
       .catch((e) => {
         setEntries([]);
         setError(String(e));
       });
-  }, [word, attempt]);
+  }, [word, language, attempt]);
 
   const source = entries?.find((e) => e.sourceUrl)?.sourceUrl;
   const groups = useMemo<Action[][]>(
@@ -166,22 +191,25 @@ function DefineWord({ pop }: ViewProps) {
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState<string | null>(null);
   const [app, setApp] = useState<AppInfo | null>(null);
+  const [language, setLanguage] = useState<DictionaryLanguage | null>(null);
   const seq = useRef(0);
 
   useEffect(() => {
-    invoke<{ recent?: Suggestion[] } | null>("data_get", { name: STORE })
-      .then((stored) => setRecent(stored?.recent ?? []))
-      .catch(() => {});
+    loadDictionary().then((data) => {
+      setRecent(data.recent);
+      setLanguage(data.language);
+    });
     frontmostApp().then(setApp);
   }, []);
 
   const saveRecent = useCallback((next: Suggestion[]) => {
     setRecent(next);
-    invoke("data_set", { name: STORE, value: { recent: next } }).catch((e) => console.error("could not save recent words", e));
+    saveDictionary({ recent: next }).catch((e) => console.error("could not save recent words", e));
   }, []);
 
   useEffect(() => {
     const id = ++seq.current;
+    if (!language) return;
     if (!text.trim()) {
       setResults([]);
       setLoading(false);
@@ -189,13 +217,13 @@ function DefineWord({ pop }: ViewProps) {
     }
     setLoading(true);
     const timer = window.setTimeout(() => {
-      suggest(text)
+      suggest(text, language)
         .then((r) => id === seq.current && setResults(r))
         .catch((e) => id === seq.current && fail("Failed to get dictionary suggestions", e))
         .finally(() => id === seq.current && setLoading(false));
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [text]);
+  }, [text, language]);
 
   const searching = text.trim().length > 0;
 
@@ -260,7 +288,7 @@ function DefineWord({ pop }: ViewProps) {
     ];
   }, [searching, recent, results, app, saveRecent]);
 
-  if (detail) return <Definition word={detail} app={app} onBack={() => setDetail(null)} />;
+  if (detail && language) return <Definition word={detail} language={language} app={app} onBack={() => setDetail(null)} />;
 
   return (
     <ListView
@@ -274,7 +302,7 @@ function DefineWord({ pop }: ViewProps) {
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={loading}
       emptyText={searching ? "No Results Found" : "Type a word to look up in dictionary"}
-      emptyDescription={searching ? "Check the spelling or try another word." : "English definitions, pronunciations and examples."}
+      emptyDescription={searching ? "Check the spelling or try another word." : language === "pt" ? "Portuguese definitions, pronunciations and examples from Wiktionary." : "English definitions, pronunciations and examples."}
     />
   );
 }

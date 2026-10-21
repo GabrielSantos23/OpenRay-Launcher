@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { definitionText, guessUrl, parseEntries, parseSuggestions, remember, suggestionUrl } from "./dictionary";
+import { definitionText, guessUrl, parseEntries, parseOpenSearch, parseSearch, parseSuggestions, parseWikitext, remember, suggestionUrl, wiktionaryUrl } from "./dictionary";
 
 describe("dictionary", () => {
   it("reads Datamuse words with their first definition and puts the exact word first", () => {
@@ -44,5 +44,49 @@ describe("dictionary", () => {
     const b = { word: "b", definition: "", isGuess: true };
     expect(remember([a, b], { ...b })).toEqual([{ ...b, isGuess: false }, a]);
     expect(remember([a], a)).toEqual([a]);
+  });
+
+  it("reads Portuguese suggestions from Wiktionary opensearch and search", () => {
+    expect(parseOpenSearch("Sauda", ["sauda", ["saudação", "saudade", "sauda", "saudade"], [], []]).map((w) => w.word)).toEqual(["sauda", "saudação", "saudade"]);
+    expect(parseSearch("acao", { query: { search: [{ title: "acao" }, { title: "ação" }] } })).toEqual([{ word: "ação", definition: "", isGuess: true }]);
+    expect(parseOpenSearch("x", { error: 1 })).toEqual([]);
+    expect(wiktionaryUrl({ action: "parse", page: "ação" })).toBe("https://pt.wiktionary.org/w/api.php?action=parse&page=a%C3%A7%C3%A3o&format=json&formatversion=2&origin=*");
+  });
+
+  it("parses the Portuguese section of a Wiktionary entry", () => {
+    const wikitext = [
+      "={{-pt-}}=",
+      "==Substantivo==",
+      "{{flex.pt|fs=ação|fp=ações}}",
+      "# efeito de [[atuar]]",
+      "#: ''Foi uma '''ação''' rápida.''",
+      "# {{escopo|pt|Economia}} [[papel]] que [[representar|representa]] [[parte]] do capital",
+      "===Sinônimos===",
+      "* De '''1''' (efeito de atuar): [[ato]], [[feito]]",
+      "===Tradução===",
+      "* {{t|en|action}}",
+      "==Pronúncia==",
+      "* AFI: {{AFI|/a.ˈsɐ̃w̃/}}",
+      "# não é definição",
+      "={{-es-}}=",
+      "==Substantivo==",
+      "# otra lengua",
+    ].join("\n");
+    expect(parseWikitext("ação", wikitext)).toEqual([
+      {
+        word: "ação",
+        phonetic: "/a.ˈsɐ̃w̃/",
+        meanings: [
+          {
+            partOfSpeech: "substantivo",
+            senses: [{ definition: "efeito de atuar", example: "Foi uma ação rápida." }, { definition: "(Economia) papel que representa parte do capital" }],
+            synonyms: ["ato", "feito"],
+            antonyms: [],
+          },
+        ],
+        sourceUrl: "https://pt.wiktionary.org/wiki/a%C3%A7%C3%A3o",
+      },
+    ]);
+    expect(parseWikitext("house", "={{-en-}}=\n==Noun==\n# a building")).toEqual([]);
   });
 });

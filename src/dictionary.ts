@@ -1,4 +1,8 @@
+import { invoke } from "@tauri-apps/api/core";
+
 export const SUGGEST_URL = "https://api.datamuse.com";
+export const WIKTIONARY_URL = "https://pt.wiktionary.org";
+const STORE = "dictionary";
 export const RECENT_LIMIT = 100;
 const SNIPPET_LIMIT = 120;
 
@@ -92,4 +96,95 @@ export function definitionText(entries: Entry[]): string {
 export function remember(recent: Suggestion[], word: Suggestion): Suggestion[] {
   if (recent[0]?.word === word.word) return recent;
   return [{ ...word, isGuess: false }, ...recent.filter((w) => w.word !== word.word)].slice(0, RECENT_LIMIT);
+}
+
+export type DictionaryLanguage = "en" | "pt";
+
+export const DICTIONARY_LANGUAGES: { value: DictionaryLanguage; label: string }[] = [
+  { value: "en", label: "English" },
+  { value: "pt", label: "Português" },
+];
+
+export interface DictionaryData {
+  recent: Suggestion[];
+  language: DictionaryLanguage;
+}
+
+export async function loadDictionary(): Promise<DictionaryData> {
+  const stored = await invoke<Partial<DictionaryData> | null>("data_get", { name: STORE }).catch(() => null);
+  return { recent: stored?.recent ?? [], language: stored?.language === "pt" ? "pt" : "en" };
+}
+
+export async function saveDictionary(patch: Partial<DictionaryData>) {
+  await invoke("data_set", { name: STORE, value: { ...(await loadDictionary()), ...patch } });
+}
+
+export function wiktionaryUrl(params: Record<string, string>): string {
+  return `${WIKTIONARY_URL}/w/api.php?${new URLSearchParams({ ...params, format: "json", formatversion: "2", origin: "*" })}`;
+}
+
+function titles(query: string, list: string[], isGuess: boolean): Suggestion[] {
+  const wanted = query.trim().toLowerCase();
+  const words = [...new Set(list)].filter((w) => !isGuess || w.toLowerCase() !== wanted).map((word) => ({ word, definition: "", isGuess }));
+  const exact = words.findIndex((w) => w.word.toLowerCase() === wanted);
+  return exact > 0 ? [words[exact], ...words.slice(0, exact), ...words.slice(exact + 1)] : words;
+}
+
+export function parseOpenSearch(query: string, body: unknown): Suggestion[] {
+  return Array.isArray(body) && Array.isArray(body[1]) ? titles(query, body[1].filter((t: unknown) => typeof t === "string"), false) : [];
+}
+
+export function parseSearch(query: string, body: unknown): Suggestion[] {
+  const results = (body as { query?: { search?: { title?: string }[] } })?.query?.search ?? [];
+  return titles(query, results.map((r) => r.title).filter((t): t is string => typeof t === "string"), true);
+}
+
+function cleanWikitext(text: string): string {
+  return text
+    .replace(/\{\{escopo2?\|(?:[a-z-]+\|)?([^}|]+)[^}]*\}\}/g, "($1)")
+    .replace(/\{\{[^{}]*\}\}/g, "")
+    .replace(/\[\[[^\]|]*\|([^\]]*)\]\]/g, "$1")
+    .replace(/\[\[([^\]]*)\]\]/g, "$1")
+    .replace(/'{2,}/g, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const SKIPPED_SECTIONS = /^(Pronúncia|Etimologia|Ver também|Tradução|Referências|Anagramas|Formas alternativas|Expressões)/;
+
+export function parseWikitext(word: string, wikitext: string): Entry[] {
+  const start = wikitext.indexOf("={{-pt-}}=");
+  if (start < 0) return [];
+  const rest = wikitext.slice(start + "={{-pt-}}=".length);
+  const next = rest.search(/^=[^=]/m);
+  const section = next < 0 ? rest : rest.slice(0, next);
+  const meanings: Meaning[] = [];
+  let current: Meaning | null = null;
+  let synonyms = false;
+  for (const raw of section.split("\n")) {
+    const line = raw.trim();
+    const heading = /^(=+)\s*(.*?)\s*=+$/.exec(line);
+    if (heading) {
+      const title = cleanWikitext(heading[2]);
+      synonyms = heading[1].length === 3 && title.startsWith("Sinônimo");
+      if (heading[1].length === 2) {
+        current = SKIPPED_SECTIONS.test(title) ? null : { partOfSpeech: title.toLowerCase(), senses: [], synonyms: [], antonyms: [] };
+        if (current) meanings.push(current);
+      }
+    } else if (current && /^#[:*]/.test(line)) {
+      const example = cleanWikitext(line.replace(/^#[:*]+/, ""));
+      const last = current.senses.at(-1);
+      if (last && example && !last.example) last.example = example;
+    } else if (current && line.startsWith("#")) {
+      const definition = cleanWikitext(line.replace(/^#+/, ""));
+      if (definition) current.senses.push({ definition });
+    } else if (current && synonyms && line.startsWith("*")) {
+      const links = [...line.matchAll(/\[\[(?:[^\]|]*\|)?([^\]]+)\]\]/g)].map((m) => m[1]);
+      current.synonyms.push(...links.filter((l) => !current!.synonyms.includes(l)));
+    }
+  }
+  const phonetic = /\{\{AFI\|([^}|]+)/.exec(section)?.[1]?.trim() ?? "";
+  const kept = meanings.filter((m) => m.senses.length);
+  return kept.length ? [{ word, phonetic, meanings: kept, sourceUrl: `${WIKTIONARY_URL}/wiki/${encodeURIComponent(word)}` }] : [];
 }

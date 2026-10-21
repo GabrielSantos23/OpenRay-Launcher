@@ -199,4 +199,5 @@
 - Create Event has no Attendees field.
 - Open in Calendar opens the calendar app (`outlookcal:` or `ms-outlook:`) without selecting the event.
 - Contacts have no photos and are not shown in root search. Search Contacts was only checked with an empty contact store; Windows does not let an unpackaged process create a test contact list.
-- Define Word is English only and needs the internet: suggestions come from Datamuse and definitions from the Free Dictionary API (dictionaryapi.dev), free keyless services without an uptime guarantee.
+- Define Word needs the internet. English uses Datamuse and the Free Dictionary API (dictionaryapi.dev); Portuguese uses the Portuguese Wiktionary. All are free keyless services without an uptime guarantee. Portuguese suggestions show no definition preview, and Wiktionary templates other than scopes are dropped from the text.
+- Only English and Portuguese are offered. Dicionário Aberto was tried for Portuguese and dropped: it follows pre-1990 spelling (“acção”, no “ação”).

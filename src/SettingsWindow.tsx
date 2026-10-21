@@ -29,6 +29,7 @@ import { FlowKeyIcon } from "./flowkey/FlowKeyIcon";
 import { FlowKeyDetails, FlowKeyInstallCard } from "./flowkey/SettingsPanel";
 import type { Failure } from "./flowkey/extensions";
 import { loadCommands } from "./registry";
+import { DICTIONARY_LANGUAGES, loadDictionary, saveDictionary, type DictionaryLanguage } from "./dictionary";
 import { Dropdown as Select } from "./Dropdown";
 import { HotkeyRecorder, type HotkeyConflict } from "./HotkeyRecorder";
 import {
@@ -208,6 +209,29 @@ function FocusSettings() {
         </Row>
       </Card>
     </>
+  );
+}
+
+function DictionarySettings() {
+  const [language, setLanguage] = useState<DictionaryLanguage | null>(null);
+  useEffect(() => {
+    loadDictionary().then((data) => setLanguage(data.language));
+  }, []);
+  if (!language) return null;
+  return (
+    <Card>
+      <Row id="dictionary-language" title="Language" description="Language of the words and definitions in Define Word.">
+        <Select
+          labelledBy="dictionary-language"
+          value={language}
+          options={DICTIONARY_LANGUAGES}
+          onChange={(next) => {
+            setLanguage(next);
+            saveDictionary({ language: next }).catch((e) => console.error("dictionary language save failed", e));
+          }}
+        />
+      </Row>
+    </Card>
   );
 }
 
@@ -708,6 +732,7 @@ export function SettingsWindow() {
               )}
               {extensionPage?.id === "focus" && <FocusSettings />}
               {extensionPage?.id === "screenshots" && <ScreenshotSettings />}
+              {extensionPage?.id === "dictionary" && <DictionarySettings />}
               {(page === "shortcuts" || extensionPage) &&
                 tableExtensions.map((extension) => (
                   <ExtensionTable
