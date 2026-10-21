@@ -154,40 +154,28 @@ mod hook {
         vk == 0x5B || vk == 0x5C
     }
 
-    fn inject(vk: u32, scan: u32, extended: bool) {
-        let flags = if extended { KEYEVENTF_EXTENDEDKEY } else { Default::default() };
-        unsafe { keybd_event(vk as u8, scan as u8, flags, MARKER) };
-    }
-
     fn start_menu(state: &mut State, event: &KBDLLHOOKSTRUCT, down: bool) -> bool {
         let Some(id) = state.bindings.iter().find(|(_, h, _)| h.vk == START_MENU && h.modifiers == Modifiers::default()).map(|(id, _, _)| id.clone()) else {
             state.win = WinTap::Idle;
             return false;
         };
-        let vk = event.vkCode;
-        match (is_win(vk), down, &state.win) {
-            (true, true, WinTap::Idle) => {
-                state.win = WinTap::Pending;
-                true
-            }
-            (true, true, WinTap::Pending) => true,
+        match (is_win(event.vkCode), down, &state.win) {
+            (true, true, WinTap::Idle) => state.win = WinTap::Pending,
+            (false, true, WinTap::Pending) => state.win = WinTap::Combo,
             (true, false, WinTap::Pending) => {
                 state.win = WinTap::Idle;
+                unsafe {
+                    keybd_event(VK_UNASSIGNED, 0, Default::default(), MARKER);
+                    keybd_event(VK_UNASSIGNED, 0, KEYEVENTF_KEYUP, MARKER);
+                    keybd_event(event.vkCode as u8, event.scanCode as u8, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, MARKER);
+                }
                 let _ = state.fired.send((id, Hotkey { modifiers: Modifiers::default(), vk: START_MENU }));
-                true
+                return true;
             }
-            (true, false, WinTap::Combo) => {
-                state.win = WinTap::Idle;
-                false
-            }
-            (false, true, WinTap::Pending) => {
-                state.win = WinTap::Combo;
-                inject(0x5B, 0x5B, true);
-                inject(vk, event.scanCode, event.flags.0 & 1 != 0);
-                true
-            }
-            _ => false,
+            (true, false, _) => state.win = WinTap::Idle,
+            _ => {}
         }
+        false
     }
 
     static STATE: OnceLock<Mutex<State>> = OnceLock::new();
