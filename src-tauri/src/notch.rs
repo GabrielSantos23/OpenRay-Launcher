@@ -14,7 +14,7 @@ use windows::Win32::Graphics::Dwm::{DWMWA_BORDER_COLOR, DWMWA_TRANSITIONS_FORCED
 use windows::Win32::Graphics::Gdi::{CreateRectRgn, GetMonitorInfoW, MonitorFromWindow, SetWindowRgn, MONITORINFO, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetCursorPos, GetForegroundWindow, GetShellWindow, GetWindowLongPtrW, GetWindowRect, IsZoomed, SetWindowLongPtrW, SetWindowPos, ShowWindow, GWL_EXSTYLE, GWL_STYLE, WS_CAPTION, WS_THICKFRAME,
+    GetCursorPos, GetForegroundWindow, GetShellWindow, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, IsZoomed, SetWindowLongPtrW, SetWindowPos, ShowWindow, GWL_EXSTYLE, GWL_STYLE, WS_CAPTION, WS_THICKFRAME,
     HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_HIDE, SW_SHOWNOACTIVATE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
@@ -81,6 +81,10 @@ pub fn covers(window: (i32, i32, i32, i32), monitor: (i32, i32, i32, i32)) -> bo
     window.0 <= monitor.0 && window.1 <= monitor.1 && window.2 >= monitor.2 && window.3 >= monitor.3
 }
 
+pub fn is_shell(path: &str) -> bool {
+    path.rsplit(['\\', '/']).next().is_some_and(|name| name.eq_ignore_ascii_case("explorer.exe"))
+}
+
 pub fn is_fullscreen(window: (i32, i32, i32, i32), monitor: (i32, i32, i32, i32), maximized: bool, framed: bool) -> bool {
     covers(window, monitor) && !(maximized && framed)
 }
@@ -91,9 +95,9 @@ fn fullscreen_on_primary() -> bool {
         if foreground.is_invalid() || foreground == GetShellWindow() {
             return false;
         }
-        let mut class = [0u16; 32];
-        let len = GetClassNameW(foreground, &mut class) as usize;
-        if matches!(String::from_utf16_lossy(&class[..len]).as_str(), "WorkerW" | "Progman") {
+        let mut pid = 0;
+        GetWindowThreadProcessId(foreground, Some(&mut pid));
+        if crate::focus::process_info(pid).is_some_and(|(path, _)| is_shell(&path)) {
             return false;
         }
         let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
@@ -250,6 +254,14 @@ mod tests {
         assert!(covers((-8, -8, 1928, 1088), monitor));
         assert!(!covers((0, 0, 1920, 1040), monitor));
         assert!(!covers((1920, 0, 3840, 1080), monitor));
+    }
+
+    #[test]
+    fn explorer_windows_count_as_the_shell() {
+        assert!(is_shell(r"C:\Windows\explorer.exe"));
+        assert!(is_shell(r"C:\WINDOWS\EXPLORER.EXE"));
+        assert!(!is_shell(r"C:\Games\explorer-game.exe"));
+        assert!(!is_shell(r"C:\Program Files\Helium\helium.exe"));
     }
 
     #[test]

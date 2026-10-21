@@ -646,7 +646,7 @@ struct Foreground {
     candidates: Vec<String>,
 }
 
-fn process_info(pid: u32) -> Option<(String, Option<String>)> {
+pub(crate) fn process_info(pid: u32) -> Option<(String, Option<String>)> {
     unsafe {
         let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
         let mut buffer = [0u16; 1024];
