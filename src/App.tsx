@@ -69,6 +69,7 @@ function InlineCard({ result, selected, onSelect, onRun }: { result: InlineResul
 }
 
 const EXTENSION_ICONS = new Map(builtInExtensions.map((e) => [e.id, e.icon]));
+const POP_TO_ROOT_TIMEOUT_MS = 90_000;
 
 export default function App() {
   const [commands, setCommands] = useState<RegisteredCommand[]>([]);
@@ -84,6 +85,7 @@ export default function App() {
   const [argumentValue, setArgumentValue] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const keepSelected = useRef<string | null>(null);
+  const hiddenAt = useRef(0);
   const [settings] = useSettings();
   const host = useActionHost(() => (argumentRef.current ?? inputRef.current)?.focus());
   const update = useAvailableUpdate();
@@ -104,20 +106,25 @@ export default function App() {
     }
   }, []);
 
+  function popToRoot() {
+    setQuery("");
+    setSelected(0);
+    setView(null);
+  }
+
   useEffect(() => {
     refresh();
     const unlisteners = [
       listen("launcher-hidden", () => {
         setLauncherVisible(false);
-        setQuery("");
-        setSelected(0);
-        setView(null);
+        hiddenAt.current = Date.now();
         host.closePanel();
         refresh();
       }),
       listen("launcher-shown", () => {
         setLauncherVisible(true);
-        inputRef.current?.focus();
+        if (Date.now() - hiddenAt.current > POP_TO_ROOT_TIMEOUT_MS) popToRoot();
+        window.setTimeout(() => (inputRef.current ?? document.querySelector<HTMLInputElement>("main input"))?.focus());
       }),
       listen<string>("snippet-expand", (event) => expandSnippet(event.payload).catch((e) => console.error("snippet expansion failed", e))),
     ];
@@ -266,7 +273,14 @@ export default function App() {
       return;
     }
     const title = action.id === "primary" && command ? `Could not open ${command.title}` : `${action.title.replace(/…$/, "")} failed`;
-    host.run(action, { failTitle: title, onSuccess: () => command && !action.keepOpen && visit(command) });
+    host.run(action, {
+      failTitle: title,
+      onSuccess: () => {
+        if (action.keepOpen) return;
+        popToRoot();
+        if (command) visit(command);
+      },
+    });
   }
 
   function runSelected(action: Action) {
@@ -309,6 +323,7 @@ export default function App() {
         setQuery("");
         setSelected(0);
       } else {
+        if (settings?.escapeKeyBehavior === "close-and-pop-to-root") popToRoot();
         invoke("hide_launcher", { restoreFocus: true });
       }
     }
@@ -321,8 +336,6 @@ export default function App() {
   if (view) {
     const pop = () => {
       setView(null);
-      setQuery("");
-      setSelected(0);
       refresh();
       window.setTimeout(() => inputRef.current?.focus());
     };

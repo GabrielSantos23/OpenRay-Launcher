@@ -56,11 +56,11 @@
 - **Settings pages.** Only pages in Openray's PageID → ms-settings table appear; names and keywords come from Windows' Settings search cache, so a page Windows hasn't indexed yet is missing.
 - **Games.** Only Steam games are detected; Epic, GOG, Riot, EA, Blizzard and Xbox are not. Game actions have no Run as Administrator or quit/restart.
 - **Missing UI.** There is no compact mode. Fallbacks are a fixed list (web searches, quicklinks with an argument, and Create Quicklink) without a settings page. Arguments have a field only in Search Quicklinks, not inline in the root search.
-- **Leaving a command.** Escape or Backspace on an empty search returns to the root search, which is cleared.
+- **Leaving a command.** Escape or Backspace on an empty search returns to the root search with its text kept.
+- **Pop to root.** The 90 s timeout is fixed; the reference's `popToRootTimeout` setting is not exposed.
 - **Action panel.** Configure Command, Configure Extension, Treat as Application and Hide/Quit/Force Quit are not offered. The panel has no noise texture, and its radius and shadow are estimates.
 - **App actions.** Show in File Explorer selects the Start Menu shortcut, not its target; the reference behavior is unverified. Packaged apps have no Run as Administrator, Show in File Explorer or Copy Path.
 - **Theme.** Only the dark theme exists, and only at the measured 100% DPI.
-- **Escape.** Escape always hides the launcher. The reference has an `escapeKeyBehavior` setting whose default is unknown.
 - **Search input focus.** The search input has no focus ring. This matches the reference, and the caret stays visible.
 
 ## Toasts and HUD
