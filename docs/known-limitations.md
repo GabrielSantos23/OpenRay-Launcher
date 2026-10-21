@@ -188,5 +188,15 @@
 - Only the primary monitor gets a notch. While the shape animates, the whole 720×224 window takes clicks for about 0.6 s.
 - The notch volume HUD appears next to the Windows volume flyout; Openray does not hide the system flyout. There is no brightness HUD.
 - Fullscreen detection checks every 500 ms whether the foreground window covers the whole primary monitor without being a maximized framed window. Exclusive-mode games that do not own the foreground window are not detected, a framed window that is not maximized but sized to the whole monitor counts as fullscreen, and File Explorer windows never count because Alt+Tab and Task View are Explorer windows.
-- The week strip shows dates only. Openray does not read a calendar, so there are no events.
+- The week strip reads events when the notch opens; an event added elsewhere while it is open shows up the next time it opens.
 - Media comes from the current Windows media session (SMTC). Apps that do not publish one, and the Spotify Web API, are not shown.
+
+## Calendar, Contacts and Dictionary
+
+- Raycast ships these three only on macOS (`availability: {macos: "production"}` in 2.8.2.0), so there is no Windows reference to compare side by side. Layout and actions follow the bundled macOS views.
+- Calendar and Contacts read the Windows data store (`Windows.ApplicationModel.Appointments` / `Contacts`): the accounts added in Settings > Accounts > Email & accounts. The new Outlook keeps its own data and does not write there, so its calendars and contacts appear only if the same account is also added to Windows.
+- My Schedule loads today and the next 30 days. There is no Join Meeting, RSVP, Block Time, Copy Availability or Edit Event, and the calendar filter picks one calendar at a time.
+- Create Event has no Attendees field.
+- Open in Calendar opens the calendar app (`outlookcal:` or `ms-outlook:`) without selecting the event.
+- Contacts have no photos and are not shown in root search. Search Contacts was only checked with an empty contact store; Windows does not let an unpackaged process create a test contact list.
+- Define Word is English only and needs the internet: suggestions come from Datamuse and definitions from the Free Dictionary API (dictionaryapi.dev), free keyless services without an uptime guarantee.

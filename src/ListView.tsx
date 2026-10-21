@@ -7,6 +7,7 @@ import { matchScore } from "./search";
 
 export interface ListSection {
   title: string;
+  subtitle?: string;
   items: Item[];
   showCount?: boolean;
 }
@@ -254,6 +255,7 @@ export function ListView({
               {section.title ? (
                 <div className="flex h-8 items-end gap-2 px-2 pb-[5px] text-11 font-semibold text-fg-60">
                   {section.title}
+                  {section.subtitle && <span className="font-medium text-fg-40">{section.subtitle}</span>}
                   {section.showCount && <span className="font-medium text-fg-40">{section.items.length}</span>}
                 </div>
               ) : (

@@ -1,8 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import type { UiTree } from "@flowkey-cli/native-sdk";
-import { AppWindow, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, Check, ClipboardList, Crop, Music, Pause, Pipette, Play, ScanText, Settings, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { AppWindow, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, Check, ClipboardList, Crop, Music, Pause, Pipette, Play, Plus, ScanText, Settings, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { addDays, CREATE_AT_EVENT, CREATE_EVENT_KEY, eventsOn, type CalendarEvent } from "./calendar";
 import { entryTitle, type ClipboardEntry } from "./clipboardHistory";
 import { formatTimer, remainingMs, type FocusSession } from "./focus";
 import {
@@ -130,24 +131,53 @@ function NowPlaying({ media }: { media: NotchMedia | null }) {
   );
 }
 
-function CalendarStrip({ focus }: { focus: FocusSession | null }) {
+function CalendarStrip({ focus, expanded }: { focus: FocusSession | null; expanded: boolean }) {
   const now = useNow(1000);
   const today = new Date(now);
+  const todayKey = today.toDateString();
+  const [offset, setOffset] = useState(0);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const month = new Intl.DateTimeFormat(undefined, { month: "short" }).format(today);
+  const selected = addDays(today, offset);
+
+  useEffect(() => {
+    if (!expanded) {
+      setOffset(0);
+      return;
+    }
+    const base = new Date(todayKey);
+    run(invoke<CalendarEvent[]>("calendar_events", { start: addDays(base, -3).getTime(), end: addDays(base, 4).getTime() }).then(setEvents), "calendar_events");
+  }, [expanded, todayKey]);
+
+  const dayEvents = eventsOn(events, selected).slice(0, focus ? 1 : 2);
+  const time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
+  const create = async () => {
+    await emit(CREATE_AT_EVENT, selected.getTime());
+    await emit("run-command", CREATE_EVENT_KEY);
+  };
+
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex items-end gap-2">
         <span className="text-18 leading-none font-semibold text-fg">{month}</span>
         <ol className="flex flex-1 justify-between" aria-label="This week">
-          {weekStrip(today).map((d) => (
-            <li key={d.key} aria-current={d.today ? "date" : undefined} className="flex w-6 flex-col items-center gap-0.5">
-              <span className={`text-[9px] uppercase ${d.today ? "text-fg" : "text-fg-40"}`}>{d.weekday}</span>
-              <span className={`text-12 tabular-nums ${d.today ? "font-semibold text-accent" : "text-fg-60"}`}>{d.day}</span>
+          {weekStrip(today).map((d, i) => (
+            <li key={d.key}>
+              <button
+                type="button"
+                aria-current={d.today ? "date" : undefined}
+                aria-pressed={offset === i - 3}
+                onClick={() => setOffset(i - 3)}
+                className={`flex w-6 flex-col items-center gap-0.5 rounded-md py-0.5 outline-offset-1 hover:bg-control focus-visible:outline-2 focus-visible:outline-accent ${offset === i - 3 ? "bg-control" : ""}`}
+              >
+                <span className={`text-[9px] uppercase ${d.today ? "text-fg" : "text-fg-40"}`}>{d.weekday}</span>
+                <span className={`text-12 tabular-nums ${d.today ? "font-semibold text-accent" : "text-fg-60"}`}>{d.day}</span>
+              </button>
             </li>
           ))}
         </ol>
       </div>
-      {focus ? (
+      {focus && (
         <div className="flex items-center gap-2 rounded-xl bg-control px-3 py-2">
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-12 font-medium text-fg">{focus.title || "Focus"}</span>
@@ -166,9 +196,27 @@ function CalendarStrip({ focus }: { focus: FocusSession | null }) {
             <Check className="size-3.5" />
           </IconButton>
         </div>
-      ) : (
-        <span className="text-12 text-fg-40">{new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long" }).format(today)}</span>
       )}
+      <div className="flex min-w-0 items-start gap-2">
+        {dayEvents.length ? (
+          <ul className="flex min-w-0 flex-1 flex-col gap-0.5" aria-label="Events">
+            {dayEvents.map((e) => (
+              <li key={`${e.calendarId}:${e.id}:${e.start}`} className="flex min-w-0 items-center gap-2 text-12">
+                <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-accent" />
+                <span className="shrink-0 text-fg-60 tabular-nums">{e.allDay ? "All day" : time.format(e.start)}</span>
+                <span className="truncate text-fg">{e.title || "Untitled event"}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-12 text-fg-40">
+            {offset === 0 ? "Nothing for today" : `Nothing for ${new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(selected)}`}
+          </span>
+        )}
+        <IconButton label="Create event" onClick={() => run(create(), "create event")} className="-my-1 size-6">
+          <Plus className="size-3.5" />
+        </IconButton>
+      </div>
     </div>
   );
 }
@@ -429,7 +477,7 @@ export function NotchWindow() {
             {tab === "nook" && (
               <div className="grid h-full grid-cols-[1.35fr_1fr_0.75fr] items-center gap-5">
                 <NowPlaying media={media} />
-                <CalendarStrip focus={focus} />
+                <CalendarStrip focus={focus} expanded={expanded} />
                 <Captures />
               </div>
             )}

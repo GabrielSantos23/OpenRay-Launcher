@@ -1,4 +1,7 @@
 mod app_volume;
+mod calendar;
+mod contacts;
+mod dictionary;
 mod cache;
 mod capture;
 mod apps;
@@ -995,6 +998,13 @@ pub fn run() {
             notch::notch_shape,
             notch::notch_media,
             notch::notch_battery,
+            calendar::calendar_list,
+            calendar::calendar_events,
+            calendar::calendar_create,
+            calendar::calendar_delete,
+            calendar::calendar_open,
+            contacts::contacts_list,
+            dictionary::dictionary_define,
             quit_app,
             settings_get,
             settings_set,

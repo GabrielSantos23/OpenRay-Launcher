@@ -198,7 +198,7 @@ function TokenField({
   );
 }
 
-function FormShell({ title, primaryTitle, onSave, onBack, children }: { title: string; primaryTitle: string; onSave: () => void; onBack: () => void; children: ReactNode }) {
+export function FormShell({ title, primaryTitle, onSave, onBack, children, footer }: { title: string; primaryTitle: string; onSave: () => void; onBack: () => void; children: ReactNode; footer?: ReactNode }) {
   return (
     <div
       className="flex min-h-0 flex-1 flex-col"
@@ -227,10 +227,12 @@ function FormShell({ title, primaryTitle, onSave, onBack, children }: { title: s
       </form>
       <Footer
         left={
-          <span className="flex items-center gap-2 text-fg-60">
-            <GlyphTile spec={FOCUS_ICON} small />
-            Focus
-          </span>
+          footer ?? (
+            <span className="flex items-center gap-2 text-fg-60">
+              <GlyphTile spec={FOCUS_ICON} small />
+              Focus
+            </span>
+          )
         }
         primaryTitle={primaryTitle}
         primaryKeys={["Ctrl", "↵"]}
@@ -242,8 +244,8 @@ function FormShell({ title, primaryTitle, onSave, onBack, children }: { title: s
   );
 }
 
-const label = "pt-2 text-right text-13 text-fg-60";
-const field = "h-[34px] w-full rounded-lg border border-key-border bg-card px-3 text-13 text-fg caret-fg outline-none placeholder:text-fg-40 focus:border-fg-40";
+export const label = "pt-2 text-right text-13 text-fg-60";
+export const field = "h-[34px] w-full rounded-lg border border-key-border bg-card px-3 text-13 text-fg caret-fg outline-none placeholder:text-fg-40 focus:border-fg-40";
 
 async function closeWith(title: string, message: string) {
   await invoke("hide_launcher", { restoreFocus: true });

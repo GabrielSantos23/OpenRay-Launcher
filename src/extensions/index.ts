@@ -1,7 +1,10 @@
 import applications from "./applications";
 import calculator from "./calculator";
+import calendar from "./calendar";
 import clipboardHistory from "./clipboard-history";
+import contacts from "./contacts";
 import core from "./core";
+import dictionary from "./dictionary";
 import emoji from "./emoji";
 import fileSearch from "./file-search";
 import focus from "./focus";
@@ -21,4 +24,4 @@ import urls from "./urls";
 import webSearches from "./web-searches";
 import windowManagement from "./window-management";
 
-export const builtInExtensions = [applications, calculator, clipboardHistory, emoji, fileSearch, focus, games, menuItems, navigation, notes, quicklinks, run, scriptCommands, screenshots, snippets, systemActions, systemPages, translate, urls, webSearches, windowManagement, core];
+export const builtInExtensions = [applications, calculator, calendar, clipboardHistory, contacts, dictionary, emoji, fileSearch, focus, games, menuItems, navigation, notes, quicklinks, run, scriptCommands, screenshots, snippets, systemActions, systemPages, translate, urls, webSearches, windowManagement, core];
