@@ -135,6 +135,7 @@
         "label": "capture",
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --process-per-site",
         "title": "Openray Capture",
+        "focus": false,
         "width": 800,
         "height": 600,
         "shadow": false,

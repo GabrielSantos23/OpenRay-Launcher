@@ -123,17 +123,25 @@ impl Matcher {
 
 mod hook {
     use super::{Decision, Hotkey, Matcher, Modifiers, START_MENU};
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::windows::process::CommandExt;
+    use std::process::{ChildStdin, ChildStdout, Command, Stdio};
     use std::sync::mpsc::{channel, Sender};
     use std::sync::{Mutex, OnceLock};
     use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-    use windows::Win32::UI::Input::KeyboardAndMouse::{keybd_event, GetAsyncKeyState, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP};
+    use windows::Win32::System::Threading::{GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_TIME_CRITICAL};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+    };
     use windows::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, GetMessageW, SetWindowsHookExW, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+        CallNextHookEx, GetMessageW, SetWindowsHookExW, HOOKPROC, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
     };
 
     pub const MARKER: usize = 0x4F50_524E;
-    const VK_UNASSIGNED: u8 = 0xE8;
+    pub const HELPER_ARG: &str = "--keyboard-hook";
+    const VK_UNASSIGNED: u16 = 0xE8;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     struct State {
         bindings: Vec<(String, Hotkey, Matcher)>,
@@ -160,22 +168,39 @@ mod hook {
             return false;
         };
         match (is_win(event.vkCode), down, &state.win) {
-            (true, true, WinTap::Idle) => state.win = WinTap::Pending,
-            (false, true, WinTap::Pending) => state.win = WinTap::Combo,
+            (true, true, WinTap::Idle) => {
+                state.win = WinTap::Pending;
+                send(&[key(0xFF, KEYBD_EVENT_FLAGS(0)), key(0xFF, KEYEVENTF_KEYUP)]);
+                true
+            }
+            (true, true, WinTap::Pending) => true,
+            (false, true, WinTap::Pending) => {
+                state.win = WinTap::Combo;
+                send(&[key(0x5B, KEYBD_EVENT_FLAGS(0)), key(event.vkCode as u16, KEYBD_EVENT_FLAGS(0))]);
+                true
+            }
             (true, false, WinTap::Pending) => {
                 state.win = WinTap::Idle;
-                unsafe {
-                    keybd_event(VK_UNASSIGNED, 0, Default::default(), MARKER);
-                    keybd_event(VK_UNASSIGNED, 0, KEYEVENTF_KEYUP, MARKER);
-                    keybd_event(event.vkCode as u8, event.scanCode as u8, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, MARKER);
-                }
                 let _ = state.fired.send((id, Hotkey { modifiers: Modifiers::default(), vk: START_MENU }));
-                return true;
+                true
             }
-            (true, false, _) => state.win = WinTap::Idle,
-            _ => {}
+            (true, false, WinTap::Combo) => {
+                state.win = WinTap::Idle;
+                false
+            }
+            _ => false,
         }
-        false
+    }
+
+    fn key(vk: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT {
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VIRTUAL_KEY(vk), dwFlags: flags, dwExtraInfo: MARKER, ..Default::default() } },
+        }
+    }
+
+    fn send(inputs: &[INPUT]) {
+        unsafe { SendInput(inputs, std::mem::size_of::<INPUT>() as i32) };
     }
 
     static STATE: OnceLock<Mutex<State>> = OnceLock::new();
@@ -193,7 +218,7 @@ mod hook {
             return false;
         }
         let modifiers = current_modifiers();
-        for (id, hotkey, matcher) in state.bindings.iter_mut() {
+        for (id, hotkey, matcher) in state.bindings.iter_mut().filter(|(_, h, _)| h.vk != START_MENU) {
             match matcher.on_key(hotkey, vk, down, modifiers) {
                 Decision::PassThrough => {}
                 Decision::Swallow => return true,
@@ -206,65 +231,36 @@ mod hook {
         false
     }
 
-    unsafe extern "system" fn proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        if code >= 0 {
-            let event = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
-            if event.dwExtraInfo != MARKER {
-                let down = wparam.0 as u32 == WM_KEYDOWN || wparam.0 as u32 == WM_SYSKEYDOWN;
-                if let Some(state) = STATE.get() {
-                    let mut state = state.lock().unwrap();
-                    if !state.suspended && start_menu(&mut state, event, down) {
-                        return LRESULT(1);
-                    }
-                    if decide(&mut state, event.vkCode, down) {
-                        return LRESULT(1);
-                    }
-                }
-                if down {
-                    crate::snippets::on_key(event.vkCode, event.scanCode);
-                }
+    fn event<'a>(code: i32, wparam: WPARAM, lparam: LPARAM) -> Option<(&'a KBDLLHOOKSTRUCT, bool)> {
+        let event = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
+        (code >= 0 && event.dwExtraInfo != MARKER).then(|| (event, wparam.0 as u32 == WM_KEYDOWN || wparam.0 as u32 == WM_SYSKEYDOWN))
+    }
+
+    unsafe extern "system" fn hotkey_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if let (Some((event, down)), Some(state)) = (event(code, wparam, lparam), STATE.get()) {
+            let mut state = state.lock().unwrap();
+            if (!state.suspended && start_menu(&mut state, event, down)) || decide(&mut state, event.vkCode, down) {
+                return LRESULT(1);
             }
         }
         unsafe { CallNextHookEx(None, code, wparam, lparam) }
     }
 
-    pub fn set_bindings(bindings: Vec<(String, Hotkey)>) {
-        if let Some(state) = STATE.get() {
-            state.lock().unwrap().bindings = bindings.into_iter().map(|(id, hotkey)| (id, hotkey, Matcher::default())).collect();
+    unsafe extern "system" fn snippet_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if let Some((event, true)) = event(code, wparam, lparam) {
+            crate::snippets::on_key(event.vkCode, event.scanCode);
         }
+        unsafe { CallNextHookEx(None, code, wparam, lparam) }
     }
 
-    pub fn suspend(suspended: bool) {
-        if let Some(state) = STATE.get() {
-            state.lock().unwrap().suspended = suspended;
-        }
-    }
-
-    pub fn install(on_fire: Box<dyn Fn(String) + Send>) -> Result<(), String> {
-        let (fired, fired_rx) = channel::<(String, Hotkey)>();
-        STATE
-            .set(Mutex::new(State { bindings: Vec::new(), suspended: false, win: WinTap::Idle, fired }))
-            .map_err(|_| "keyboard hook already installed".to_string())?;
-        std::thread::Builder::new()
-            .name("openray-hotkey-dispatch".into())
-            .spawn(move || {
-                for (id, hotkey) in fired_rx {
-                    if hotkey.modifiers.alt || hotkey.modifiers.win {
-                        unsafe {
-                            keybd_event(VK_UNASSIGNED, 0, Default::default(), MARKER);
-                            keybd_event(VK_UNASSIGNED, 0, KEYEVENTF_KEYUP, MARKER);
-                        }
-                    }
-                    on_fire(id);
-                }
-            })
-            .map_err(|e| e.to_string())?;
+    fn hook_thread(name: &str, proc: HOOKPROC) -> Result<(), String> {
         let (tx, rx) = channel();
         std::thread::Builder::new()
-            .name("openray-keyboard-hook".into())
+            .name(name.into())
             .spawn(move || unsafe {
+                let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
                 let module = GetModuleHandleW(None).ok();
-                match SetWindowsHookExW(WH_KEYBOARD_LL, Some(proc), module.map(Into::into), 0) {
+                match SetWindowsHookExW(WH_KEYBOARD_LL, proc, module.map(Into::into), 0) {
                     Ok(_) => {
                         let _ = tx.send(Ok(()));
                         let mut msg = MSG::default();
@@ -277,6 +273,122 @@ mod hook {
             })
             .map_err(|e| e.to_string())?;
         rx.recv().map_err(|e| e.to_string())?
+    }
+
+    fn encode(bindings: &[(String, Hotkey)]) -> String {
+        let rows: Vec<_> = bindings
+            .iter()
+            .map(|(id, h)| serde_json::json!([id, [h.modifiers.ctrl, h.modifiers.alt, h.modifiers.shift, h.modifiers.win], h.vk]))
+            .collect();
+        format!("B{}", serde_json::Value::Array(rows))
+    }
+
+    fn decode(json: &str) -> Vec<(String, Hotkey)> {
+        let rows: Vec<(String, [bool; 4], u32)> = serde_json::from_str(json).unwrap_or_default();
+        rows.into_iter()
+            .map(|(id, [ctrl, alt, shift, win], vk)| (id, Hotkey { modifiers: Modifiers { ctrl, alt, shift, win }, vk }))
+            .collect()
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn bindings_survive_the_helper_protocol() {
+        let bindings = vec![("launcher".to_string(), Hotkey { modifiers: Modifiers::default(), vk: START_MENU }), ("a/b".to_string(), super::parse("Ctrl+Shift+K").unwrap())];
+        assert_eq!(decode(encode(&bindings).strip_prefix('B').unwrap()), bindings);
+    }
+
+    pub fn run_helper() {
+        let (fired, fired_rx) = channel::<(String, Hotkey)>();
+        let _ = STATE.set(Mutex::new(State { bindings: Vec::new(), suspended: false, win: WinTap::Idle, fired }));
+        std::thread::spawn(move || {
+            let mut out = std::io::stdout();
+            for (id, hotkey) in fired_rx {
+                if hotkey.modifiers.alt || hotkey.modifiers.win {
+                    send(&[key(VK_UNASSIGNED, KEYBD_EVENT_FLAGS(0)), key(VK_UNASSIGNED, KEYEVENTF_KEYUP)]);
+                }
+                if writeln!(out, "{id}").and_then(|()| out.flush()).is_err() {
+                    std::process::exit(0);
+                }
+            }
+        });
+        if hook_thread("openray-keyboard-hook", Some(hotkey_proc)).is_err() {
+            std::process::exit(1);
+        }
+        for line in std::io::stdin().lock().lines().map_while(Result::ok) {
+            let line = line.trim_start_matches('\u{feff}').trim();
+            let mut state = STATE.get().unwrap().lock().unwrap();
+            if let Some(json) = line.strip_prefix('B') {
+                state.bindings = decode(json).into_iter().map(|(id, hotkey)| (id, hotkey, Matcher::default())).collect();
+            } else if let Some(flag) = line.strip_prefix('S') {
+                state.suspended = flag == "1";
+            }
+        }
+    }
+
+    struct Helper {
+        stdin: Option<ChildStdin>,
+        bindings: String,
+        suspended: bool,
+    }
+
+    static HELPER: Mutex<Helper> = Mutex::new(Helper { stdin: None, bindings: String::new(), suspended: false });
+
+    fn write(line: &str) {
+        let mut helper = HELPER.lock().unwrap();
+        if let Some(stdin) = helper.stdin.as_mut() {
+            if writeln!(stdin, "{line}").and_then(|()| stdin.flush()).is_err() {
+                helper.stdin = None;
+            }
+        }
+    }
+
+    pub fn set_bindings(bindings: Vec<(String, Hotkey)>) {
+        let line = encode(&bindings);
+        HELPER.lock().unwrap().bindings = line.clone();
+        write(&line);
+    }
+
+    pub fn suspend(suspended: bool) {
+        HELPER.lock().unwrap().suspended = suspended;
+        write(if suspended { "S1" } else { "S0" });
+    }
+
+    // Windows skips an in-process low-level hook for about a second after this process takes the foreground, so the
+    // swallowing hook runs in a helper process, like the reference's UIAccess helper.
+    fn spawn_helper(exe: &std::path::Path) -> std::io::Result<ChildStdout> {
+        let mut child = Command::new(exe).arg(HELPER_ARG).stdin(Stdio::piped()).stdout(Stdio::piped()).creation_flags(CREATE_NO_WINDOW).spawn()?;
+        let stdout = child.stdout.take().ok_or_else(|| std::io::Error::other("no helper stdout"))?;
+        let replay = {
+            let mut helper = HELPER.lock().unwrap();
+            helper.stdin = child.stdin.take();
+            [helper.bindings.clone(), (if helper.suspended { "S1" } else { "S0" }).to_string()]
+        };
+        for line in replay.iter().filter(|l| !l.is_empty()) {
+            write(line);
+        }
+        Ok(stdout)
+    }
+
+    pub fn install(on_fire: Box<dyn Fn(String) + Send>) -> Result<(), String> {
+        hook_thread("openray-snippet-hook", Some(snippet_proc))?;
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let first = spawn_helper(&exe).map_err(|e| e.to_string())?;
+        std::thread::Builder::new()
+            .name("openray-hotkey-helper".into())
+            .spawn(move || {
+                let mut stdout = Some(first);
+                loop {
+                    if let Some(out) = stdout.take() {
+                        for id in BufReader::new(out).lines().map_while(Result::ok) {
+                            on_fire(id);
+                        }
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    stdout = spawn_helper(&exe).ok();
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 }
 
@@ -292,7 +404,7 @@ pub fn bindings(pairs: &[(String, String)]) -> Result<Vec<(String, Hotkey)>, Str
     Ok(result)
 }
 
-pub use hook::{install, set_bindings, suspend, MARKER};
+pub use hook::{install, run_helper, set_bindings, suspend, HELPER_ARG, MARKER};
 
 #[cfg(test)]
 mod tests {

@@ -371,3 +371,12 @@ Not yet investigated:
 - **Quick Look and indexing.** @906004 `quickLookSelection` “Quick Look the file selected in File Explorer. Assign a global hotkey to preview the selection without focusing Raycast.”; `indexing` “File Search is indexing…”, subtitle “Indexing N files (E entries/s)”, root search section `files`, pinned, always shown, actions Open File Search and Stop Indexing.
 - **Menu items.** @922294 `searchMenuItems` sits in the `mcp` extension; how the reference reads menus on Windows was not investigated.
 
+
+## Replace Start Menu (Win key)
+
+- Settings button `Replace Start Menu` (`settings-window-CvqjsQ_c.js`) sets `globalHotkey` to the Win-only hotkey; copy: "The Win key will open Raycast instead of the Start Menu. You'll still be able to open the Start Menu from the taskbar."
+- The keyboard hook runs in `Raycast.UIAccess.exe` (uiAccess process), not `native.dll`. Ghidra 12.1.4 headless: hook proc `FUN_1402c35d0` delegates to `FUN_1402c38d0` and stores a last-call timestamp; the hook thread calls `SetThreadPriority`.
+- Modifier release helper `FUN_1402c5f00`: modifier bit table at `0x140404250` = LCtrl, RCtrl, LAlt, RAlt, LShift, RShift, LWin, RWin. When the released mask includes a Win bit (`> 0x3f`) it prepends the INPUT at `0x1403eb480` = `wVk 0xFF, dwFlags KEYEVENTF_KEYUP` to the same `SendInput` batch, which keeps Start from opening.
+- In the main hook routine `FUN_1402c3d20`, when a Win-only modifier tap is bound (`(mods & 0x3f) == 0` and the binding lookup `FUN_1402c66f0` returns 1), it sends the two INPUTs at `0x1403eb3e0`/`0x1403eb3f8` (`wVk 0xFF` down, then up) while Win is held and lets the Win events through; the tap fires on release via `FUN_1402be0f0`.
+- Why a separate process (measured in Openray, not the reference): with the hook inside the launcher process, Windows did not call it for about 950 ms after the launcher took the foreground; a Win tap in that window opened Start. With an LL hook running in another process the loss stopped (0 of 12 taps vs. 9 of 12). Matches Microsoft's note that a hook exceeding `LowLevelHooksTimeout` is skipped.
+- Flow Launcher's community WinHotkey plugin uses the same masking (`Send {Blind}{VKFF}` on LWin down) and sends Esc first when the active window class is `Windows.UI.Core.CoreWindow` or `Shell_TrayWnd`.

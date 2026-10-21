@@ -39,7 +39,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 
 ### Consequences
 
-- **Global hotkey.** A WH_KEYBOARD_LL hook, matching the reference. `RegisterHotKey` was used in the first skeleton and replaced in milestone 1.
+- **Global hotkey.** A WH_KEYBOARD_LL hook, matching the reference. `RegisterHotKey` was used in the first skeleton and replaced in milestone 1. The hook that swallows hotkeys runs in a helper process (`openray.exe --keyboard-hook`, stdin: bindings and suspend, stdout: fired ids), like the reference's `Raycast.UIAccess.exe`, because Windows skips an in-process low-level hook for about a second after the process takes the foreground. The main process keeps a non-swallowing hook for snippets.
 - **Third-party extension isolation is deferred.** Built-ins run in-process in the web layer.
 
 ## Module boundaries
@@ -48,7 +48,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 |---|---|---|
 | Lifecycle | `src-tauri/src/lib.rs` | Single instance, tray, startup hidden, quit; `open_window` builds the Settings, Notes and tooltip windows from their `tauri.conf.json` entries (`"create": false`) on demand, and they are destroyed on close |
 | Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
-| Global hotkey | `src-tauri/src/hotkey.rs` | Parse hotkeys, bindings list (launcher + command hotkeys, duplicates rejected), WH_KEYBOARD_LL hook thread, dispatcher thread, suspend while recording |
+| Global hotkey | `src-tauri/src/hotkey.rs` | Parse hotkeys, bindings list (launcher + command hotkeys, duplicates rejected), helper process with the swallowing WH_KEYBOARD_LL hook (respawned if it exits), in-process snippet hook, suspend while recording |
 | Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, AppsFolder (MSIX) scan, shell icons served on `appicon://`, ShellExecute, DWM attributes |
 | Settings and persistence | `src-tauri/src/store.rs`, `src-tauri/src/registry.rs` | `settings.json` (hotkey, tray, show-on screen, Escape options, per-command alias/hotkey/disabled), `frecency.json`, `favorites.json`, and the extension data files `quicklinks.json`, `emoji.json` and `notes.json` (`data_get`/`data_set`, names allow-listed) in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login; Windows accent from `AccentPalette` |
 | Settings window | `src/SettingsWindow.tsx`, `src/settings.ts`, `src/Dropdown.tsx`, `src/HotkeyRecorder.tsx` | `settings` Tauri window: pages, hotkey recorder, commands table; `useSettings` keeps every window in sync through the `settings-changed` event |

@@ -13,7 +13,7 @@ mod games;
 mod focus;
 mod registry;
 mod run;
-mod hotkey;
+pub mod hotkey;
 mod hud;
 mod launcher;
 mod notes;

@@ -6,6 +6,7 @@ use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_TRANSITIONS_FORCEDISABLED, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
 };
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VK_ESCAPE};
 use windows::Win32::UI::WindowsAndMessaging::{
     BringWindowToTop, GetAncestor, GetForegroundWindow, GetShellWindow, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, IsWindow,
     SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE,
@@ -126,6 +127,21 @@ pub fn owns_foreground(window: &WebviewWindow) -> bool {
     unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) == hwnd }
 }
 
+fn is_shell_flyout(hwnd: HWND) -> bool {
+    crate::clipboard::window_app(hwnd).is_some_and(|(_, path)| {
+        let path = path.to_ascii_lowercase();
+        path.ends_with(r"\startmenuexperiencehost.exe") || path.ends_with(r"\searchhost.exe")
+    })
+}
+
+fn close_shell_flyout() {
+    let esc = |flags| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_ESCAPE, dwFlags: flags, dwExtraInfo: crate::hotkey::MARKER, ..Default::default() } },
+    };
+    unsafe { SendInput(&[esc(KEYBD_EVENT_FLAGS(0)), esc(KEYEVENTF_KEYUP)], std::mem::size_of::<INPUT>() as i32) };
+}
+
 pub fn previous_window() -> HWND {
     HWND(PREVIOUS_FOREGROUND.load(Ordering::SeqCst) as _)
 }
@@ -156,7 +172,9 @@ pub fn show(app: &AppHandle) {
     let Some(hwnd) = hwnd(&window) else { return };
     if !is_shown() {
         let previous = unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) };
-        if previous != hwnd {
+        if is_shell_flyout(previous) {
+            close_shell_flyout();
+        } else if previous != hwnd {
             PREVIOUS_FOREGROUND.store(previous.0 as isize, Ordering::SeqCst);
         }
         place(app, &window, previous);

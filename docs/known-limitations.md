@@ -7,6 +7,7 @@
 ## Global hotkey
 
 - Replace Start Menu: Ctrl+Esc and clicking the Start button still open Start.
+- Hotkeys that swallow keys run in a helper process (`openray.exe --keyboard-hook`). If it dies, Openray restarts it after one second; hotkeys pressed in that second are lost. Snippet typing detection stays in the main process and can miss keys for about a second after an Openray window takes the foreground.
 
 - **Mechanism.** Openray uses a WH_KEYBOARD_LL hook (`src-tauri/src/hotkey.rs`), like the reference.
   - The hook only decides and returns; a dispatcher thread does the work. Doing work inside the hook made Windows drop it after the first press.
