@@ -16,6 +16,7 @@ mod run;
 pub mod hotkey;
 mod hud;
 mod launcher;
+mod notch;
 mod notes;
 mod settings_pages;
 mod snippets;
@@ -409,6 +410,7 @@ fn apply_settings(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_visible(settings.show_in_tray);
     }
+    notch::apply(app, settings);
     Ok(())
 }
 
@@ -990,6 +992,9 @@ pub fn run() {
             show_hud,
             hud_present,
             hud_hide,
+            notch::notch_resize,
+            notch::notch_media,
+            notch::notch_battery,
             quit_app,
             settings_get,
             settings_set,

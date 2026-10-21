@@ -1,18 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import type { Arguments, CommandArgument, ManifestCommand } from "@flowkey-cli/native-sdk";
+import { emitTo, listen } from "@tauri-apps/api/event";
+import type { Arguments, CommandArgument, ManifestCommand, UiItem } from "@flowkey-cli/native-sdk";
 import { useEffect, useRef, useState } from "react";
 import { Footer } from "../ActionHost";
 import { Dropdown } from "../Dropdown";
 import type { Command, Extension, ViewProps } from "../extension-api";
+import { NOTCH_ACTION_EVENT, NOTCH_READY_EVENT, NOTCH_WIDGETS_EVENT, notchItems, type NotchWidget } from "../notch";
+import { isEnabled, type Settings } from "../settings";
 import { BackButton } from "../ListView";
 import { showToast } from "../toast";
 import { ask } from "../flowkey/dialogs";
-import { CHANGED_EVENT, REMOVED_EVENT, describeGrants, forgetCached, grantConsent, listExtensions, missingPreferences, pendingConsent, preferencesOf, type Failure } from "../flowkey/extensions";
+import { CHANGED_EVENT, REMOVED_EVENT, describeGrants, forgetCached, grantConsent, isNotchCommand, listExtensions, missingPreferences, pendingConsent, preferencesOf, type Failure } from "../flowkey/extensions";
 import { FlowKeyIcon } from "../flowkey/FlowKeyIcon";
 import { FlowKeyView, LoadingView, WINDOW_EVENT, type WindowSignal } from "../flowkey/FlowKeyView";
 import { dispatchNative, forgetStores } from "../flowkey/natives";
-import { hostFor, installHostHooks, loadedHost, unloadHost, type CallContext, type InstalledExtension } from "../flowkey/runtime";
+import { hostFor, installHostHooks, loadedHost, newViewId, unloadHost, type CallContext, type InstalledExtension } from "../flowkey/runtime";
 import { WebCommandView } from "../flowkey/WebCommand";
 
 export const LAUNCH_EVENT = "flowkey-launch";
@@ -307,6 +309,57 @@ function scheduleIntervals(extensions: InstalledExtension[]) {
   }
 }
 
+const notchViews = new Map<string, NotchWidget & { extension: InstalledExtension; viewId: string }>();
+
+function publishNotch() {
+  const widgets: NotchWidget[] = [...notchViews.values()].map(({ key, title, icon, tree, error }) => ({ key, title, icon, tree, error }));
+  emitTo("notch", NOTCH_WIDGETS_EVENT, widgets).catch(() => {});
+}
+
+async function bridgeNotch(extensions: InstalledExtension[]) {
+  const settings = await invoke<Settings>("settings_get");
+  const wanted = new Set<string>();
+  for (const extension of extensions) {
+    for (const command of extension.manifest.commands.filter(isNotchCommand)) {
+      const key = `${extensionKey(extension)}/${command.id}`;
+      if (!isEnabled(settings, key, extensionKey(extension)) || !(await ensureReady(extension, false))) continue;
+      wanted.add(key);
+      if (notchViews.get(key)?.extension.manifest.version === extension.manifest.version) continue;
+      const entry = { key, title: command.title, icon: command.icon ?? extension.manifest.icon, tree: null, extension, viewId: newViewId() };
+      notchViews.set(key, entry);
+      hostFor(extension)
+        .render(entry.viewId, command.id, { query: "" }, {
+          onTree: (tree) => {
+            Object.assign(entry, { tree, error: undefined });
+            publishNotch();
+          },
+          onError: (error) => {
+            Object.assign(entry, { error: error.message });
+            publishNotch();
+          },
+        })
+        .catch((error) => console.error("notch widget failed", key, error));
+    }
+  }
+  for (const [key, entry] of notchViews) {
+    if (wanted.has(key)) continue;
+    loadedHost(entry.extension.manifest.id)?.close(entry.viewId);
+    notchViews.delete(key);
+  }
+  publishNotch();
+}
+
+listen(NOTCH_READY_EVENT, publishNotch).catch((e) => console.error("could not watch the notch", e));
+
+listen<{ key: string; itemId?: string; actionId: string }>(NOTCH_ACTION_EVENT, ({ payload }) => {
+  const entry = notchViews.get(payload.key);
+  if (!entry) return;
+  const item: UiItem | undefined = entry.tree ? notchItems(entry.tree).find((i) => i.id === payload.itemId) : undefined;
+  hostFor(entry.extension)
+    .action(entry.viewId, payload.actionId, item)
+    .catch((error) => console.error("notch action failed", payload.key, error));
+}).catch((e) => console.error("could not watch notch actions", e));
+
 export let flowKeyFailures: Failure[] = [];
 export const flowKeyInstalled = new Map<string, InstalledExtension>();
 
@@ -317,7 +370,10 @@ export async function loadFlowKeyExtensions(schedule = false): Promise<Extension
     flowKeyInstalled.clear();
     extensions.forEach((extension) => flowKeyInstalled.set(extensionKey(extension), extension));
     failures.forEach((f) => console.warn(`FlowKey extension ${f.id} (${f.source}) failed to load: ${f.message}`));
-    if (schedule) scheduleIntervals(extensions);
+    if (schedule) {
+      scheduleIntervals(extensions);
+      bridgeNotch(extensions).catch((e) => console.error("could not load notch widgets", e));
+    }
     return extensions.map((extension) => ({ id: extensionKey(extension), title: extension.manifest.name, commands: commandsFor(extension) }));
   } catch (error) {
     console.error("could not list FlowKey extensions", error);

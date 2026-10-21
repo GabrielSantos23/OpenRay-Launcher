@@ -16,6 +16,7 @@ document.addEventListener("contextmenu", (event) => event.preventDefault());
 
 const views: Record<string, () => Promise<{ default: ComponentType }>> = {
   hud: () => import("./Hud").then((m) => ({ default: m.Hud })),
+  notch: () => import("./NotchWindow").then((m) => ({ default: m.NotchWindow })),
   settings: () => import("./SettingsWindow").then((m) => ({ default: m.SettingsWindow })),
   notes: () => import("./NotesWindow").then((m) => ({ default: m.NotesWindow })),
   tooltip: () => import("./Tooltip").then((m) => ({ default: m.Tooltip })),

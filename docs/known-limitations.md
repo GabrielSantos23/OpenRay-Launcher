@@ -182,3 +182,12 @@
 - Idle memory of a release build right after start, before the launcher opens, on this machine: 141 MB private for Openray plus its WebView2 processes (237 MB before 0.1.21). Startup time was not measured.
 - WebView2 runs with `--disable-gpu` (saves ~75 MB, the GPU process) and `--process-per-site` (all windows share one renderer, saves ~25 MB per extra window). Rendering is in software; a hang in one window's page affects the others.
 - App, Settings page and Steam game lists are cached: a newly installed app can take up to 20 seconds and one more launcher open to appear (uninstalling clears the cache at once).
+
+## Notch
+
+- Only the primary monitor gets a notch. Expanding and collapsing resize the window in one step; there is no shape animation.
+- The notch volume HUD appears next to the Windows volume flyout; Openray does not hide the system flyout. There is no brightness HUD.
+- Fullscreen detection checks whether the foreground window covers the whole primary monitor, every 500 ms. Exclusive-mode games that do not own the foreground window are not detected.
+- The week strip shows dates only. Openray does not read a calendar, so there are no events.
+- Media comes from the current Windows media session (SMTC). Apps that do not publish one, and the Spotify Web API, are not shown.
+- FlowKey notch widgets use a `notch` command field that the published `@flowkey-cli/native-sdk` 0.5.2 does not declare yet; Openray validates it itself until the SDK change is published.

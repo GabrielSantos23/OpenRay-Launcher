@@ -78,6 +78,10 @@ fn default_volume(flow: EDataFlow) -> Result<IAudioEndpointVolume, String> {
     }
 }
 
+pub(crate) fn speaker_volume() -> Result<IAudioEndpointVolume, String> {
+    default_volume(eRender)
+}
+
 fn speaker(change: impl FnOnce(&IAudioEndpointVolume) -> windows::core::Result<()>) -> Result<(), String> {
     change(&default_volume(eRender)?).map_err(message)
 }

@@ -16,7 +16,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/api/event", () => ({ emit: vi.fn(async () => {}), listen: vi.fn(async () => () => {}) }));
 
 const { dispatchNative, forgetStores } = await import("./natives");
-const { missingPreferences, newerVersion, forgetCached } = await import("./extensions");
+const { missingPreferences, newerVersion, forgetCached, isNotchCommand, manifestIssues } = await import("./extensions");
 const { orderActions, toShortcut } = await import("./FlowKeyView");
 const { actionIcon, lucideIcon } = await import("./FlowKeyIcon");
 
@@ -67,6 +67,24 @@ describe("flowkey native dispatcher", () => {
     await expect(call(extension(), "shell.openUrl", { url: "spotify:track:1" })).rejects.toMatchObject({ code: "schemeNotAllowed" });
     await call(extension({ uriSchemes: ["spotify"] }), "shell.openUrl", { url: "spotify:track:1" });
     expect(calls.some((c) => c.command === "open_url" && c.args.url === "spotify:track:1")).toBe(true);
+  });
+});
+
+describe("flowkey notch commands", () => {
+  const manifest = (command: Record<string, unknown>) => ({ id: "demo", name: "Demo", version: "1.0.0", commands: [{ id: "open", title: "Open", ...command }], nativeMethods: [], httpHosts: [] });
+
+  it("accepts notch only on tree view commands", () => {
+    expect(manifestIssues(manifest({ notch: true }))).toBeNull();
+    expect(manifestIssues(manifest({ notch: false, mode: "background" }))).toBeNull();
+    expect(manifestIssues(manifest({ notch: true, mode: "background" }))).toContain("commands[0].notch");
+    expect(manifestIssues(manifest({ notch: true, mode: "view", ui: "web" }))).toContain("commands[0].notch");
+    expect(manifestIssues(manifest({ notch: "yes" }))).toContain("commands[0].notch");
+  });
+
+  it("picks out notch widgets", () => {
+    expect(isNotchCommand({ id: "a", title: "A", notch: true } as never)).toBe(true);
+    expect(isNotchCommand({ id: "a", title: "A" })).toBe(false);
+    expect(isNotchCommand({ id: "a", title: "A", mode: "background", notch: true } as never)).toBe(false);
   });
 });
 

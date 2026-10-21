@@ -898,7 +898,7 @@ pub async fn flowkey_image(app: AppHandle, url: String, hosts: Vec<String>) -> R
     Ok(format!("http://extimg.localhost/{hash}.{ext}"))
 }
 
-mod media {
+pub(crate) mod media {
     use super::{fail, now_secs, Res};
     use serde_json::{json, Value};
     use windows::Media::Control::{GlobalSystemMediaTransportControlsSessionManager as Manager, GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status};

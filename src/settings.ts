@@ -20,6 +20,8 @@ export interface Settings {
   appearance: "system" | "dark" | "light";
   themeDarkId: string;
   themeLightId: string;
+  notchEnabled: boolean;
+  notchShowInFullscreen: boolean;
   commands: Record<string, CommandPrefs>;
 }
 

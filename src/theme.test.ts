@@ -10,6 +10,8 @@ const settings = (patch: Partial<Settings>): Settings => ({
   escapeKeyClosesWindow: true,
   appearance: "system",
   themeDarkId: "bundled-sky",
+  notchEnabled: true,
+  notchShowInFullscreen: false,
   themeLightId: "bundled-noon",
   commands: {},
   ...patch,

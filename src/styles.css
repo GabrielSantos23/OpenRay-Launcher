@@ -27,6 +27,8 @@
   --color-yellow: #ffc531;
   --color-focus-overlay: #050505;
   --color-capture-dim: rgb(0 0 0 / 0.45);
+  --color-notch: #000000;
+  --color-notch-fg: #ffffff;
   --color-loader: #ffffff;
   --color-accent: #4fa3f8;
   --color-titlebar: rgb(from var(--color-fg) r g b / 5%);
@@ -103,6 +105,43 @@ body,
   font-family: var(--font-sans);
   user-select: none;
   -webkit-font-smoothing: antialiased;
+}
+
+.notch-surface {
+  --color-fg: var(--color-notch-fg);
+  --color-fg-60: rgb(from var(--color-notch-fg) r g b / 60%);
+  --color-fg-40: rgb(from var(--color-notch-fg) r g b / 40%);
+  --color-control: rgb(from var(--color-notch-fg) r g b / 10%);
+  --color-control-hover: rgb(from var(--color-notch-fg) r g b / 16%);
+}
+
+.notch-eq {
+  transform: scaleY(0.6);
+}
+
+@keyframes notch-eq {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .notch-eq {
+    animation: notch-eq 0.9s ease-in-out infinite;
+  }
+  .notch-eq-1 {
+    animation-delay: -0.45s;
+  }
+  .notch-eq-2 {
+    animation-delay: -0.2s;
+  }
+  .notch-eq-3 {
+    animation-delay: -0.65s;
+  }
 }
 
 @utility loader-gradient {

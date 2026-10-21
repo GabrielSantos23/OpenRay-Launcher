@@ -18,6 +18,7 @@ import {
   Puzzle,
   X,
   LayoutGrid,
+  PanelTop,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Extension, RegisteredCommand } from "./extension-api";
@@ -96,6 +97,7 @@ const PAGES: Page[] = [
   { id: "general", title: "General", icon: <Tile><Gear className="size-3.5" /></Tile>, keywords: ["open at login", "system tray", "hotkey", "updates", "check for updates", "version"] },
   { id: "launcher", title: "Launcher", icon: <Tile><Rocket className="size-3.5" /></Tile>, keywords: ["show openray on", "screen"] },
   { id: "shortcuts", title: "Shortcuts", icon: <Tile><Command className="size-3.5" /></Tile>, keywords: ["alias", "hotkey", "commands"] },
+  { id: "notch", title: "Notch", icon: <Tile><PanelTop className="size-3.5" /></Tile>, keywords: ["notch", "now playing", "fullscreen", "widgets", "volume"] },
   { id: "keyboard", title: "Keyboard", icon: <Tile><Keyboard className="size-3.5" /></Tile>, keywords: ["escape key"] },
   { id: "extensions", title: "Extensions", icon: <Tile><Puzzle className="size-3.5" /></Tile>, keywords: ["install", "flowkey", "package", "uninstall"] },
 ];
@@ -354,6 +356,19 @@ function LauncherPage({ settings, save }: { settings: SettingsData; save: Save }
             { value: "primary-screen", label: "Primary screen" },
           ]}
         />
+      </Row>
+    </Card>
+  );
+}
+
+function NotchPage({ settings, save }: { settings: SettingsData; save: Save }) {
+  return (
+    <Card>
+      <Row id="notch-enabled" title="Enable Notch" description="Show a notch at the top of the primary screen. Hover it for media, calendar, clipboard and capture shortcuts.">
+        <Switch labelledBy="notch-enabled" checked={settings.notchEnabled} onChange={(notchEnabled) => save({ ...settings, notchEnabled })} />
+      </Row>
+      <Row id="notch-fullscreen" title="Show in Fullscreen" description="Keep the notch visible over fullscreen apps and games.">
+        <Switch labelledBy="notch-fullscreen" checked={settings.notchShowInFullscreen} onChange={(notchShowInFullscreen) => save({ ...settings, notchShowInFullscreen })} />
       </Row>
     </Card>
   );
@@ -677,6 +692,7 @@ export function SettingsWindow() {
             <div className="flex flex-col gap-4">
               {page === "general" && <GeneralPage settings={settings} save={save} recorder={recorder} />}
               {page === "launcher" && <LauncherPage settings={settings} save={save} />}
+              {page === "notch" && <NotchPage settings={settings} save={save} />}
               {page === "keyboard" && <KeyboardPage settings={settings} save={save} />}
               {page === "extensions" && <FlowKeyInstallCard failures={failures} onChanged={reloadExtensions} />}
               {flowkeyPage && (
