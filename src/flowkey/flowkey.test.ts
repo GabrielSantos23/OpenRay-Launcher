@@ -82,9 +82,9 @@ describe("flowkey notch commands", () => {
   });
 
   it("picks out notch widgets", () => {
-    expect(isNotchCommand({ id: "a", title: "A", notch: true } as never)).toBe(true);
+    expect(isNotchCommand({ id: "a", title: "A", notch: true })).toBe(true);
     expect(isNotchCommand({ id: "a", title: "A" })).toBe(false);
-    expect(isNotchCommand({ id: "a", title: "A", mode: "background", notch: true } as never)).toBe(false);
+    expect(isNotchCommand({ id: "a", title: "A", mode: "background", notch: true })).toBe(false);
   });
 });
 

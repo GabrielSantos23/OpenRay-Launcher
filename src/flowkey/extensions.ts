@@ -22,22 +22,13 @@ export const FLOWKEY_ORIGIN = "http://flowkey.localhost/";
 export const CHANGED_EVENT = "flowkey-changed";
 export const REMOVED_EVENT = "flowkey-removed";
 
-type NotchCommand = ManifestCommand & { notch?: unknown };
-
-function validNotch(command: NotchCommand): boolean {
-  if (command.notch === undefined) return true;
-  return typeof command.notch === "boolean" && (!command.notch || (command.mode !== "background" && command.ui !== "web"));
-}
-
 export function isNotchCommand(command: ManifestCommand): boolean {
-  return (command as NotchCommand).notch === true && validNotch(command);
+  return command.notch === true && command.mode !== "background" && command.ui !== "web";
 }
 
 export function manifestIssues(manifest: unknown, folder?: string): string | null {
   const { errors } = validateManifest(manifest);
   if (errors.length) return errors.map((e) => `${e.field}: ${e.message}`).join("; ");
-  const notch = (manifest as ExtensionManifest).commands.findIndex((c) => !validNotch(c));
-  if (notch >= 0) return `commands[${notch}].notch: command notch must be a boolean on a view command with ui 'tree'`;
   const id = (manifest as ExtensionManifest).id;
   if (folder !== undefined && folder !== id) return `manifest id '${id}' does not match its folder '${folder}'`;
   return null;

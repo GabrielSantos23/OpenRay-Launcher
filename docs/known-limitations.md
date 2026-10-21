@@ -190,4 +190,3 @@
 - Fullscreen detection checks every 500 ms whether the foreground window covers the whole primary monitor without being a maximized framed window. Exclusive-mode games that do not own the foreground window are not detected, a framed window that is not maximized but sized to the whole monitor counts as fullscreen, and File Explorer windows never count because Alt+Tab and Task View are Explorer windows.
 - The week strip shows dates only. Openray does not read a calendar, so there are no events.
 - Media comes from the current Windows media session (SMTC). Apps that do not publish one, and the Spotify Web API, are not shown.
-- FlowKey notch widgets use a `notch` command field that the published `@flowkey-cli/native-sdk` 0.5.2 does not declare yet; Openray validates it itself until the SDK change is published.
