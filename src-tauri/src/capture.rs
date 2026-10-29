@@ -10,7 +10,8 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::UI::Shell::{FOLDERID_Pictures, SHGetKnownFolderPath, KF_FLAG_DEFAULT};
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetCursorPos, GetSystemMetrics, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+    EnumWindows, GetCursorPos, GetLayeredWindowAttributes, GetSystemMetrics, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GWL_EXSTYLE, LAYERED_WINDOW_ATTRIBUTES_FLAGS,
+    LWA_ALPHA, WS_EX_LAYERED, WS_EX_TRANSPARENT, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
 };
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
@@ -153,6 +154,19 @@ pub fn window_frame(hwnd: HWND) -> Option<Rect> {
     (rect.w > 0 && rect.h > 0).then_some(rect)
 }
 
+fn see_through(ex_style: u32, layered_alpha: Option<u8>) -> bool {
+    ex_style & WS_EX_TRANSPARENT.0 != 0 || layered_alpha == Some(0)
+}
+
+fn layered_alpha(hwnd: HWND, ex_style: u32) -> Option<u8> {
+    if ex_style & WS_EX_LAYERED.0 == 0 {
+        return None;
+    }
+    let (mut alpha, mut flags) = (0u8, LAYERED_WINDOW_ATTRIBUTES_FLAGS(0));
+    unsafe { GetLayeredWindowAttributes(hwnd, None, Some(&mut alpha), Some(&mut flags)) }.ok()?;
+    flags.contains(LWA_ALPHA).then_some(alpha)
+}
+
 pub fn windows() -> Vec<Rect> {
     unsafe extern "system" fn each(hwnd: HWND, data: LPARAM) -> BOOL {
         let list = &mut *(data.0 as *mut Vec<Rect>);
@@ -160,7 +174,8 @@ pub fn windows() -> Vec<Rect> {
         let _ = DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &mut cloaked as *mut _ as _, 4);
         let mut pid = 0;
         GetWindowThreadProcessId(hwnd, Some(&mut pid));
-        if IsWindowVisible(hwnd).as_bool() && !IsIconic(hwnd).as_bool() && cloaked == 0 && GetWindowTextLengthW(hwnd) > 0 && pid != std::process::id() {
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        if IsWindowVisible(hwnd).as_bool() && !IsIconic(hwnd).as_bool() && cloaked == 0 && GetWindowTextLengthW(hwnd) > 0 && pid != std::process::id() && !see_through(ex, layered_alpha(hwnd, ex)) {
             if let Some(rect) = window_frame(hwnd) {
                 list.push(rect);
             }
@@ -327,6 +342,16 @@ mod tests {
         assert_eq!(custom_folder(&serde_json::json!({ "folder": "relative" })), None);
         assert_eq!(custom_folder(&serde_json::json!({ "folder": "  " })), None);
         assert_eq!(custom_folder(&serde_json::Value::Null), None);
+    }
+
+    #[test]
+    fn skips_click_through_and_fully_transparent_windows() {
+        assert!(see_through(WS_EX_LAYERED.0 | WS_EX_TRANSPARENT.0, Some(0)));
+        assert!(see_through(WS_EX_LAYERED.0, Some(0)));
+        assert!(see_through(WS_EX_TRANSPARENT.0, None));
+        assert!(!see_through(WS_EX_LAYERED.0, Some(255)));
+        assert!(!see_through(WS_EX_LAYERED.0, None));
+        assert!(!see_through(0, None));
     }
 
     #[test]

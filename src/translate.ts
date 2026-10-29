@@ -1,6 +1,6 @@
 export const AUTO = "auto";
 export const DEFAULT_TARGET = "en";
-export const DEBOUNCE_MS = 330;
+export const DEBOUNCE_MS = 1000;
 
 export interface Language {
   value: string;
