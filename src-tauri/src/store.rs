@@ -34,6 +34,15 @@ pub enum Appearance {
     Light,
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum Language {
+    #[default]
+    System,
+    En,
+    Pt,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct CommandPrefs {
@@ -51,6 +60,7 @@ pub struct Settings {
     pub escape_key_behavior: EscapeKeyBehavior,
     pub escape_key_closes_window: bool,
     pub appearance: Appearance,
+    pub language: Language,
     pub theme_dark_id: String,
     pub theme_light_id: String,
     pub notch_enabled: bool,
@@ -78,6 +88,7 @@ impl Default for Settings {
             escape_key_behavior: EscapeKeyBehavior::default(),
             escape_key_closes_window: true,
             appearance: Appearance::default(),
+            language: Language::default(),
             theme_dark_id: "bundled-raycast-dark".into(),
             theme_light_id: "bundled-raycast-light".into(),
             notch_enabled: true,

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Dropdown } from "../Dropdown";
 import { GlyphTile } from "../icons";
 import { defineExtension, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { ListView, type ListSection } from "../ListView";
 import { copyAndClose, frontmostApp, pasteTitle, type AppInfo } from "../output";
 import { matchScore } from "../search";
@@ -103,12 +104,12 @@ function SearchEmoji({ pop }: ViewProps) {
           },
           {
             id: "copy",
-            title: "Copy to Clipboard",
+            title: t("Copy to Clipboard"),
             icon: Clipboard,
             shortcut: { key: "Enter", ctrl: true },
             run: async () => {
               await record(emoji.emoji);
-              await copyAndClose(emoji.emoji, "Copied Emoji to Clipboard");
+              await copyAndClose(emoji.emoji, t("Copied Emoji to Clipboard"));
             },
           },
         ],
@@ -126,14 +127,14 @@ function SearchEmoji({ pop }: ViewProps) {
         .filter((m) => m.score > 0)
         .sort((a, b) => b.score - a.score)
         .map((m) => toItem(m.e, "results"));
-      return results.length ? [{ title: "Results", items: results }] : [];
+      return results.length ? [{ title: t("Results"), items: results }] : [];
     }
     const byEmoji = new Map(emojis.map((e) => [e.emoji, e]));
     const recent = frequent(usage).flatMap((emoji) => (byEmoji.has(emoji) ? [toItem(byEmoji.get(emoji)!, "recent")] : []));
-    const recentSection = { title: "Frequently Used", items: recent, showCount: true };
+    const recentSection = { title: t("Frequently Used"), items: recent, showCount: true };
     if (category === "recent") return [recentSection];
     const categories = CATEGORIES.filter((c) => category === "all" || c.value === category).map((c) => ({
-      title: c.label,
+      title: t(c.label),
       items: emojis.filter((e) => e.category === c.value).map((e) => toItem(e, c.value)),
       showCount: true,
     }));
@@ -142,7 +143,7 @@ function SearchEmoji({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Search Emoji & Symbols…"
+      placeholder={t("Search Emoji & Symbols…")}
       sections={sections}
       onBack={pop}
       searchText={text}
@@ -150,17 +151,17 @@ function SearchEmoji({ pop }: ViewProps) {
       filtering={false}
       layout="grid"
       columns={8}
-      footerTitle={current ? `Search Emoji & Symbols – ${current.title}` : "Search Emoji & Symbols"}
+      footerTitle={current ? t("Search Emoji & Symbols – {title}", { title: current.title }) : t("Search Emoji & Symbols")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={emojis === null}
-      emptyText="No emoji found"
+      emptyText={t("No emoji found")}
       onSelectionChange={setCurrent}
       accessory={
         <div className="w-[197px] shrink-0">
           <span id="emoji-category" className="sr-only">
-            Filter by Category
+            {t("Filter by Category")}
           </span>
-          <Dropdown size="field" labelledBy="emoji-category" value={category} options={FILTERS} onChange={setCategory} />
+          <Dropdown size="field" labelledBy="emoji-category" value={category} options={FILTERS.map((f) => ({ ...f, label: t(f.label) }))} onChange={setCategory} />
         </div>
       }
     />
@@ -176,7 +177,7 @@ export default defineExtension({
       id: "searchEmoji",
       title: "Search Emoji & Symbols",
       subtitle: "Emoji & Symbols",
-      keywords: ["emoji", "symbols", "smiley"],
+      keywords: ["emoji", "symbols", "smiley", "emojis", "símbolos"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SearchEmoji,

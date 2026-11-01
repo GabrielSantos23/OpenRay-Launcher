@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, RotateCcw, SquareMenu, Star, StarOff } from "lucide-react";
 import type { Action, RegisteredCommand, Shortcut } from "./extension-api";
+import { t } from "./i18n";
 import type { Frecency } from "./search";
 
 const KEY_LABELS: Record<string, string> = { Enter: "↵", ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Backspace: "⌫", Delete: "Del", Escape: "Esc", PageUp: "PgUp", PageDown: "PgDn", Home: "Home", End: "End", Tab: "Tab", " ": "Space" };
@@ -47,7 +48,7 @@ export function actionGroups(command: RegisteredCommand, context: ActionContext)
       ? [
           {
             id: "add-favorite",
-            title: "Add to Favorites",
+            title: t("Add to Favorites"),
             icon: Star,
             shortcut: { key: "f", ctrl: true, shift: true },
             keepOpen: true,
@@ -57,20 +58,20 @@ export function actionGroups(command: RegisteredCommand, context: ActionContext)
       : [
           {
             id: "remove-favorite",
-            title: "Remove from Favorites",
+            title: t("Remove from Favorites"),
             icon: StarOff,
             shortcut: { key: "f", ctrl: true, shift: true },
             keepOpen: true,
             run: () => setFavorites(favorites.filter((key) => key !== command.key)),
           },
           ...(index > 0
-            ? [{ id: "move-favorite-up", title: "Move Favorite Up", icon: ArrowUp, shortcut: { key: "ArrowUp", ctrl: true, alt: true }, keepOpen: true, run: () => move(-1) }]
+            ? [{ id: "move-favorite-up", title: t("Move Favorite Up"), icon: ArrowUp, shortcut: { key: "ArrowUp", ctrl: true, alt: true }, keepOpen: true, run: () => move(-1) }]
             : []),
           ...(index < favorites.length - 1
             ? [
                 {
                   id: "move-favorite-down",
-                  title: "Move Favorite Down",
+                  title: t("Move Favorite Down"),
                   icon: ArrowDown,
                   shortcut: { key: "ArrowDown", ctrl: true, alt: true },
                   keepOpen: true,
@@ -81,7 +82,7 @@ export function actionGroups(command: RegisteredCommand, context: ActionContext)
         ];
   const ranking: Action[] =
     (context.frecency[command.key] ?? 0) > 0
-      ? [{ id: "reset-ranking", title: "Reset Ranking", icon: RotateCcw, keepOpen: true, run: () => context.resetRanking(command.key) }]
+      ? [{ id: "reset-ranking", title: t("Reset Ranking"), icon: RotateCcw, keepOpen: true, run: () => context.resetRanking(command.key) }]
       : [];
   return [[primary, ...own], favoriteActions, ...rest, ranking].filter((group) => group.length > 0);
 }

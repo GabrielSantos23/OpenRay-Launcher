@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { t } from "./i18n";
 import type { Toast } from "./toast";
 import { ActivityIndicator, GLOW } from "./FooterToast";
 
@@ -53,8 +54,8 @@ export function Hud() {
         </div>
       )}
       <div className={`relative flex min-w-0 flex-col justify-center gap-0.5 whitespace-nowrap ${toast.message ? "-top-px" : "top-px"}`}>
-        <h1 className="truncate font-medium text-fg">{toast.title}</h1>
-        {toast.message && <p className="truncate text-11 text-fg-60">{toast.message}</p>}
+        <h1 className="truncate font-medium text-fg">{t(toast.title, toast.params)}</h1>
+        {toast.message && <p className="truncate text-11 text-fg-60">{t(toast.message, toast.params)}</p>}
       </div>
     </div>
   );

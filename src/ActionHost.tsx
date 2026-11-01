@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionPanel, Keys, type PanelPlacement } from "./ActionPanel";
 import type { Action, Confirmation } from "./extension-api";
 import { FooterToast } from "./FooterToast";
+import { t } from "./i18n";
 import { showToast, useToast } from "./toast";
 
 export function Logo() {
@@ -62,10 +63,10 @@ function ConfirmDialog({ confirmation, onAnswer }: { confirmation: Confirmation;
       >
         <div className="flex flex-col gap-1">
           <h2 id="confirm-title" className="font-semibold text-fg">
-            {confirmation.title}
+            {t(confirmation.title)}
           </h2>
           <p id="confirm-message" className="text-fg-60">
-            {confirmation.message}
+            {t(confirmation.message)}
           </p>
         </div>
         <div className="flex w-full flex-col gap-2">
@@ -74,7 +75,7 @@ function ConfirmDialog({ confirmation, onAnswer }: { confirmation: Confirmation;
             onClick={() => onAnswer(true)}
             className="h-8 rounded-[6px] bg-control font-medium text-destructive outline-offset-2 hover:bg-control-hover focus-visible:outline-2 focus-visible:outline-accent"
           >
-            {confirmation.confirmTitle}
+            {t(confirmation.confirmTitle)}
           </button>
           <button
             ref={cancelRef}
@@ -82,7 +83,7 @@ function ConfirmDialog({ confirmation, onAnswer }: { confirmation: Confirmation;
             onClick={() => onAnswer(false)}
             className="h-8 rounded-[6px] bg-control font-medium text-fg outline-offset-2 hover:bg-control-hover focus-visible:outline-2 focus-visible:outline-accent"
           >
-            Cancel
+            {t("Cancel")}
           </button>
         </div>
       </div>
@@ -116,7 +117,7 @@ export function useActionHost(focusInput: () => void, placement?: PanelPlacement
       try {
         setPanel({ title: action.title.replace(/…$/, ""), groups: [await action.submenu()] });
       } catch (e) {
-        fail(`${action.title.replace(/…$/, "")} failed`, e);
+        fail(t("{title} failed", { title: action.title.replace(/…$/, "") }), e);
       }
       return;
     }
@@ -204,7 +205,7 @@ export function Footer({
             onClick={onTogglePanel}
             className={`flex h-[26px] shrink-0 cursor-default items-center gap-2 rounded-[6px] pr-[3px] pl-2 font-medium text-fg-60 ${panelOpen ? "bg-list-selection" : ""}`}
           >
-            Actions
+            {t("Actions")}
             <Keys labels={["Ctrl", "K"]} />
           </button>
         </>

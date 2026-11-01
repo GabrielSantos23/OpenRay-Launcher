@@ -5,6 +5,7 @@ import { CircleCheck, CirclePause, CirclePlay, Ellipsis, GripVertical, Target, X
 import { useEffect, useState } from "react";
 import { elapsedFraction, FOCUS_ICON, formatTimer, pauseRemainingMs, remainingMs, timerStep, type FocusSession } from "./focus";
 import { GlyphTile } from "./icons";
+import { t } from "./i18n";
 
 function useFocusSession() {
   const [session, setSession] = useState<FocusSession | null>(null);
@@ -82,14 +83,14 @@ export function FocusPanel() {
         <span className="truncate">{session.title}</span>
       </div>
       <div className="absolute inset-0 flex items-center gap-1 px-2 opacity-0 transition-opacity duration-150 group-data-[hovered=true]:opacity-100">
-        <PanelButton icon={paused ? CirclePlay : CirclePause} text={paused ? "Resume" : "Pause"} onClick={(rect) => (paused ? run("focus_resume") : menu("pause", rect))} />
-        <PanelButton icon={CircleCheck} text="Complete" onClick={() => run("focus_complete")} />
-        <PanelButton icon={Ellipsis} label="More" onClick={(rect) => menu("more", rect)} />
+        <PanelButton icon={paused ? CirclePlay : CirclePause} text={paused ? t("Resume") : t("Pause")} onClick={(rect) => (paused ? run("focus_resume") : menu("pause", rect))} />
+        <PanelButton icon={CircleCheck} text={t("Complete")} onClick={() => run("focus_complete")} />
+        <PanelButton icon={Ellipsis} label={t("More")} onClick={(rect) => menu("more", rect)} />
         <div
           role="button"
           tabIndex={-1}
-          aria-label="Drag Focus Panel"
-          title="Drag to move, double-click to reset"
+          aria-label={t("Drag Focus Panel")}
+          title={t("Drag to move, double-click to reset")}
           onMouseDown={(e) => {
             e.preventDefault();
             if (e.button === 0 && e.detail === 1) void getCurrentWindow().startDragging();
@@ -130,8 +131,8 @@ export function FocusToast() {
     <main role="status" className="relative flex h-screen w-screen items-center gap-3 bg-panel pr-9 pl-4 text-fg select-none">
       <GlyphTile spec={FOCUS_ICON} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <h1 className="truncate text-13 font-semibold">{toast.title}</h1>
-        {toast.message && <p className="truncate text-12 text-fg-60">{toast.message}</p>}
+        <h1 className="truncate text-13 font-semibold">{t(toast.title)}</h1>
+        {toast.message && <p className="truncate text-12 text-fg-60">{t(toast.message)}</p>}
       </div>
       {toast.snooze && (
         <button
@@ -139,12 +140,12 @@ export function FocusToast() {
           onClick={() => invoke("focus_snooze").catch((e) => console.error("snooze failed", e))}
           className="h-7 shrink-0 rounded-[6px] bg-control px-3 text-12 font-medium hover:bg-control-hover"
         >
-          Snooze
+          {t("Snooze")}
         </button>
       )}
       <button
         type="button"
-        aria-label="Close"
+        aria-label={t("Close")}
         onClick={() => invoke("focus_toast_hide")}
         className="absolute top-2 right-2 flex size-5 items-center justify-center rounded text-fg-60 hover:bg-control hover:text-fg"
       >
@@ -176,11 +177,11 @@ export function FocusBlock() {
   return (
     <main className="flex h-screen w-screen flex-col items-center justify-center bg-focus-overlay text-fg select-none">
       <Target aria-hidden="true" className="size-4 text-fg-60" />
-      <h1 className="mt-3 max-w-[80%] truncate text-15 font-semibold">{block.name} has been blocked by Openray</h1>
+      <h1 className="mt-3 max-w-[80%] truncate text-15 font-semibold">{t("{name} has been blocked by Openray", { name: block.name })}</h1>
       <div className="mt-4 flex gap-2">
         {minutes > 0 && (
           <button type="button" autoFocus onClick={snooze} className="h-[30px] min-w-[180px] rounded-[6px] bg-control px-4 text-12 font-medium hover:bg-control-hover">
-            Snooze for {minutes} {minutes === 1 ? "minute" : "minutes"}
+            {t(minutes === 1 ? "Snooze for {n} minute" : "Snooze for {n} minutes", { n: minutes })}
           </button>
         )}
         {block.website && (
@@ -189,12 +190,12 @@ export function FocusBlock() {
             onClick={() => invoke("focus_close_tab").catch((e) => console.error("close tab failed", e))}
             className="h-[30px] rounded-[6px] bg-control px-4 text-12 font-medium hover:bg-control-hover"
           >
-            Close Tab
+            {t("Close Tab")}
           </button>
         )}
       </div>
       <p className="mt-5 text-11 text-fg-60">
-        {block.website ? "Switching focus to another window will hide this page." : "Switching focus to another window will close this app."}
+        {block.website ? t("Switching focus to another window will hide this page.") : t("Switching focus to another window will close this app.")}
       </p>
     </main>
   );

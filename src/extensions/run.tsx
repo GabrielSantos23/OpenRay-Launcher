@@ -5,6 +5,7 @@ import { fail, Footer } from "../ActionHost";
 import { matchesShortcut } from "../actions";
 import { Dropdown } from "../Dropdown";
 import { defineExtension, type Action, type Command, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { GlyphTile } from "../icons";
 import { BackButton, ListView } from "../ListView";
 import { copyAndClose } from "../output";
@@ -68,15 +69,15 @@ function RunCommandForm({ initial, initialCommand, onDone, onBack }: { initial?:
   const aliasRef = useRef<HTMLInputElement>(null);
   const ids = useId();
   const editing = initial && !initial.id.startsWith("copy:");
-  const title = editing ? "Edit Run Command" : "Create Run Command";
+  const title = editing ? t("Edit Run Command") : t("Create Run Command");
 
   async function save() {
     try {
       const list = await loadRunCommands();
       const name = alias.trim();
       const next = {
-        command: command.trim() ? undefined : "Command is required",
-        alias: !name ? "Alias is required" : list.some((c) => c.alias.toLowerCase() === name.toLowerCase() && c.id !== initial?.id) ? "Another run command uses this alias" : undefined,
+        command: command.trim() ? undefined : t("Command is required"),
+        alias: !name ? t("Alias is required") : list.some((c) => c.alias.toLowerCase() === name.toLowerCase() && c.id !== initial?.id) ? t("Another run command uses this alias") : undefined,
       };
       setErrors(next);
       if (next.command) return commandRef.current?.focus();
@@ -92,10 +93,10 @@ function RunCommandForm({ initial, initialCommand, onDone, onBack }: { initial?:
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       };
       await saveRunCommands(editing ? list.map((c) => (c.id === record.id ? record : c)) : [...list, record]);
-      showToast({ variant: "success", title: editing ? "Updated Run Command" : "Created Run Command" });
+      showToast({ variant: "success", title: editing ? t("Updated Run Command") : t("Created Run Command") });
       onDone();
     } catch (e) {
-      fail("Could not save Run Command", e);
+      fail(t("Could not save Run Command"), e);
     }
   }
 
@@ -126,29 +127,29 @@ function RunCommandForm({ initial, initialCommand, onDone, onBack }: { initial?:
         }}
       >
         <label htmlFor={`${ids}-command`} className={label}>
-          Command
+          {t("Command")}
         </label>
         <div className="flex flex-col gap-1.5">
-          <input id={`${ids}-command`} ref={commandRef} autoFocus spellCheck={false} value={command} onChange={(e) => setCommand(e.target.value)} placeholder="E.g. ping 1.1.1.1 -t" aria-invalid={!!errors.command} className={`${field} ${border(errors.command)}`} />
-          <p className={`text-12 ${errors.command ? "text-red" : "text-fg-60"}`}>{errors.command ?? "A program, file, folder, URI or %VARIABLE%, followed by its arguments."}</p>
+          <input id={`${ids}-command`} ref={commandRef} autoFocus spellCheck={false} value={command} onChange={(e) => setCommand(e.target.value)} placeholder={t("E.g. ping 1.1.1.1 -t")} aria-invalid={!!errors.command} className={`${field} ${border(errors.command)}`} />
+          <p className={`text-12 ${errors.command ? "text-red" : "text-fg-60"}`}>{errors.command ?? t("A program, file, folder, URI or %VARIABLE%, followed by its arguments.")}</p>
         </div>
         <label htmlFor={`${ids}-alias`} className={label}>
-          Alias
+          {t("Alias")}
         </label>
         <div className="flex flex-col gap-1.5">
-          <input id={`${ids}-alias`} ref={aliasRef} spellCheck={false} value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="Command alias" aria-invalid={!!errors.alias} className={`${field} ${border(errors.alias)}`} />
+          <input id={`${ids}-alias`} ref={aliasRef} spellCheck={false} value={alias} onChange={(e) => setAlias(e.target.value)} placeholder={t("Command alias")} aria-invalid={!!errors.alias} className={`${field} ${border(errors.alias)}`} />
           {errors.alias && <p className="text-12 text-red">{errors.alias}</p>}
         </div>
         <label htmlFor={`${ids}-description`} className={label}>
-          Description
+          {t("Description")}
         </label>
-        <input id={`${ids}-description`} spellCheck={false} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className={`${field} ${border()}`} />
+        <input id={`${ids}-description`} spellCheck={false} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("Description (optional)")} className={`${field} ${border()}`} />
         <label htmlFor={`${ids}-tags`} className={label}>
-          Tags
+          {t("Tags")}
         </label>
         <div className="flex flex-col gap-1.5">
-          <input id={`${ids}-tags`} spellCheck={false} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags (optional)" className={`${field} ${border()}`} />
-          <p className="text-12 text-fg-60">Separate tags with commas.</p>
+          <input id={`${ids}-tags`} spellCheck={false} value={tags} onChange={(e) => setTags(e.target.value)} placeholder={t("Tags (optional)")} className={`${field} ${border()}`} />
+          <p className="text-12 text-fg-60">{t("Separate tags with commas.")}</p>
         </div>
       </form>
       <Footer
@@ -158,7 +159,7 @@ function RunCommandForm({ initial, initialCommand, onDone, onBack }: { initial?:
             {title}
           </span>
         }
-        primaryTitle="Save Run Command"
+        primaryTitle={t("Save Run Command")}
         primaryKeys={["Ctrl", "↵"]}
         showActions={false}
         panelOpen={false}
@@ -175,7 +176,7 @@ function useRunCommands() {
       .then(setList)
       .catch((e) => {
         setList([]);
-        fail("Could not load Run Commands", e);
+        fail(t("Could not load Run Commands"), e);
       });
   }, []);
   useEffect(reload, [reload]);
@@ -200,7 +201,7 @@ function OpenRun({ pop }: ViewProps) {
       .then(setCatalog)
       .catch((e) => {
         setCatalog([]);
-        fail("Could not load commands", e);
+        fail(t("Could not load commands"), e);
       });
   }, [reloadHistory]);
 
@@ -216,33 +217,33 @@ function OpenRun({ pop }: ViewProps) {
   const sections = useMemo(() => {
     const groups = runRows(text, history, catalog ?? [], commands ?? [], completions, filter === "all" ? undefined : [filter]);
     return groups.map((group) => ({
-      title: group.title,
+      title: t(group.title),
       items: group.rows.map((row): Item => {
         const full = row.record ? joinCommand(row.record.command, row.record.arguments) : row.command;
         const runnable = row.kind === "executable" || row.kind === "managementConsole" || row.kind === "command";
         const primary: Action[] = [
-          { id: "run", title: "Run Command", icon: Play, run: () => (row.record ? executeRecord(row.record) : execute(row.command)) },
-          ...(runnable ? [{ id: "run-admin", title: "Run Command as Administrator", icon: Shield, shortcut: { key: "Enter", ctrl: true, shift: true }, run: () => (row.record ? executeRecord(row.record, "", true) : execute(full, true)) }] : []),
-          ...(row.kind === "executable" || row.kind === "command" ? [{ id: "run-shell", title: "Run in Shell", icon: Terminal, shortcut: { key: "Enter", ctrl: true }, run: () => execute(full, false, true) }] : []),
-          { id: "copy", title: "Copy Command", icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(full, "Copied to Clipboard") },
-          ...(row.kind === "environmentVariable" && row.source !== "input" ? [{ id: "copy-value", title: "Copy Value", icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(row.description, "Copied to Clipboard") }] : []),
-          ...(row.source !== "input" && (row.kind === "path" || (row.kind === "executable" && row.description)) ? [{ id: "reveal", title: "Show in File Explorer", icon: Folder, run: () => invoke<void>("show_in_explorer", { path: row.description.replace(/\\$/, "") }) }] : []),
+          { id: "run", title: t("Run Command"), icon: Play, run: () => (row.record ? executeRecord(row.record) : execute(row.command)) },
+          ...(runnable ? [{ id: "run-admin", title: t("Run Command as Administrator"), icon: Shield, shortcut: { key: "Enter", ctrl: true, shift: true }, run: () => (row.record ? executeRecord(row.record, "", true) : execute(full, true)) }] : []),
+          ...(row.kind === "executable" || row.kind === "command" ? [{ id: "run-shell", title: t("Run in Shell"), icon: Terminal, shortcut: { key: "Enter", ctrl: true }, run: () => execute(full, false, true) }] : []),
+          { id: "copy", title: t("Copy Command"), icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(full, t("Copied to Clipboard")) },
+          ...(row.kind === "environmentVariable" && row.source !== "input" ? [{ id: "copy-value", title: t("Copy Value"), icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(row.description, t("Copied to Clipboard")) }] : []),
+          ...(row.source !== "input" && (row.kind === "path" || (row.kind === "executable" && row.description)) ? [{ id: "reveal", title: t("Show in File Explorer"), icon: Folder, run: () => invoke<void>("show_in_explorer", { path: row.description.replace(/\\$/, "") }) }] : []),
         ];
         const manage: Action[] = row.record
-          ? [{ id: "edit", title: "Edit Run Command", icon: Pencil, shortcut: { key: "e", ctrl: true }, keepOpen: true, run: () => setForm({ initial: row.record }) }]
-          : [{ id: "create", title: "Create Run Command", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setForm({ command: row.command }) }];
+          ? [{ id: "edit", title: t("Edit Run Command"), icon: Pencil, shortcut: { key: "e", ctrl: true }, keepOpen: true, run: () => setForm({ initial: row.record }) }]
+          : [{ id: "create", title: t("Create Run Command"), icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setForm({ command: row.command }) }];
         const destructive: Action[] = [
           ...(row.source === "history"
-            ? [{ id: "forget", title: "Delete from History", icon: Trash2, destructive: true, keepOpen: true, shortcut: { key: "d", ctrl: true }, run: async () => {
+            ? [{ id: "forget", title: t("Delete from History"), icon: Trash2, destructive: true, keepOpen: true, shortcut: { key: "d", ctrl: true }, run: async () => {
                 await invoke("run_forget", { command: row.command });
-                showToast({ variant: "success", title: "Deleted from history" });
+                showToast({ variant: "success", title: t("Deleted from history") });
                 reloadHistory();
               } }]
             : []),
           ...(row.record
-            ? [{ id: "delete", title: "Delete Run Command", icon: Trash2, destructive: true, keepOpen: true, shortcut: { key: "d", ctrl: true, shift: true }, run: async () => {
+            ? [{ id: "delete", title: t("Delete Run Command"), icon: Trash2, destructive: true, keepOpen: true, shortcut: { key: "d", ctrl: true, shift: true }, run: async () => {
                 await saveRunCommands((commands ?? []).filter((c) => c.id !== row.record!.id));
-                showToast({ variant: "success", title: "Deleted Run Command" });
+                showToast({ variant: "success", title: t("Deleted Run Command") });
                 reloadCommands();
               } }]
             : []),
@@ -252,7 +253,7 @@ function OpenRun({ pop }: ViewProps) {
           title: row.command,
           subtitle: row.source === "input" ? undefined : row.description,
           icon: <RowIcon row={row} />,
-          accessory: <span className="text-13 text-fg-60">{KIND_LABELS[row.kind]}</span>,
+          accessory: <span className="text-13 text-fg-60">{t(KIND_LABELS[row.kind])}</span>,
           actions: [primary, manage, destructive],
         };
       }),
@@ -269,23 +270,23 @@ function OpenRun({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Type a command…"
+      placeholder={t("Type a command…")}
       sections={sections}
       onBack={pop}
       searchText={text}
       onSearchTextChange={setText}
       filtering={false}
-      footerTitle="Run"
+      footerTitle={t("Run")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={catalog === null}
-      emptyText="No Commands"
-      emptyDescription="Type a command above and press Enter to run it"
+      emptyText={t("No Commands")}
+      emptyDescription={t("Type a command above and press Enter to run it")}
       accessory={
         <div className="w-[215px] shrink-0">
           <span id="run-kind" className="sr-only">
-            Filter Results
+            {t("Filter Results")}
           </span>
-          <Dropdown size="field" labelledBy="run-kind" value={filter} options={FILTERS} onChange={setFilter} />
+          <Dropdown size="field" labelledBy="run-kind" value={filter} options={FILTERS.map((f) => ({ ...f, label: t(f.label) }))} onChange={setFilter} />
         </div>
       }
     />
@@ -299,7 +300,7 @@ function SearchRunCommands({ pop }: ViewProps) {
   const sections = useMemo(
     () =>
       runCommandSections(list ?? []).map((section) => ({
-        title: section.title,
+        title: t(section.title),
         items: section.items.map((record): Item => {
           const full = joinCommand(record.command, record.arguments);
           return {
@@ -311,58 +312,58 @@ function SearchRunCommands({ pop }: ViewProps) {
             accessory: record.tags.length ? <span className="truncate text-13 text-fg-60">{record.tags.join(", ")}</span> : undefined,
             actions: [
               [
-                { id: "execute", title: "Execute Command", icon: Play, run: () => executeRecord(record) },
-                { id: "copy", title: "Copy to Clipboard", icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(full, "Copied to Clipboard") },
+                { id: "execute", title: t("Execute Command"), icon: Play, run: () => executeRecord(record) },
+                { id: "copy", title: t("Copy to Clipboard"), icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(full, t("Copied to Clipboard")) },
               ],
               [
                 {
                   id: "pin",
-                  title: record.pinned ? "Unpin" : "Pin",
+                  title: record.pinned ? t("Unpin") : t("Pin"),
                   icon: record.pinned ? PinOff : Pin,
                   shortcut: { key: "p", ctrl: true, shift: true },
                   keepOpen: true,
                   run: async () => {
                     await saveRunCommands((list ?? []).map((c) => (c.id === record.id ? { ...c, pinned: !c.pinned } : c)));
-                    showToast({ variant: "success", title: record.pinned ? "Unpinned" : "Pinned" });
+                    showToast({ variant: "success", title: record.pinned ? t("Unpinned") : t("Pinned") });
                     reload();
                   },
                 },
-                { id: "edit", title: "Edit", icon: Pencil, shortcut: { key: "e", ctrl: true }, keepOpen: true, run: () => setForm({ initial: record }) },
+                { id: "edit", title: t("Edit"), icon: Pencil, shortcut: { key: "e", ctrl: true }, keepOpen: true, run: () => setForm({ initial: record }) },
                 {
                   id: "duplicate",
-                  title: "Duplicate",
+                  title: t("Duplicate"),
                   icon: CopyPlus,
                   keepOpen: true,
                   run: () => setForm({ initial: { ...record, id: `copy:${record.id}`, alias: `${record.alias} copy`, pinned: false, lastExecutedAt: undefined } }),
                 },
-                { id: "create", title: "Create Run Command", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setForm({}) },
+                { id: "create", title: t("Create Run Command"), icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setForm({}) },
               ],
               [
                 {
                   id: "delete",
-                  title: "Delete",
+                  title: t("Delete"),
                   icon: Trash2,
                   destructive: true,
                   keepOpen: true,
                   shortcut: { key: "d", ctrl: true },
-                  confirm: { title: "Delete Run Command?", message: "This action cannot be undone.", confirmTitle: "Delete" },
+                  confirm: { title: t("Delete Run Command?"), message: t("This action cannot be undone."), confirmTitle: t("Delete") },
                   run: async () => {
                     await saveRunCommands((list ?? []).filter((c) => c.id !== record.id));
-                    showToast({ variant: "success", title: "Deleted" });
+                    showToast({ variant: "success", title: t("Deleted") });
                     reload();
                   },
                 },
                 {
                   id: "delete-all",
-                  title: "Delete All",
+                  title: t("Delete All"),
                   icon: Trash2,
                   destructive: true,
                   keepOpen: true,
                   shortcut: { key: "d", ctrl: true, shift: true },
-                  confirm: { title: "Delete All Run Commands?", message: "This action cannot be undone.", confirmTitle: "Delete All" },
+                  confirm: { title: t("Delete All Run Commands?"), message: t("This action cannot be undone."), confirmTitle: t("Delete All") },
                   run: async () => {
                     await saveRunCommands([]);
-                    showToast({ variant: "success", title: "Deleted all" });
+                    showToast({ variant: "success", title: t("Deleted all") });
                     reload();
                   },
                 },
@@ -384,15 +385,15 @@ function SearchRunCommands({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Search run commands…"
+      placeholder={t("Search run commands…")}
       sections={sections}
       onBack={pop}
-      footerTitle="Search Run Commands"
+      footerTitle={t("Search Run Commands")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={list === null}
-      emptyActions={[[{ id: "create", title: "Create Run Command", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setForm({}) }]]}
-      emptyText="No Run Commands"
-      emptyDescription="Press Ctrl+N to create one."
+      emptyActions={[[{ id: "create", title: t("Create Run Command"), icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setForm({}) }]]}
+      emptyText={t("No Run Commands")}
+      emptyDescription={t("Press Ctrl+N to create one.")}
     />
   );
 }
@@ -406,7 +407,7 @@ function runCommandItem(record: RunCommand): Command {
     keywords: ["run", "command", record.command, ...(record.arguments ? [record.arguments] : []), ...record.tags],
     kind: "Run Command",
     primaryActionTitle: "Run Command",
-    argument: { placeholder: "Arguments", optional: true, run: (value) => executeRecord(record, value) },
+    argument: { placeholder: t("Arguments"), optional: true, run: (value) => executeRecord(record, value) },
   };
 }
 
@@ -415,24 +416,24 @@ export default defineExtension({
   title: "Run",
   icon: ICON,
   commands: [
-    { id: "windows-run", title: "Open Run", subtitle: "Run", keywords: ["run", "execute", "win+r", "command"], kind: "Command", primaryActionTitle: "Open Command", view: OpenRun },
+    { id: "windows-run", title: "Open Run", subtitle: "Run", keywords: ["run", "execute", "win+r", "command", "executar"], kind: "Command", primaryActionTitle: "Open Command", view: OpenRun },
     {
       id: "execute",
       title: "Execute Run Command",
       subtitle: "Run",
       icon: { glyph: Terminal, tone: "slate" },
-      keywords: ["run", "execute", "command"],
+      keywords: ["run", "execute", "command", "executar"],
       kind: "Command",
       primaryActionTitle: "Run Command",
       argument: { placeholder: "Command", run: (value) => execute(value) },
     },
-    { id: "search", title: "Search Run Commands", subtitle: "Run", icon: { glyph: List, tone: "slate" }, keywords: ["run", "alias", "commands"], kind: "Command", primaryActionTitle: "Open Command", view: SearchRunCommands },
+    { id: "search", title: "Search Run Commands", subtitle: "Run", icon: { glyph: List, tone: "slate" }, keywords: ["run", "alias", "commands", "comandos"], kind: "Command", primaryActionTitle: "Open Command", view: SearchRunCommands },
     {
       id: "create",
       title: "Create Run Command",
       subtitle: "Run",
       icon: { glyph: Plus, tone: "slate" },
-      keywords: ["run", "alias", "new"],
+      keywords: ["run", "alias", "new", "novo"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: ({ pop }) => <RunCommandForm onDone={pop} onBack={pop} />,

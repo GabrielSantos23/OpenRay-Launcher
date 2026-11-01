@@ -3,6 +3,7 @@ import { Clipboard, Folder, Gamepad2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { fail } from "../ActionHost";
 import { defineExtension, type Action, type Command, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { GlyphTile } from "../icons";
 import { ListView } from "../ListView";
 import { copyAndClose } from "../output";
@@ -37,18 +38,18 @@ const openGame = (game: Game) => invoke<void>("open_url", { url: game.launch, ap
 
 export function gameActions(game: Game): Action[][] {
   return [
-    [{ id: "show-in-explorer", title: "Show in File Explorer", icon: Folder, run: () => invoke("show_in_explorer", { path: game.installDir }) }],
+    [{ id: "show-in-explorer", title: t("Show in File Explorer"), icon: Folder, run: () => invoke("show_in_explorer", { path: game.installDir }) }],
     [
-      { id: "copy-path", title: "Copy Path", icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(game.installDir, "Copied Path to Clipboard") },
-      { id: "copy-name", title: "Copy Name", icon: Clipboard, shortcut: { key: "c", alt: true, shift: true }, run: () => copyAndClose(game.name.trim(), "Copied Name to Clipboard") },
+      { id: "copy-path", title: t("Copy Path"), icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(game.installDir, t("Copied Path to Clipboard")) },
+      { id: "copy-name", title: t("Copy Name"), icon: Clipboard, shortcut: { key: "c", alt: true, shift: true }, run: () => copyAndClose(game.name.trim(), t("Copied Name to Clipboard")) },
     ],
     [
       {
         id: "uninstall",
-        title: "Uninstall Game",
+        title: t("Uninstall Game"),
         icon: Trash2,
         destructive: true,
-        confirm: { title: `Uninstall ${game.name.trim()}?`, message: `${game.launcher} will open to uninstall it.`, confirmTitle: "Uninstall" },
+        confirm: { title: t("Uninstall {name}?", { name: game.name.trim() }), message: t("{launcher} will open to uninstall it.", { launcher: game.launcher }), confirmTitle: t("Uninstall") },
         run: () => invoke("open_url", { url: game.uninstall, appPath: null }),
       },
     ],
@@ -69,7 +70,7 @@ function GameLauncher({ pop }: ViewProps) {
   useEffect(() => {
     listGames()
       .then(setData)
-      .catch((e) => fail("Unable to Load Games", e));
+      .catch((e) => fail(t("Unable to Load Games"), e));
   }, []);
 
   const sections = useMemo(() => {
@@ -79,9 +80,9 @@ function GameLauncher({ pop }: ViewProps) {
         id: game.id,
         title: game.name.trim(),
         icon: <GameIcon game={game} />,
-        accessory: kind("Game"),
+        accessory: kind(t("Game")),
         keywords: [game.launcher],
-        actions: [[{ id: "open", title: "Open Game", icon: Gamepad2, run: () => openGame(game) }, ...gameActions(game)[0]], ...gameActions(game).slice(1)],
+        actions: [[{ id: "open", title: t("Open Game"), icon: Gamepad2, run: () => openGame(game) }, ...gameActions(game)[0]], ...gameActions(game).slice(1)],
       }),
     );
     const launchers = (data?.launchers ?? []).map(
@@ -89,30 +90,30 @@ function GameLauncher({ pop }: ViewProps) {
         id: launcher.path,
         title: launcher.name,
         icon: <img src={`${convertFileSrc(launcher.path, "appicon")}?size=${Math.round(22 * window.devicePixelRatio)}`} alt="" draggable={false} className="size-[22px] shrink-0" />,
-        accessory: kind("Launcher"),
-        actions: [[{ id: "open", title: "Open Application", icon: Gamepad2, run: () => invoke<void>("launch_app", { path: launcher.path }) }]],
+        accessory: kind(t("Launcher")),
+        actions: [[{ id: "open", title: t("Open Application"), icon: Gamepad2, run: () => invoke<void>("launch_app", { path: launcher.path }) }]],
       }),
     );
-    if (text.trim()) return [{ title: "Results", items: [...games, ...launchers] }];
+    if (text.trim()) return [{ title: t("Results"), items: [...games, ...launchers] }];
     return [
-      { title: "Suggestions", items: games.slice(0, 5) },
-      { title: "Games", items: games.slice(5) },
-      { title: "Game Launchers", items: launchers },
+      { title: t("Suggestions"), items: games.slice(0, 5) },
+      { title: t("Games"), items: games.slice(5) },
+      { title: t("Game Launchers"), items: launchers },
     ].filter((s) => s.items.length > 0);
   }, [data, text]);
 
   return (
     <ListView
-      placeholder="Search games…"
+      placeholder={t("Search games…")}
       sections={sections}
       onBack={pop}
       searchText={text}
       onSearchTextChange={setText}
-      footerTitle="Game Launcher"
+      footerTitle={t("Game Launcher")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={data === null}
-      emptyText={text.trim() ? "No Results" : "No Games Found"}
-      emptyDescription={text.trim() ? "Try a different search term." : undefined}
+      emptyText={text.trim() ? t("No Results") : t("No Games Found")}
+      emptyDescription={text.trim() ? t("Try a different search term.") : undefined}
     />
   );
 }
@@ -126,7 +127,7 @@ export default defineExtension({
       id: "search-games",
       title: "Game Launcher",
       subtitle: "Games",
-      keywords: ["games", "steam", "play"],
+      keywords: ["games", "steam", "play", "jogos", "jogar"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: GameLauncher,
@@ -138,7 +139,7 @@ export default defineExtension({
         id: game.id,
         title: game.name.trim(),
         icon: iconUrl(game) ?? ICON,
-        keywords: ["game", "games", game.launcher],
+        keywords: ["game", "games", "jogo", "jogos", game.launcher],
         kind: "Game",
         primaryActionTitle: "Open Game",
         actions: gameActions(game),

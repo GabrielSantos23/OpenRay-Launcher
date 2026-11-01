@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface Labeled {
   label: string;
   value: string;
@@ -20,7 +22,7 @@ export interface PersonSection {
 }
 
 export function displayName(person: Person): string {
-  return person.name || person.organization || "No Name";
+  return person.name || person.organization || t("No Name");
 }
 
 export function initials(person: Person): string {

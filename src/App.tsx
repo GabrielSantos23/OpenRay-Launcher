@@ -11,11 +11,27 @@ import { LAUNCH_EVENT, loadFlowKeyExtensions } from "./extensions/flowkey";
 import { expandSnippet } from "./extensions/snippets";
 import { FlowKeyDialog } from "./flowkey/Dialog";
 import { WINDOW_EVENT, type WindowSignal } from "./flowkey/FlowKeyView";
+import { t } from "./i18n";
 import { loadCommands } from "./registry";
 import { search, type Frecency, type Section } from "./search";
 import { setLauncherVisible } from "./toast";
 import { commandPrefs, isEnabled, useSettings } from "./settings";
 import { useAvailableUpdate } from "./updater";
+
+function localizeCommand(command: RegisteredCommand): RegisteredCommand {
+  return {
+    ...command,
+    title: t(command.title),
+    subtitle: command.subtitle ? t(command.subtitle) : command.subtitle,
+    kind: t(command.kind),
+    primaryActionTitle: t(command.primaryActionTitle),
+    argument: command.argument ? { ...command.argument, placeholder: t(command.argument.placeholder) } : command.argument,
+  };
+}
+
+function localizeSections(sections: Section[]): Section[] {
+  return sections.map((section) => ({ ...section, title: t(section.title) }));
+}
 
 function CardSide({ side, isInput }: { side: InlineSide; isInput?: boolean }) {
   return (
@@ -26,7 +42,7 @@ function CardSide({ side, isInput }: { side: InlineSide; isInput?: boolean }) {
         ) : (
           <span className="max-w-full truncate text-[24px] font-semibold text-fg">
             {isInput
-              ? side.text.split(/(\s+(?:in|to|as|=)\s+)/i).map((part, i) => (
+              ? side.text.split(/(\s+(?:in|to|as|para|em|como|=)\s+)/i).map((part, i) => (
                   <span key={i} className={i % 2 ? "whitespace-pre text-fg-40" : ""}>
                     {part}
                   </span>
@@ -62,7 +78,7 @@ function InlineCard({ result, selected, onSelect, onRun }: { result: InlineResul
         <span aria-hidden="true" className="text-[15px] leading-none text-fg">
           →
         </span>
-        {result.note && <span className="absolute top-full mt-1 text-11 whitespace-nowrap text-fg-60">{result.note}</span>}
+        {result.note && <span className="absolute top-full mt-1 max-w-[92%] truncate text-11 whitespace-nowrap text-fg-60">{result.note}</span>}
       </div>
     </div>
   );
@@ -98,7 +114,7 @@ export default function App() {
         invoke<Frecency>("frecency_all").catch(() => ({}) as Frecency),
         invoke<string[]>("favorites_get").catch(() => []),
       ]);
-      setCommands(loaded);
+      setCommands(loaded.map(localizeCommand));
       setFrecency(scores);
       setFavorites(favs);
     } finally {
@@ -157,18 +173,18 @@ export default function App() {
     [enabled, settings],
   );
   const sections = useMemo<Section[]>(() => {
-    const results = search(enabled.filter((c) => !c.query), query, frecency, favorites, aliases);
+    const results = localizeSections(search(enabled.filter((c) => !c.query), query, frecency, favorites, aliases));
     const text = query.trim();
     if (!text) return results;
     const matched = enabled
       .filter((c) => c.query?.matches(text))
-      .map((c): RegisteredCommand => ({ ...c, key: `query:${c.key}`, subtitle: text, actions: undefined, run: () => c.query!.run(text) }));
-    if (matched.length && results[0]?.title === "Results") results[0] = { ...results[0], items: [...matched, ...results[0].items] };
-    else if (matched.length) results.unshift({ title: "Results", items: matched });
+      .map((c): RegisteredCommand => ({ ...localizeCommand(c), key: `query:${c.key}`, subtitle: text, actions: undefined, run: () => c.query!.run(text) }));
+    if (matched.length && results[0]?.title === t("Results")) results[0] = { ...results[0], items: [...matched, ...results[0].items] };
+    else if (matched.length) results.unshift({ title: t("Results"), items: matched });
     const fallbacks = enabled
       .filter((c) => c.fallback || c.fallbackView)
-      .map((c): RegisteredCommand => ({ ...c, key: `fallback:${c.key}`, actions: undefined, view: c.fallbackView?.(text), run: c.fallback ? () => c.fallback!(text) : undefined }));
-    return fallbacks.length ? [...results, { title: `Use “${text}” with...`, items: fallbacks }] : results;
+      .map((c): RegisteredCommand => ({ ...localizeCommand(c), key: `fallback:${c.key}`, actions: undefined, view: c.fallbackView?.(text), run: c.fallback ? () => c.fallback!(text) : undefined }));
+    return fallbacks.length ? [...results, { title: t("Use “{query}” with...", { query: text }), items: fallbacks }] : results;
   }, [enabled, query, frecency, favorites, aliases]);
 
   const inlineResult = inline && inline.query === query ? inline.result : null;
@@ -226,7 +242,7 @@ export default function App() {
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
   }, [active, sections]);
 
-  const installUpdate: Action = { id: "install-update", title: "Install Update", shortcut: { key: "Enter" }, keepOpen: true, run: () => update!.downloadAndInstall() };
+  const installUpdate: Action = { id: "install-update", title: t("Install Update"), shortcut: { key: "Enter" }, keepOpen: true, run: () => update!.downloadAndInstall() };
   const groups: Action[][] = isUpdate
     ? [[installUpdate]]
     : isInline
@@ -250,7 +266,7 @@ export default function App() {
           })
         : [];
   const primaryTitle = isUpdate ? installUpdate.title : isInline ? inlineResult!.primaryActionTitle : current?.primaryActionTitle;
-  const panelTitle = isUpdate ? "New Update Available" : isInline ? inlineResult!.output.text || inlineResult!.output.label : (current?.title ?? "");
+  const panelTitle = isUpdate ? t("New Update Available") : isInline ? inlineResult!.output.text || inlineResult!.output.label : (current?.title ?? "");
 
   function visit(command: RegisteredCommand) {
     if (command.key.startsWith("fallback:") || command.key.startsWith("query:")) return;
@@ -265,14 +281,14 @@ export default function App() {
     if (command?.argument && action.id === "primary") {
       const { run, optional } = command.argument;
       if (!argumentValue.trim() && !optional) return argumentRef.current?.focus();
-      host.run({ ...action, keepOpen: true, run: () => run(argumentValue) },{ failTitle: `Could not run ${command.title}`, onSuccess: () => visit(command) });
+      host.run({ ...action, keepOpen: true, run: () => run(argumentValue) }, { failTitle: t("Could not run {title}", { title: command.title }), onSuccess: () => visit(command) });
       return;
     }
     if (command && action.id === "primary" && command.view) {
       openView(command);
       return;
     }
-    const title = action.id === "primary" && command ? `Could not open ${command.title}` : `${action.title.replace(/…$/, "")} failed`;
+    const title = action.id === "primary" && command ? t("Could not open {title}", { title: command.title }) : t("{title} failed", { title: action.title.replace(/…$/, "") });
     host.run(action, {
       failTitle: title,
       onSuccess: () => {
@@ -365,8 +381,8 @@ export default function App() {
             setSelected(0);
           }}
           onKeyDown={onKeyDown}
-          placeholder="Search for apps or commands..."
-          aria-label="Search for apps or commands"
+          placeholder={t("Search for apps or commands...")}
+          aria-label={t("Search for apps or commands")}
           role="combobox"
           aria-expanded="true"
           aria-controls="results"
@@ -391,8 +407,8 @@ export default function App() {
         <Loader active={loading > 0 || host.busy} />
       </header>
 
-      <div ref={listRef} id="results" role="listbox" aria-label="Results" aria-busy={loading > 0} className="min-h-0 flex-1 overflow-y-auto px-inset pb-inset">
-        {count === 0 && <p className="flex h-full items-center justify-center text-13 text-fg-60">No results for “{query.trim()}”</p>}
+      <div ref={listRef} id="results" role="listbox" aria-label={t("Results")} aria-busy={loading > 0} className="min-h-0 flex-1 overflow-y-auto px-inset pb-inset">
+        {count === 0 && <p className="flex h-full items-center justify-center text-13 text-fg-60">{t("No results for “{query}”", { query: query.trim() })}</p>}
         {showUpdate && (
           <div
             id="option-update"
@@ -404,12 +420,12 @@ export default function App() {
             className={`mt-2 flex h-[56px] cursor-default items-center gap-3 rounded-row px-2 text-13 ${isUpdate ? "bg-list-selection" : "bg-list-hover"}`}
           >
             <GlyphTile spec={{ glyph: RefreshCw, tone: "red" }} />
-            <span className="truncate font-medium">New Update Available</span>
+            <span className="truncate font-medium">{t("New Update Available")}</span>
           </div>
         )}
         {inlineResult && (
-          <div role="group" aria-label={inlineResult.section}>
-            <div className="flex h-8 items-end px-2 pb-[5px] text-11 font-semibold text-fg-60">{inlineResult.section}</div>
+          <div role="group" aria-label={t(inlineResult.section)}>
+            <div className="flex h-8 items-end px-2 pb-[5px] text-11 font-semibold text-fg-60">{t(inlineResult.section)}</div>
             <InlineCard
               result={inlineResult}
               selected={isInline}
@@ -447,22 +463,22 @@ export default function App() {
         ))}
       </div>
 
-      <Footer
-        left={
-          <button type="button" tabIndex={-1} aria-label="Open Settings" title="Open Settings" onClick={() => invoke("open_settings")} className="-m-1 rounded-[6px] p-1 hover:bg-list-hover">
-            <Logo />
-          </button>
-        }
-        primaryTitle={primaryTitle}
-        panelOpen={host.panelOpen}
-        showActions={groups.flat().length > 1}
-        onTogglePanel={() => (host.panelOpen ? host.closePanel() : groups.length && host.openPanel(panelTitle, groups))}
-      />
-      {host.render(runSelected)}
-      <FlowKeyDialog />
-      <div aria-live="polite" className="sr-only">
-        {count} {count === 1 ? "result" : "results"}
-      </div>
+        <Footer
+          left={
+            <button type="button" tabIndex={-1} aria-label={t("Open Settings")} title={t("Open Settings")} onClick={() => invoke("open_settings")} className="-m-1 rounded-[6px] p-1 hover:bg-list-hover">
+              <Logo />
+            </button>
+          }
+          primaryTitle={primaryTitle}
+          panelOpen={host.panelOpen}
+          showActions={groups.flat().length > 1}
+          onTogglePanel={() => (host.panelOpen ? host.closePanel() : groups.length && host.openPanel(panelTitle, groups))}
+        />
+        {host.render(runSelected)}
+        <FlowKeyDialog />
+        <div aria-live="polite" className="sr-only">
+          {t(count === 1 ? "{count} result" : "{count} results", { count })}
+        </div>
     </main>
   );
 }

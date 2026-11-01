@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { t } from "./i18n";
 import { Clipboard, ClipboardPaste } from "lucide-react";
 import type { Action } from "./extension-api";
 import { showHUD } from "./toast";
@@ -12,14 +13,15 @@ export function frontmostApp(): Promise<AppInfo | null> {
   return invoke<AppInfo | null>("frontmost_app").catch(() => null);
 }
 
-export async function copyAndClose(text: string, title = "Copied to Clipboard") {
+export async function copyAndClose(text: string, title?: string) {
+  title ??= t("Copied to Clipboard");
   await invoke("copy_text", { text });
   await invoke("hide_launcher", { restoreFocus: true });
   showHUD({ variant: "success", title });
 }
 
 export function pasteTitle(app: AppInfo | null): string {
-  return app ? `Paste to ${app.name}` : "Paste";
+  return app ? t("Paste to {app}", { app: app.name }) : t("Paste");
 }
 
 export function copyPasteActions(text: string, app: AppInfo | null, copyTitle: string, pasteFirst = false): Action[] {

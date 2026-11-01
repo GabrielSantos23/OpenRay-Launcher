@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Footer } from "../ActionHost";
 import { Dropdown } from "../Dropdown";
 import type { Command, Extension, ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { NOTCH_ACTION_EVENT, NOTCH_READY_EVENT, NOTCH_WIDGETS_EVENT, notchItems, type NotchWidget } from "../notch";
 import { isEnabled, type Settings } from "../settings";
 import { BackButton } from "../ListView";
@@ -128,11 +129,11 @@ async function checkReady(extension: InstalledExtension, interactive: boolean): 
     if (!interactive) return false;
     await invoke("show_launcher");
     const allowed = await ask({
-      title: `Allow “${extension.manifest.name}”?`,
-      message: "This extension was installed outside Openray and needs your permission to use:",
+      title: t("Allow “{name}”?", { name: extension.manifest.name }),
+      message: t("This extension was installed outside Openray and needs your permission to use:"),
       items: describeGrants(missing),
-      confirmTitle: "Allow",
-      cancelTitle: "Cancel",
+      confirmTitle: t("Allow"),
+      cancelTitle: t("Cancel"),
       destructive: false,
     });
     if (!allowed) return false;
@@ -141,7 +142,7 @@ async function checkReady(extension: InstalledExtension, interactive: boolean): 
   const required = missingPreferences(extension.manifest, await preferencesOf(extension.manifest));
   if (required.length) {
     if (interactive) {
-      showToast({ variant: "failure", title: `${extension.manifest.name} needs setup`, message: `Set ${required.map((p) => p.title).join(", ")} in Settings → Extensions` });
+      showToast({ variant: "failure", title: t("{name} needs setup", { name: extension.manifest.name }), message: t("Set {preferences} in Settings → Extensions", { preferences: required.map((p) => p.title).join(", ") }) });
       invoke("open_settings").catch((e) => console.error("open_settings failed", e));
     }
     return false;
@@ -158,7 +159,7 @@ export async function runBackground(extension: InstalledExtension, commandId: st
     if (entry) arm(viewId, entry);
   } catch (error) {
     const message = (error as { message?: string })?.message ?? String(error);
-    showToast({ variant: "failure", title: `${extension.manifest.commands.find((c) => c.id === commandId)?.title ?? commandId} failed`, message });
+    showToast({ variant: "failure", title: t("{title} failed", { title: extension.manifest.commands.find((c) => c.id === commandId)?.title ?? commandId }), message });
   }
 }
 
@@ -174,7 +175,7 @@ function ArgumentsView({ extension, command, onSubmit, onBack }: { extension: In
     const missing = definitions.findIndex((a) => a.required && !values[a.name]?.trim());
     if (missing >= 0) {
       refs.current[missing]?.focus();
-      showToast({ variant: "failure", title: `${definitions[missing].placeholder} is required` });
+      showToast({ variant: "failure", title: t("{field} is required", { field: definitions[missing].placeholder }) });
       return;
     }
     onSubmit(Object.fromEntries(Object.entries(values).filter(([, v]) => v !== "")));
@@ -221,15 +222,15 @@ function ArgumentsView({ extension, command, onSubmit, onBack }: { extension: In
               spellCheck={false}
               value={values[definition.name]}
               onChange={(e) => setValues((v) => ({ ...v, [definition.name]: e.target.value }))}
-              placeholder={definition.required ? definition.placeholder : `${definition.placeholder} (optional)`}
+              placeholder={definition.required ? definition.placeholder : t("{placeholder} (optional)", { placeholder: definition.placeholder })}
               aria-label={definition.placeholder}
               className="h-6 w-[150px] min-w-0 rounded-[5px] bg-control px-2 text-13 text-fg caret-fg outline-none placeholder:text-fg-60 focus:bg-control-hover"
             />
           ),
         )}
       </header>
-      <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-13 text-fg-60">Fill in the arguments, then press Enter.</div>
-      <Footer left={<span className="truncate text-fg-60">{extension.manifest.name}</span>} primaryTitle={command.mode === "background" ? "Run Command" : "Open Command"} panelOpen={false} showActions={false} onTogglePanel={() => {}} />
+      <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-13 text-fg-60">{t("Fill in the arguments, then press Enter.")}</div>
+      <Footer left={<span className="truncate text-fg-60">{extension.manifest.name}</span>} primaryTitle={command.mode === "background" ? t("Run Command") : t("Open Command")} panelOpen={false} showActions={false} onTogglePanel={() => {}} />
     </div>
   );
 }

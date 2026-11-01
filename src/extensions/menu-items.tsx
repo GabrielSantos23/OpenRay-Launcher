@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fail } from "../ActionHost";
 import { defineExtension, type IconSpec, type Item, type ViewProps } from "../extension-api";
 import { GlyphTile } from "../icons";
+import { t } from "../i18n";
 import { ListView } from "../ListView";
 import { copyAndClose } from "../output";
 
@@ -25,14 +26,14 @@ function SearchMenuItems({ pop }: ViewProps) {
       .then(([app, items]) => setData({ app, items }))
       .catch((e) => {
         setData({ app: "", items: [] });
-        fail("Could not read menu items", e);
+        fail(t("Could not read menu items"), e);
       });
   }, []);
 
   const sections = useMemo(() => {
     const groups = new Map<string, Item[]>();
     for (const item of data?.items ?? []) {
-      const section = item.path[0] ?? "Menu";
+      const section = item.path[0] ?? t("Menu");
       const location = item.path.slice(1).join(" › ");
       const entry: Item = {
         id: `${item.id}:${item.path.join("/")}:${item.title}`,
@@ -43,8 +44,8 @@ function SearchMenuItems({ pop }: ViewProps) {
         accessory: item.shortcut ? <kbd className="font-sans text-12 text-fg-60">{item.shortcut}</kbd> : undefined,
         actions: [
           [
-            { id: "run", title: "Run Menu Item", icon: Play, run: () => invoke<void>("menu_items_invoke", { id: item.id }) },
-            { id: "copy", title: "Copy Menu Path", icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose([...item.path, item.title].join(" › "), "Copied Menu Path") },
+            { id: "run", title: t("Run Menu Item"), icon: Play, run: () => invoke<void>("menu_items_invoke", { id: item.id }) },
+            { id: "copy", title: t("Copy Menu Path"), icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose([...item.path, item.title].join(" › "), t("Copied Menu Path")) },
           ],
         ],
       };
@@ -55,14 +56,14 @@ function SearchMenuItems({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder={data?.app ? `Search menu items of ${data.app}…` : "Search menu items…"}
+      placeholder={data?.app ? t("Search menu items of {app}…", { app: data.app }) : t("Search menu items…")}
       sections={sections}
       onBack={pop}
-      footerTitle="Search Menu Items"
+      footerTitle={t("Search Menu Items")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={data === null}
-      emptyText="No Menu Items"
-      emptyDescription={`${data?.app || "This app"} has no classic menu bar that Openray can read.`}
+      emptyText={t("No Menu Items")}
+      emptyDescription={t("{app} has no classic menu bar that Openray can read.", { app: data?.app || t("This app") })}
     />
   );
 }
@@ -76,7 +77,7 @@ export default defineExtension({
       id: "search",
       title: "Search Menu Items",
       subtitle: "Menu Items",
-      keywords: ["menu bar", "menu", "commands", "active app"],
+      keywords: ["menu bar", "menu", "commands", "active app", "itens de menu", "barra de menus"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SearchMenuItems,

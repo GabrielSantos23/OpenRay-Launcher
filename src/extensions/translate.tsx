@@ -5,6 +5,7 @@ import { fail, Footer, Loader, useActionHost } from "../ActionHost";
 import { matchesShortcut } from "../actions";
 import { Dropdown, type DropdownOption } from "../Dropdown";
 import { defineExtension, type Action, type IconSpec, type Shortcut, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { GlyphTile } from "../icons";
 import { BackButton } from "../ListView";
 import { copyAndClose, frontmostApp, pasteTitle, type AppInfo } from "../output";
@@ -78,7 +79,7 @@ function Translate({ pop }: ViewProps) {
     const timer = window.setTimeout(() => {
       invoke<Translation>("translate", { text, source: pair.source, target: pair.target })
         .then((t) => id === seq.current && setResult({ text, translated: t.text, pair, detected: t.detectedSourceLanguage ?? undefined }))
-        .catch((e) => id === seq.current && fail("Translation failed", e))
+        .catch((e) => id === seq.current && fail(t("Translation failed"), e))
         .finally(() => id === seq.current && setPending(false));
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
@@ -102,7 +103,7 @@ function Translate({ pop }: ViewProps) {
     () => [
       {
         value: AUTO,
-        label: detected ? `${languageLabel(detected)} (Detected)` : "Detect Language",
+        label: detected ? t("{language} (Detected)", { language: languageLabel(detected) }) : t("Detect Language"),
         icon: <WandSparkles aria-hidden="true" className="size-4 shrink-0" />,
       },
       ...TARGETS,
@@ -113,30 +114,30 @@ function Translate({ pop }: ViewProps) {
   const groups = useMemo<Action[][]>(() => {
     if (!pair) return [];
     const pick = (side: keyof LanguagePair, options: DropdownOption<string>[]): Action[] =>
-      options.map((o) => ({ id: o.value, title: o.label, accessory: o.value === pair[side] ? "Selected" : undefined, run: () => choose({ ...pair, [side]: o.value }), keepOpen: true }));
+      options.map((o) => ({ id: o.value, title: o.label, accessory: o.value === pair[side] ? t("Selected") : undefined, run: () => choose({ ...pair, [side]: o.value }), keepOpen: true }));
     return [
       [
-        { id: "copy", title: "Copy Translation", icon: Clipboard, shortcut: { key: "Enter", ctrl: true }, disabled: !translation, run: () => copyAndClose(translation, "Copied translation to clipboard") },
+        { id: "copy", title: t("Copy Translation"), icon: Clipboard, shortcut: { key: "Enter", ctrl: true }, disabled: !translation, run: () => copyAndClose(translation, t("Copied translation to clipboard")) },
         { id: "paste", title: pasteTitle(app), icon: ClipboardPaste, shortcut: { key: "Enter", ctrl: true, alt: true }, disabled: !translation, run: () => invoke("paste_text", { text: translation }) },
-        { id: "copySource", title: "Copy Source Text", icon: Clipboard, shortcut: { key: "Enter", ctrl: true, shift: true }, disabled: !text, run: () => copyAndClose(text, "Copied source text to clipboard") },
+        { id: "copySource", title: t("Copy Source Text"), icon: Clipboard, shortcut: { key: "Enter", ctrl: true, shift: true }, disabled: !text, run: () => copyAndClose(text, t("Copied source text to clipboard")) },
       ],
       [
-        { id: "swap", title: "Swap Languages", icon: ArrowRightLeft, shortcut: SWAP, disabled: !swapped, keepOpen: true, run: swap },
-        { id: "source", title: "Change Source Language…", icon: Flag, shortcut: { key: "p", ctrl: true, shift: true }, keepOpen: true, run: () => {}, submenu: () => pick("source", sources) },
-        { id: "target", title: "Change Target Language…", icon: Flag, shortcut: { key: "p", ctrl: true }, keepOpen: true, run: () => {}, submenu: () => pick("target", TARGETS) },
+        { id: "swap", title: t("Swap Languages"), icon: ArrowRightLeft, shortcut: SWAP, disabled: !swapped, keepOpen: true, run: swap },
+        { id: "source", title: t("Change Source Language…"), icon: Flag, shortcut: { key: "p", ctrl: true, shift: true }, keepOpen: true, run: () => {}, submenu: () => pick("source", sources) },
+        { id: "target", title: t("Change Target Language…"), icon: Flag, shortcut: { key: "p", ctrl: true }, keepOpen: true, run: () => {}, submenu: () => pick("target", TARGETS) },
       ],
     ];
   }, [pair, translation, text, app, swapped, swap, sources, choose]);
 
   function runAction(action: Action) {
-    if (!action.disabled) host.run(action, { failTitle: `${action.title.replace(/…$/, "")} failed` });
+    if (!action.disabled) host.run(action, { failTitle: t("{title} failed", { title: action.title.replace(/…$/, "") }) });
   }
 
   function onKeyDown(event: React.KeyboardEvent) {
     if (event.defaultPrevented || host.panelOpen) return;
     if (matchesShortcut(event, { key: "k", ctrl: true })) {
       event.preventDefault();
-      host.openPanel("Translate", groups);
+      host.openPanel(t("Translate"), groups);
       return;
     }
     const action = groups.flat().find((a) => a.shortcut && matchesShortcut(event, a.shortcut));
@@ -156,10 +157,10 @@ function Translate({ pop }: ViewProps) {
     <div onKeyDown={onKeyDown} className="relative flex min-h-0 flex-1 flex-col">
       <header className="absolute inset-x-0 top-0 z-10 grid h-[54px] grid-cols-2 items-center">
         <span id="translate-source" className="sr-only">
-          Source language
+          {t("Source language")}
         </span>
         <span id="translate-target" className="sr-only">
-          Target language
+          {t("Target language")}
         </span>
         <div className="absolute left-search-inset">
           <BackButton onBack={pop} />
@@ -181,8 +182,8 @@ function Translate({ pop }: ViewProps) {
             spellCheck={false}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Speak now"
-            aria-label="Text to translate"
+            placeholder={t("Speak now")}
+            aria-label={t("Text to translate")}
             lang={pair.source === AUTO ? detected : pair.source}
             className="relative min-h-0 flex-1 resize-none bg-transparent py-2 pr-[46px] pl-6 text-[24px] leading-[1.25] text-fg caret-fg outline-none placeholder:text-fg-40"
           />
@@ -192,17 +193,17 @@ function Translate({ pop }: ViewProps) {
         </div>
         <div className="flex min-h-0 flex-col gap-4 p-2 pt-10">
           <output
-            aria-label="Translation"
+            aria-label={t("Translation")}
             aria-busy={pending}
             lang={pair.target}
             className="min-h-0 flex-1 overflow-y-auto py-2 pr-[22px] pl-[38px] text-[24px] leading-[1.25] break-words whitespace-pre-wrap text-fg select-text"
           >
-            {translation || pending ? `${translation}${pending ? "…" : ""}` : <span className="text-fg-40">Translation</span>}
+            {translation || pending ? `${translation}${pending ? "…" : ""}` : <span className="text-fg-40">{t("Translation")}</span>}
           </output>
           <span className="h-7 shrink-0" />
         </div>
         <TipButton
-          label="Swap languages"
+          label={t("Swap languages")}
           shortcut={SWAP}
           onClick={swap}
           className={`absolute top-1/2 left-1/2 z-10 flex size-9 -translate-1/2 items-center justify-center rounded-full bg-list-hover text-fg ${swapped ? "hover:bg-control" : "opacity-40"}`}
@@ -215,13 +216,13 @@ function Translate({ pop }: ViewProps) {
         left={
           <span className="flex min-w-0 items-center gap-2 text-fg-60">
             <GlyphTile spec={ICON} small />
-            <span className="truncate">Translator</span>
+            <span className="truncate">{t("Translator")}</span>
           </span>
         }
         primaryTitle={primary.title}
         primaryKeys={["Ctrl", "↵"]}
         panelOpen={host.panelOpen}
-        onTogglePanel={() => (host.panelOpen ? host.closePanel() : host.openPanel("Translate", groups))}
+        onTogglePanel={() => (host.panelOpen ? host.closePanel() : host.openPanel(t("Translate"), groups))}
       />
       {host.render(runAction)}
     </div>
@@ -237,7 +238,7 @@ export default defineExtension({
       id: "translate",
       title: "Translate",
       subtitle: "Translator",
-      keywords: ["translate", "translator", "language", "google"],
+      keywords: ["translate", "translator", "language", "google", "traduzir", "tradução"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: Translate,

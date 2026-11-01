@@ -5,6 +5,7 @@ import { fail } from "../ActionHost";
 import { defineExtension, type Action, type IconSpec, type Item, type ViewProps } from "../extension-api";
 import { ListView } from "../ListView";
 import { GlyphTile } from "../icons";
+import { t } from "../i18n";
 
 const ICON: IconSpec = { glyph: AppWindow, tone: "blue" };
 
@@ -31,16 +32,16 @@ function windowActions(target: OpenWindow, reload: () => void): Action[][] {
   };
   const actions: Action[][] = [
     [
-      { id: "switch", title: "Switch to Window", icon: AppWindow, run: () => act("switch") },
-      { id: "minimize", title: target.minimized ? "Unminimize Window" : "Minimize Window", icon: MinusCircle, shortcut: { key: "m", ctrl: true }, run: () => act(target.minimized ? "switch" : "minimize") },
-      { id: "close", title: "Close Window", icon: XCircle, destructive: true, shortcut: { key: "w", ctrl: true, shift: true }, run: () => act("close") },
-      { id: "toggle-maximize", title: target.maximized ? "Restore" : "Maximize", icon: target.maximized ? Minimize2 : Maximize2, shortcut: { key: "f", ctrl: true }, run: () => act("toggle-maximize") },
+      { id: "switch", title: t("Switch to Window"), icon: AppWindow, run: () => act("switch") },
+      { id: "minimize", title: target.minimized ? t("Unminimize Window") : t("Minimize Window"), icon: MinusCircle, shortcut: { key: "m", ctrl: true }, run: () => act(target.minimized ? "switch" : "minimize") },
+      { id: "close", title: t("Close Window"), icon: XCircle, destructive: true, shortcut: { key: "w", ctrl: true, shift: true }, run: () => act("close") },
+      { id: "toggle-maximize", title: target.maximized ? t("Restore") : t("Maximize"), icon: target.maximized ? Minimize2 : Maximize2, shortcut: { key: "f", ctrl: true }, run: () => act("toggle-maximize") },
     ],
   ];
   if (target.appName) {
     actions.push([
-      { id: "quit", title: "Quit Application", icon: Power, destructive: true, keepOpen: true, shortcut: { key: "q", ctrl: true }, run: quit("quit") },
-      { id: "force-quit", title: "Force Quit Application", icon: Power, destructive: true, keepOpen: true, shortcut: { key: "q", ctrl: true, shift: true }, run: quit("force-quit") },
+      { id: "quit", title: t("Quit Application"), icon: Power, destructive: true, keepOpen: true, shortcut: { key: "q", ctrl: true }, run: quit("quit") },
+      { id: "force-quit", title: t("Force Quit Application"), icon: Power, destructive: true, keepOpen: true, shortcut: { key: "q", ctrl: true, shift: true }, run: quit("force-quit") },
     ]);
   }
   return actions;
@@ -53,7 +54,7 @@ function SwitchWindows({ pop }: ViewProps) {
   useEffect(() => {
     invoke<OpenWindow[]>("window_list")
       .then(setWindows)
-      .catch((e) => fail("Could not list windows", e));
+      .catch((e) => fail(t("Could not list windows"), e));
   }, [version]);
 
   const reload = () => setVersion((v) => v + 1);
@@ -78,10 +79,10 @@ function SwitchWindows({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Search windows…"
+      placeholder={t("Search windows…")}
       sections={sections}
       onBack={pop}
-      footerTitle="Switch Windows"
+      footerTitle={t("Switch Windows")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={windows === null}
       selectedId={windows?.[1] ? String(windows[1].id) : undefined}
@@ -99,7 +100,7 @@ export default defineExtension({
       id: "switch-windows",
       title: "Switch Windows",
       subtitle: "Navigation",
-      keywords: ["windows switch", "window switcher"],
+      keywords: ["windows switch", "window switcher", "janelas", "alternador de janelas"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SwitchWindows,

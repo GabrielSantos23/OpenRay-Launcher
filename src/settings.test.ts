@@ -17,6 +17,7 @@ const base: Settings = {
   escapeKeyBehavior: "pop-back-or-close",
   escapeKeyClosesWindow: true,
   appearance: "system",
+  language: "system",
   themeDarkId: "bundled-raycast-dark",
   themeLightId: "bundled-raycast-light",
   notchEnabled: true,

@@ -1,6 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { Clipboard, Settings } from "lucide-react";
 import { defineExtension, type Command } from "../extension-api";
+import { t } from "../i18n";
 import { copyAndClose } from "../output";
 
 interface SystemPage {
@@ -24,10 +25,10 @@ export default defineExtension({
         id: `${page.path}#${page.name}`,
         title: page.name,
         icon: `${convertFileSrc(page.kind === "System Settings" ? SETTINGS_APP : page.path, "appicon")}?size=${size}`,
-        keywords: [page.kind === "System Settings" ? "settings" : "control panel", ...page.keywords.split(";").filter(Boolean)],
+        keywords: [...(page.kind === "System Settings" ? ["settings", "configurações"] : ["control panel", "painel de controle"]), ...page.keywords.split(";").filter(Boolean)],
         kind: page.kind,
         primaryActionTitle: page.kind === "System Settings" ? "Open Settings Page" : "Open",
-        actions: [[], [{ id: "copy-name", title: "Copy Name", icon: Clipboard, shortcut: { key: "c", alt: true, shift: true }, run: () => copyAndClose(page.name, "Copied Name to Clipboard") }]],
+        actions: [[], [{ id: "copy-name", title: t("Copy Name"), icon: Clipboard, shortcut: { key: "c", alt: true, shift: true }, run: () => copyAndClose(page.name, t("Copied Name to Clipboard")) }]],
         run: () => invoke("launch_app", { path: page.path }),
       }),
     );

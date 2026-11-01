@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fail } from "../ActionHost";
 import type { IconSpec, Item, ViewProps } from "../extension-api";
 import { GlyphTile } from "../icons";
+import { t } from "../i18n";
 import { ListView } from "../ListView";
 import { showToast } from "../toast";
 import { VolumeLevel, volumeActions } from "./sound-devices";
@@ -35,7 +36,7 @@ export function VolumeMixer({ pop }: ViewProps) {
   const reload = useCallback(() => {
     invoke<AppAudio[]>("app_volumes")
       .then(setApps)
-      .catch((e) => fail("Could not list app volumes", e));
+      .catch((e) => fail(t("Could not list app volumes"), e));
   }, []);
 
   useEffect(reload, [reload]);
@@ -58,20 +59,20 @@ export function VolumeMixer({ pop }: ViewProps) {
     });
     const sorted = sortApps(apps ?? []);
     return [
-      { title: "Playing", items: sorted.filter((a) => a.isPlaying).map(item) },
-      { title: "Idle", items: sorted.filter((a) => !a.isPlaying).map(item) },
+      { title: t("Playing"), items: sorted.filter((a) => a.isPlaying).map(item) },
+      { title: t("Idle"), items: sorted.filter((a) => !a.isPlaying).map(item) },
     ].filter((s) => s.items.length > 0);
   }, [apps, reload]);
 
   return (
     <ListView
-      placeholder="Search apps…"
+      placeholder={t("Search apps…")}
       sections={sections}
       onBack={pop}
-      footerTitle="Volume Mixer"
+      footerTitle={t("Volume Mixer")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={apps === null}
-      emptyText="No apps are playing audio"
+      emptyText={t("No apps are playing audio")}
     />
   );
 }

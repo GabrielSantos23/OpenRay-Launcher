@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Overlay, useAnchorRect } from "./Dropdown";
+import { t } from "./i18n";
 import { hotkeyFromEvent, hotkeyLabels } from "./settings";
 
 export interface HotkeyConflict {
@@ -128,18 +129,18 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
     body = (
       <>
         <Message tone="red">
-          Already used by <strong className="font-semibold">{result.conflict.name}</strong>
+          {t("Already used by")} <strong className="font-semibold">{result.conflict.name}</strong>
         </Message>
         <Keys labels={hotkeyLabels(result.hotkey)} variant="conflict" />
-        <Message tone="tertiary">{result.conflict.overwritable ? "Overwrite it or record a new hotkey" : "Discard or record a new hotkey"}</Message>
+        <Message tone="tertiary">{result.conflict.overwritable ? t("Overwrite it or record a new hotkey") : t("Discard or record a new hotkey")}</Message>
       </>
     );
   } else if (result.state === "invalid") {
     body = (
       <>
-        <Message tone="red">{result.message ?? "This key combination isn't supported"}</Message>
+        <Message tone="red">{result.message ?? t("This key combination isn't supported")}</Message>
         <Keys labels={result.labels} variant="conflict" />
-        <Message tone="tertiary">Discard or record a new hotkey</Message>
+        <Message tone="tertiary">{t("Discard or record a new hotkey")}</Message>
       </>
     );
   } else if (held.length > 0) {
@@ -153,17 +154,17 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
   } else if (value) {
     body = (
       <>
-        <Message>{clearable ? "Press Backspace to delete" : " "}</Message>
+        <Message>{clearable ? t("Press Backspace to delete") : " "}</Message>
         <Keys labels={hotkeyLabels(value)} />
-        <Message tone="tertiary">{clearable ? "or record a new hotkey" : "Record a new hotkey"}</Message>
+        <Message tone="tertiary">{clearable ? t("or record a new hotkey") : t("Record a new hotkey")}</Message>
       </>
     );
   } else {
     body = (
       <>
-        <Message>e.g.</Message>
+        <Message>{t("e.g.")}</Message>
         <Keys labels={["Ctrl", "Alt", "A"]} variant="hint" />
-        <Message tone="tertiary">Single Step</Message>
+        <Message tone="tertiary">{t("Single Step")}</Message>
       </>
     );
   }
@@ -180,11 +181,11 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`${label}: ${value || "none"}`}
+        aria-label={t("{label}: {value}", { label, value: value || t("none") })}
         onClick={() => setOpen(true)}
         className={`h-6 rounded-[5px] bg-control px-3 font-medium text-fg outline-offset-2 hover:bg-control-hover ${open ? "outline-2 outline-accent" : ""}`}
       >
-        {value ? hotkeyLabels(value).join(" ") : open ? "Recording…" : "Record Hotkey"}
+        {value ? hotkeyLabels(value).join(" ") : open ? t("Recording…") : t("Record Hotkey")}
       </button>
     ) : (
       <button
@@ -192,7 +193,7 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`${label}: ${value || "none"}`}
+        aria-label={t("{label}: {value}", { label, value: value || t("none") })}
         onClick={() => setOpen(true)}
         className={`flex h-6 max-w-[145px] min-w-0 items-center gap-1.5 rounded-[5px] px-1.5 font-medium outline-offset-0 hover:shadow-[0_0_0_1px_var(--color-control-hover)] ${open ? "outline-2 outline-accent" : ""}`}
       >
@@ -205,7 +206,7 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
             ))}
           </span>
         ) : (
-          <span className="truncate text-fg-40">{open ? "Recording…" : "Record Hotkey"}</span>
+          <span className="truncate text-fg-40">{open ? t("Recording…") : t("Record Hotkey")}</span>
         )}
       </button>
     );
@@ -216,8 +217,8 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
       {variant === "cell" && clearable && (
         <button
           type="button"
-          aria-label={`Remove hotkey from ${label.replace(/^Hotkey for /, "")}`}
-          title="Remove hotkey"
+          aria-label={t("Remove hotkey from {title}", { title: label.replace(/^(Hotkey for|Atalho para) /, "") })}
+          title={t("Remove hotkey")}
           onClick={() => onClear!()}
           className="flex size-4 shrink-0 items-center justify-center rounded text-fg-60 hover:text-fg"
         >
@@ -230,7 +231,7 @@ export function HotkeyRecorder({ value, label, findConflict, onSave, onClear, va
           <div
             ref={contentRef}
             role="dialog"
-            aria-label={`Record ${label}`}
+            aria-label={t("Record {label}", { label })}
             tabIndex={-1}
             onKeyDown={onKeyDown}
             onKeyUp={(e) => {

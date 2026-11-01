@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fail } from "../ActionHost";
 import type { Action, IconSpec, Item, ViewProps } from "../extension-api";
 import { GlyphTile } from "../icons";
+import { t } from "../i18n";
 import { ListView } from "../ListView";
 import { showToast } from "../toast";
 
@@ -56,18 +57,18 @@ export function volumeActions(direction: Direction, target: VolumeTarget, change
   const mute = !target.isMuted;
   const icons = SETUP[direction];
   return [
-    [{ id: "toggle-mute", title: target.isMuted ? "Unmute" : "Mute", icon: target.isMuted ? icons.unmuted : icons.muted, shortcut: { key: "m", ctrl: true }, keepOpen: true, run: change({ muted: mute }, `Unable to ${mute ? "mute" : "unmute"} ${target.name}`) }],
+    [{ id: "toggle-mute", title: target.isMuted ? t("Unmute") : t("Mute"), icon: target.isMuted ? icons.unmuted : icons.muted, shortcut: { key: "m", ctrl: true }, keepOpen: true, run: change({ muted: mute }, t(`Unable to ${mute ? "mute" : "unmute"} {name}`, { name: target.name })) }],
     [
-      { id: "increase-volume", title: "Increase Volume", icon: Volume2, shortcut: { key: "=" }, keepOpen: true, run: change({ volume: volumeStep(target.volume, true) }, `Unable to set ${target.name} volume`) },
-      { id: "decrease-volume", title: "Decrease Volume", icon: Volume1, shortcut: { key: "-" }, keepOpen: true, run: change({ volume: volumeStep(target.volume, false) }, `Unable to set ${target.name} volume`) },
+      { id: "increase-volume", title: t("Increase Volume"), icon: Volume2, shortcut: { key: "=" }, keepOpen: true, run: change({ volume: volumeStep(target.volume, true) }, t("Unable to set {name} volume", { name: target.name })) },
+      { id: "decrease-volume", title: t("Decrease Volume"), icon: Volume1, shortcut: { key: "-" }, keepOpen: true, run: change({ volume: volumeStep(target.volume, false) }, t("Unable to set {name} volume", { name: target.name })) },
     ],
     LEVELS.map((level) => ({
       id: `set-volume-${level}`,
-      title: `Set Volume to ${level}%`,
+      title: t("Set Volume to {level}%", { level }),
       icon: level ? icons.unmuted : icons.muted,
-      accessory: !target.isMuted && Math.round(target.volume) === level ? "Current" : undefined,
+      accessory: !target.isMuted && Math.round(target.volume) === level ? t("Current") : undefined,
       keepOpen: true,
-      run: change({ volume: level }, `Unable to set ${target.name} volume`),
+      run: change({ volume: level }, t("Unable to set {name} volume", { name: target.name })),
     })),
   ];
 }
@@ -80,7 +81,7 @@ export function VolumeLevel({ device, direction }: { device: VolumeTarget; direc
       <span className="h-1 w-12 overflow-hidden rounded-full bg-control">
         <span className="block h-full rounded-full bg-fg-60" style={{ width: `${Math.round(device.volume)}%` }} />
       </span>
-      <Icon aria-label={device.isMuted ? "Muted" : undefined} className="size-3.5" />
+      <Icon aria-label={device.isMuted ? t("Muted") : undefined} className="size-3.5" />
     </span>
   );
 }
@@ -92,7 +93,7 @@ function SoundDevices({ pop, direction }: ViewProps & { direction: Direction }) 
   const reload = useCallback(() => {
     invoke<SoundDevice[]>("sound_devices", { direction })
       .then(setDevices)
-      .catch((e) => fail("Could not list sound devices", e));
+      .catch((e) => fail(t("Could not list sound devices"), e));
   }, [direction]);
 
   useEffect(reload, [reload]);
@@ -115,10 +116,10 @@ function SoundDevices({ pop, direction }: ViewProps & { direction: Direction }) 
           groups.push([
             {
               id: "select",
-              title: `Set as ${setup.label}`,
+              title: t("Set as {label}", { label: t(setup.label) }),
               icon: deviceIcon(direction, device.formFactor),
               keepOpen: true,
-              run: change(device, { default: true }, `Unable to set ${setup.label} to ${device.name}`, `${setup.label} set to ${device.name}`),
+              run: change(device, { default: true }, t("Unable to set {label} to {name}", { label: t(setup.label), name: device.name }), t("{label} set to {name}", { label: t(setup.label), name: device.name })),
             },
           ]);
         }
@@ -127,19 +128,19 @@ function SoundDevices({ pop, direction }: ViewProps & { direction: Direction }) 
       groups.push([
         {
           id: "copy-name",
-          title: "Copy Device Name",
+          title: t("Copy Device Name"),
           icon: Copy,
           shortcut: { key: "c", ctrl: true, shift: true },
           keepOpen: true,
           run: async () => {
             await invoke("copy_text", { text: device.name });
-            showToast({ variant: "success", title: "Copied to Clipboard" });
+            showToast({ variant: "success", title: t("Copied to Clipboard") });
           },
         },
       ]);
       groups.push([
-        { id: "refresh", title: "Refresh Devices", icon: RefreshCw, shortcut: { key: "r", ctrl: true }, keepOpen: true, run: reload },
-        { id: "open-settings", title: "Open Sound Settings", icon: Settings, shortcut: { key: "o", ctrl: true, shift: true }, run: () => invoke("open_url", { url: "ms-settings:sound", appPath: null }) },
+        { id: "refresh", title: t("Refresh Devices"), icon: RefreshCw, shortcut: { key: "r", ctrl: true }, keepOpen: true, run: reload },
+        { id: "open-settings", title: t("Open Sound Settings"), icon: Settings, shortcut: { key: "o", ctrl: true, shift: true }, run: () => invoke("open_url", { url: "ms-settings:sound", appPath: null }) },
       ]);
       return groups;
     };
@@ -152,7 +153,7 @@ function SoundDevices({ pop, direction }: ViewProps & { direction: Direction }) 
         accessory:
           device.state === "active" ? (
             <span className="flex items-center gap-2">
-              {device.isDefault && <span className="rounded-[4px] bg-icon-blue-top/15 px-1.5 py-px text-11 font-medium text-icon-blue-top">Default</span>}
+              {device.isDefault && <span className="rounded-[4px] bg-icon-blue-top/15 px-1.5 py-px text-11 font-medium text-icon-blue-top">{t("Default")}</span>}
               <VolumeLevel device={device} direction={direction} />
             </span>
           ) : undefined,
@@ -160,18 +161,18 @@ function SoundDevices({ pop, direction }: ViewProps & { direction: Direction }) 
       };
     };
     const sorted = sortDevices(devices ?? []);
-    return SECTIONS.map(([state, title]) => ({ title, items: sorted.filter((d) => d.state === state).map(item) })).filter((s) => s.items.length > 0);
+    return SECTIONS.map(([state, title]) => ({ title: t(title), items: sorted.filter((d) => d.state === state).map(item) })).filter((s) => s.items.length > 0);
   }, [devices, direction, reload, setup]);
 
   return (
     <ListView
-      placeholder="Search devices…"
+      placeholder={t("Search devices…")}
       sections={sections}
       onBack={pop}
-      footerTitle={setup.title}
+      footerTitle={t(setup.title)}
       footerIcon={<GlyphTile spec={setup.icon} small />}
       isLoading={devices === null}
-      emptyText={`No ${setup.label.toLowerCase()}s found`}
+      emptyText={t(`No ${setup.label.toLowerCase()}s found`)}
     />
   );
 }

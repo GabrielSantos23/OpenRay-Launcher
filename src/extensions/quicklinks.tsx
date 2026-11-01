@@ -6,6 +6,7 @@ import { matchesShortcut } from "../actions";
 import { Dropdown } from "../Dropdown";
 import { GlyphTile } from "../icons";
 import { defineExtension, type Command, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { BackButton, ListView, Metadata } from "../ListView";
 import { copyAndClose } from "../output";
 import { displayLink, exportQuicklinks, faviconUrl, fillLink, linkArguments, mergeQuicklinks, parseQuicklinkImport, type Quicklink } from "../quicklinks";
@@ -69,14 +70,14 @@ function QuicklinkForm({ initial, initialLink, onDone, onBack }: { initial?: Qui
   const browsers = useBrowsers();
   const ids = useId();
   const options = useMemo(() => {
-    const list = [{ value: "", label: "Default Browser" }, ...browsers];
+    const list = [{ value: "", label: t("Default Browser") }, ...browsers];
     if (initial?.appPath && !list.some((o) => o.value === initial.appPath)) list.push({ value: initial.appPath, label: initial.appName ?? initial.appPath });
     return list.map((o) => ({ ...o, icon: <AppIcon path={o.value} /> }));
   }, [browsers, initial]);
-  const title = initial ? "Edit Quicklink" : "Create Quicklink";
+  const title = initial ? t("Edit Quicklink") : t("Create Quicklink");
 
   async function save() {
-    const next = { link: link.trim() ? undefined : "Link is required", name: name.trim() ? undefined : "Name is required" };
+    const next = { link: link.trim() ? undefined : t("Link is required"), name: name.trim() ? undefined : t("Name is required") };
     setErrors(next);
     if (next.link) return linkRef.current?.focus();
     if (next.name) return nameRef.current?.focus();
@@ -91,10 +92,10 @@ function QuicklinkForm({ initial, initialLink, onDone, onBack }: { initial?: Qui
       };
       const exists = list.some((q) => q.id === quicklink.id);
       await saveQuicklinks(exists ? list.map((q) => (q.id === quicklink.id ? quicklink : q)) : [...list, quicklink]);
-      showToast({ variant: "success", title: initial ? "Updated Quicklink" : "Created Quicklink" });
+      showToast({ variant: "success", title: initial ? t("Updated Quicklink") : t("Created Quicklink") });
       onDone();
     } catch (e) {
-      fail("Could not save Quicklink", e);
+      fail(t("Could not save Quicklink"), e);
     }
   }
 
@@ -123,7 +124,7 @@ function QuicklinkForm({ initial, initialLink, onDone, onBack }: { initial?: Qui
         }}
       >
         <label htmlFor={`${ids}-link`} className="pt-2 text-right text-13 text-fg-60">
-          Link
+          {t("Link")}
         </label>
         <div className="flex flex-col gap-1.5">
           <textarea
@@ -139,11 +140,11 @@ function QuicklinkForm({ initial, initialLink, onDone, onBack }: { initial?: Qui
             className={`${field} h-[100px] resize-none py-2 ${errors.link ? "border-red" : "border-key-border focus:border-fg-40"}`}
           />
           <p id={`${ids}-link-help`} className={`text-12 ${errors.link ? "text-red" : "text-fg-60"}`}>
-            {errors.link ?? "Use {argument} to ask for text when you open it, or {clipboard}, {date}, {time} and {uuid} to insert them."}
+            {errors.link ?? t("Use {argument} to ask for text when you open it, or {clipboard}, {date}, {time} and {uuid} to insert them.")}
           </p>
         </div>
         <label htmlFor={`${ids}-name`} className="pt-2 text-right text-13 text-fg-60">
-          Name
+          {t("Name")}
         </label>
         <div className="flex flex-col gap-1.5">
           <input
@@ -152,14 +153,14 @@ function QuicklinkForm({ initial, initialLink, onDone, onBack }: { initial?: Qui
             spellCheck={false}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Quicklink name"
+            placeholder={t("Quicklink name")}
             aria-invalid={!!errors.name}
             className={`${field} h-[34px] ${errors.name ? "border-red" : "border-key-border focus:border-fg-40"}`}
           />
           {errors.name && <p className="text-12 text-red">{errors.name}</p>}
         </div>
         <span id={`${ids}-open-with`} className="pt-2 text-right text-13 text-fg-60">
-          Open With
+          {t("Open With")}
         </span>
         <Dropdown size="field" labelledBy={`${ids}-open-with`} value={appPath} options={options} onChange={setAppPath} />
       </form>
@@ -170,7 +171,7 @@ function QuicklinkForm({ initial, initialLink, onDone, onBack }: { initial?: Qui
             {title}
           </span>
         }
-        primaryTitle="Save Quicklink"
+        primaryTitle={t("Save Quicklink")}
         primaryKeys={["Ctrl", "↵"]}
         showActions={false}
         panelOpen={false}
@@ -204,7 +205,7 @@ function SearchQuicklinks({ pop, selectId }: ViewProps & { selectId?: string }) 
       .then(setList)
       .catch((e) => {
         setList([]);
-        fail("Could not load Quicklinks", e);
+        fail(t("Could not load Quicklinks"), e);
       });
   }, []);
   useEffect(reload, [reload]);
@@ -221,35 +222,35 @@ function SearchQuicklinks({ pop, selectId }: ViewProps & { selectId?: string }) 
         icon: <QuicklinkIcon link={quicklink.link} />,
         actions: [
           [
-            { id: "open", title: "Open Quicklink", icon: ExternalLink, run: () => openQuicklink(quicklink, values[quicklink.id] ?? {}) },
+            { id: "open", title: t("Open Quicklink"), icon: ExternalLink, run: () => openQuicklink(quicklink, values[quicklink.id] ?? {}) },
             {
               id: "copy-link",
-              title: "Copy Link",
+              title: t("Copy Link"),
               icon: Clipboard,
               shortcut: { key: "c", ctrl: true, shift: true },
-              run: () => copyAndClose(fillLink(quicklink.link, values[quicklink.id] ?? {}), "Copied Link to Clipboard"),
+              run: () => copyAndClose(fillLink(quicklink.link, values[quicklink.id] ?? {}), t("Copied Link to Clipboard")),
             },
           ],
           [
-            { id: "edit", title: "Edit Quicklink", icon: Pencil, shortcut: { key: "e", ctrl: true }, keepOpen: true, run: () => setEditing(quicklink) },
+            { id: "edit", title: t("Edit Quicklink"), icon: Pencil, shortcut: { key: "e", ctrl: true }, keepOpen: true, run: () => setEditing(quicklink) },
             {
               id: "duplicate",
-              title: "Duplicate Quicklink",
+              title: t("Duplicate Quicklink"),
               icon: CopyPlus,
               keepOpen: true,
               run: () => setEditing({ ...quicklink, id: crypto.randomUUID(), name: `${quicklink.name} Copy` }),
             },
-            { id: "create", title: "Create Quicklink", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing("new") },
+            { id: "create", title: t("Create Quicklink"), icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing("new") },
           ],
           [
             {
               id: "delete",
-              title: "Delete Quicklink",
+              title: t("Delete Quicklink"),
               icon: Trash2,
               destructive: true,
               keepOpen: true,
               shortcut: { key: "d", ctrl: true },
-              confirm: { title: "Delete Quicklink?", message: `“${quicklink.name}” will be deleted. This can't be undone.`, confirmTitle: "Delete Quicklink" },
+              confirm: { title: t("Delete Quicklink?"), message: t("“{name}” will be deleted. This can't be undone.", { name: quicklink.name }), confirmTitle: t("Delete Quicklink") },
               run: async () => {
                 await saveQuicklinks((list ?? []).filter((q) => q.id !== quicklink.id));
                 reload();
@@ -271,14 +272,14 @@ function SearchQuicklinks({ pop, selectId }: ViewProps & { selectId?: string }) 
 
   return (
     <ListView
-      placeholder="Search for Quicklinks…"
-      sections={[{ title: "Quicklinks", items }]}
+      placeholder={t("Search for Quicklinks…")}
+      sections={[{ title: t("Quicklinks"), items }]}
       onBack={pop}
-      footerTitle="Search Quicklinks"
+      footerTitle={t("Search Quicklinks")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={list === null}
-      emptyText="No Quicklinks yet. Press Ctrl+N to create one."
-      emptyActions={[[{ id: "create", title: "Create Quicklink", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing("new") }]]}
+      emptyText={t("No Quicklinks yet. Press Ctrl+N to create one.")}
+      emptyActions={[[{ id: "create", title: t("Create Quicklink"), icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing("new") }]]}
       selectedId={selectId}
       onSelectionChange={setCurrent}
       argument={
@@ -299,9 +300,9 @@ function SearchQuicklinks({ pop, selectId }: ViewProps & { selectId?: string }) 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 font-mono text-13 break-all whitespace-pre-wrap text-fg">{preview}</div>
             <Metadata
               rows={[
-                { label: "Name", value: quicklink.name },
-                { label: "Link", value: <span className="truncate">{quicklink.link}</span> },
-                { label: "Open With", value: quicklink.appName ?? "Default Browser" },
+                { label: t("Name"), value: quicklink.name },
+                { label: t("Link"), value: <span className="truncate">{quicklink.link}</span> },
+                { label: t("Open With"), value: quicklink.appName ?? t("Default Browser") },
               ]}
             />
           </>
@@ -327,8 +328,7 @@ async function importQuicklinks() {
   const apps = await invoke<{ name: string; path: string }[]>("list_apps").catch(() => []);
   const { list, added, skipped } = mergeQuicklinks(await loadQuicklinks(), incoming, apps, () => crypto.randomUUID());
   await saveQuicklinks(list);
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-  showToast({ variant: "success", title: "Import successful", message: [added > 0 && `${plural(added, "quicklink")} added`, skipped > 0 && `${plural(skipped, "duplicate")} skipped`].filter(Boolean).join(", ") || undefined });
+  showToast({ variant: "success", title: t("Import successful"), message: [added > 0 && t(`{count} quicklink${added === 1 ? "" : "s"} added`, { count: added }), skipped > 0 && t(`{count} duplicate${skipped === 1 ? "" : "s"} skipped`, { count: skipped })].filter(Boolean).join(", ") || undefined });
 }
 
 async function exportAll() {
@@ -340,7 +340,7 @@ async function exportAll() {
   const path = `${folder.replace(/\\$/, "")}\\Quicklinks ${date}.json`;
   await invoke("flowkey_fs", { op: "writeText", path, content: exportQuicklinks(list) });
   await invoke("show_in_explorer", { path });
-  showToast({ variant: "success", title: "Exported quicklinks" });
+  showToast({ variant: "success", title: t("Exported quicklinks") });
 }
 
 function quicklinkCommand(quicklink: Quicklink): Command {
@@ -372,7 +372,7 @@ export default defineExtension({
       id: "create",
       title: "Create Quicklink",
       subtitle: "Quicklinks",
-      keywords: ["link", "url", "bookmark"],
+      keywords: ["link", "url", "bookmark", "links", "atalhos"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: CreateQuicklink,
@@ -382,7 +382,7 @@ export default defineExtension({
       id: "search",
       title: "Search Quicklinks",
       subtitle: "Quicklinks",
-      keywords: ["link", "url", "bookmark"],
+      keywords: ["link", "url", "bookmark", "links", "atalhos"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SearchQuicklinks,
@@ -392,7 +392,7 @@ export default defineExtension({
       title: "Import Quicklinks",
       subtitle: "Quicklinks",
       icon: { glyph: Download, tone: "purple" },
-      keywords: ["link", "json", "import"],
+      keywords: ["link", "json", "import", "importar"],
       kind: "Command",
       primaryActionTitle: "Run Command",
       run: importQuicklinks,
@@ -402,7 +402,7 @@ export default defineExtension({
       title: "Export Quicklinks",
       subtitle: "Quicklinks",
       icon: { glyph: Upload, tone: "purple" },
-      keywords: ["link", "json", "export", "backup"],
+      keywords: ["link", "json", "export", "backup", "exportar"],
       kind: "Command",
       primaryActionTitle: "Run Command",
       run: exportAll,

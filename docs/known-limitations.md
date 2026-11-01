@@ -201,3 +201,11 @@
 - Contacts have no photos and are not shown in root search. Search Contacts was only checked with an empty contact store; Windows does not let an unpackaged process create a test contact list.
 - Define Word needs the internet. English uses Datamuse and the Free Dictionary API (dictionaryapi.dev); Portuguese uses the Portuguese Wiktionary. All are free keyless services without an uptime guarantee. Portuguese suggestions show no definition preview, and Wiktionary templates other than scopes are dropped from the text.
 - Only English and Portuguese are offered. Dicionário Aberto was tried for Portuguese and dropped: it follows pre-1990 spelling (“acção”, no “ação”).
+
+## i18n (English / Portuguese)
+
+- **Coverage.** Every shipped window and extension is translated; anything not yet in the pt-BR dictionaries renders as the English string, by design. The FlowKey extensions' own content (names and descriptions installed by the user) is not translated.
+- **Numbers.** Calculator results keep the en-US digit grouping (`1,234.56`) for parity with the reference; money amounts and dates follow the chosen language (`pt-BR` when Portuguese).
+- **Portuguese queries.** The calculator understands "100 dolares para brl", "100,50 reais em dolares", "10 km em milhas", "hora em brasil" and similar phrases for fixed word lists. Ambiguous currency words (peso, franco, coroa, rupia) are deliberately not mapped. Time-zone aliases cover ldn, nyc, sf, la, sp and hk; San Francisco resolves to Los Angeles because IANA has no San Francisco zone.
+- **Unit conversions.** Factors are standard (SI, US customary, CSS at 96 PPI with an optional `at N ppi` modifier for px/em/rem). Months are 30.44 days and years are tropical years, so month/year conversions are approximate. `rem`/`em` assume a 16 px root font size. Time differences and "days until" use the local machine clock.
+- **Pinned screenshot window.** The "Pinned Screenshot" native window title is set in Rust and is not translated yet.

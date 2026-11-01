@@ -4,6 +4,7 @@ import type { ExtensionManifest, PreferenceSchema } from "@flowkey-cli/native-sd
 import { useEffect, useState } from "react";
 import { Dropdown as Select } from "../Dropdown";
 import { Card, Row, Switch } from "../controls";
+import { t } from "../i18n";
 import { ask } from "./dialogs";
 import { CHANGED_EVENT, describeGrants, forgetCached, grantConsent, grantsFor, listExtensions, manifestIssues, newerVersion, pendingConsent, preferencesOf, REMOVED_EVENT, setPreferences, dataSet, type Failure } from "./extensions";
 import { grantsOf, NO_GRANTS } from "./gate";
@@ -36,20 +37,20 @@ export function FlowKeyInstallCard({ failures, onChanged }: { failures: Failure[
       const current = (await listExtensions()).extensions.find((e) => e.manifest.id === manifest.id && e.source === "installed");
       if (current && !newerVersion(manifest.version, current.manifest.version)) throw new Error(`${manifest.name} ${current.manifest.version} is already installed. Only a newer version can replace it.`);
       const allowed = await ask({
-        title: `Install “${manifest.name}” ${manifest.version}?`,
-        message: describeGrants(grantsOf(manifest)).length ? "It will be allowed to:" : "It asks for no permissions.",
+        title: t("Install “{name}” {version}?", { name: manifest.name, version: manifest.version }),
+        message: describeGrants(grantsOf(manifest)).length ? t("It will be allowed to:") : t("It asks for no permissions."),
         items: describeGrants(grantsOf(manifest)),
-        confirmTitle: "Install",
-        cancelTitle: "Cancel",
+        confirmTitle: t("Install"),
+        cancelTitle: t("Cancel"),
         destructive: false,
       });
       if (!allowed) return;
       await invoke("flowkey_install", { path, id: manifest.id });
       await grantConsent(manifest);
-      setStatus({ text: `Installed ${manifest.name} ${manifest.version}.`, error: false });
+      setStatus({ text: t("Installed {name} {version}.", { name: manifest.name, version: manifest.version }), error: false });
       onChanged();
     } catch (error) {
-      setStatus({ text: message(error), error: true });
+      setStatus({ text: t(message(error)), error: true });
     } finally {
       setBusy(false);
     }
@@ -57,19 +58,19 @@ export function FlowKeyInstallCard({ failures, onChanged }: { failures: Failure[
 
   return (
     <Card>
-      <Row id="flowkey-install" title="Install Extension" description="Add a .flowkey package built with the FlowKey CLI.">
+      <Row id="flowkey-install" title={t("Install Extension")} description={t("Add a .flowkey package built with the FlowKey CLI.")}>
         <button type="button" disabled={busy} onClick={install} className={BUTTON}>
-          Install from File…
+          {t("Install from File…")}
         </button>
       </Row>
-      <Row id="flowkey-folder" title="Extensions Folder" description={folder || "Unavailable"}>
-        <button type="button" disabled={!folder} onClick={() => invoke("open_url", { url: folder }).catch((e) => setStatus({ text: message(e), error: true }))} className={BUTTON}>
-          Open Folder
+      <Row id="flowkey-folder" title={t("Extensions Folder")} description={folder || t("Unavailable")}>
+        <button type="button" disabled={!folder} onClick={() => invoke("open_url", { url: folder }).catch((e) => setStatus({ text: t(message(e)), error: true }))} className={BUTTON}>
+          {t("Open Folder")}
         </button>
       </Row>
       {failures.map((failure) => (
-        <Row key={`${failure.source}:${failure.id}`} id={`flowkey-failure-${failure.id}`} title={`${failure.id} could not load`} description={failure.message}>
-          <span className="text-12 text-red">{failure.source === "bundled" ? "Bundled" : "Installed"}</span>
+        <Row key={`${failure.source}:${failure.id}`} id={`flowkey-failure-${failure.id}`} title={t("{id} could not load", { id: failure.id })} description={t(failure.message)}>
+          <span className="text-12 text-red">{failure.source === "bundled" ? t("Bundled") : t("Installed")}</span>
         </Row>
       ))}
       <p aria-live="polite" className={`px-3 text-12 empty:hidden ${status?.error ? "pb-2 text-red" : "pb-2 text-fg-60"}`}>
@@ -95,7 +96,7 @@ function PreferenceInput({ schema, value, onChange, id }: { schema: PreferenceSc
   if (schema.type === "dropdown" || schema.type === "appPicker") {
     const options = schema.type === "dropdown" ? (schema.options ?? []).map((o) => ({ value: o.value, label: o.title })) : apps.map((a) => ({ value: a.path, label: a.name }));
     const current = typeof value === "string" ? value : "";
-    const withEmpty = options.some((o) => o.value === current) ? options : [{ value: current, label: current ? current : "Choose…" }, ...options];
+    const withEmpty = options.some((o) => o.value === current) ? options : [{ value: current, label: current ? current : t("Choose…") }, ...options];
     return <Select labelledBy={id} size="small" value={current} options={withEmpty} onChange={onChange} />;
   }
   const browse = schema.type === "file" || schema.type === "directory";
@@ -121,7 +122,7 @@ function PreferenceInput({ schema, value, onChange, id }: { schema: PreferenceSc
             if (picked) onChange(picked);
           }}
         >
-          Browse…
+          {t("Browse…")}
         </button>
       )}
     </span>
@@ -161,10 +162,10 @@ export function FlowKeyDetails({ extension, onChanged }: { extension: InstalledE
 
   async function uninstall() {
     const confirmed = await ask({
-      title: `Uninstall “${manifest.name}”?`,
-      message: "This deletes the extension and its saved data, secrets and sign-ins from this computer. You can install it again later.",
-      confirmTitle: "Uninstall",
-      cancelTitle: "Cancel",
+      title: t("Uninstall “{name}”?", { name: manifest.name }),
+      message: t("This deletes the extension and its saved data, secrets and sign-ins from this computer. You can install it again later."),
+      confirmTitle: t("Uninstall"),
+      cancelTitle: t("Cancel"),
       destructive: true,
     });
     if (!confirmed) return;
@@ -192,12 +193,12 @@ export function FlowKeyDetails({ extension, onChanged }: { extension: InstalledE
     <>
       <Card>
         <Row id={`fk-${manifest.id}-about`} title={`${manifest.name} ${manifest.version}`} description={manifest.description}>
-          <span className="text-12 text-fg-60">{extension.source === "bundled" ? "Bundled with Openray" : "Installed"}</span>
+          <span className="text-12 text-fg-60">{extension.source === "bundled" ? t("Bundled with Openray") : t("Installed")}</span>
         </Row>
         {extension.source === "installed" && (
-          <Row id={`fk-${manifest.id}-uninstall`} title="Uninstall" description={extension.dir}>
+          <Row id={`fk-${manifest.id}-uninstall`} title={t("Uninstall")} description={extension.dir}>
             <button type="button" onClick={uninstall} className={`${BUTTON} text-destructive`}>
-              Uninstall…
+              {t("Uninstall…")}
             </button>
           </Row>
         )}
@@ -207,7 +208,7 @@ export function FlowKeyDetails({ extension, onChanged }: { extension: InstalledE
           {manifest.preferences!.map((schema) => {
             const id = `fk-${manifest.id}-pref-${schema.name}`;
             return (
-              <Row key={schema.name} id={id} title={`${schema.title}${schema.required ? " (required)" : ""}`} description={schema.description}>
+              <Row key={schema.name} id={id} title={schema.required ? t("{title} (required)", { title: schema.title }) : schema.title} description={schema.description}>
                 <PreferenceInput id={id} schema={schema} value={values[schema.name]} onChange={(value) => save(schema.name, value)} />
               </Row>
             );
@@ -215,7 +216,7 @@ export function FlowKeyDetails({ extension, onChanged }: { extension: InstalledE
         </Card>
       )}
       <Card>
-        <Row id={`fk-${manifest.id}-permissions`} title="Permissions" description={grantedList.length ? grantedList.join(" · ") : "No permissions granted"}>
+        <Row id={`fk-${manifest.id}-permissions`} title={t("Permissions")} description={grantedList.length ? grantedList.map((g) => t(g)).join(" · ") : t("No permissions granted")}>
           {pending.length > 0 && (
             <button
               type="button"
@@ -225,16 +226,16 @@ export function FlowKeyDetails({ extension, onChanged }: { extension: InstalledE
                 await refresh();
               }}
             >
-              Allow {pending.length} Pending
+              {t("Allow {count} Pending", { count: pending.length })}
             </button>
           )}
           {extension.source === "installed" && grantedList.length > 0 && (
             <button type="button" className={BUTTON} onClick={revoke}>
-              Revoke All
+              {t("Revoke All")}
             </button>
           )}
         </Row>
-        {pending.length > 0 && <Row id={`fk-${manifest.id}-pending`} title="Waiting for Approval" description={pending.join(" · ")}>{null}</Row>}
+        {pending.length > 0 && <Row id={`fk-${manifest.id}-pending`} title={t("Waiting for Approval")} description={pending.map((p) => t(p)).join(" · ")}>{null}</Row>}
       </Card>
       {error && (
         <p role="alert" className="px-3 text-12 text-red">

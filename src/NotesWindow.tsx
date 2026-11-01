@@ -45,6 +45,7 @@ import type { PanelPlacement } from "./ActionPanel";
 import { matchesShortcut } from "./actions";
 import type { Action, Shortcut } from "./extension-api";
 import { updatedAgo } from "./extensions/calculator";
+import { t } from "./i18n";
 import { browseSections, countLabel, currentNote, emptyNote, loadNotes, newNote, noteTitle, saveNotes, type Note, type NotesRequest } from "./notes";
 import { matchScore } from "./search";
 import { useSettings } from "./settings";
@@ -157,7 +158,7 @@ function BrowseNotes({
   return (
     <>
       <div className="fixed inset-0 z-10" onMouseDown={onClose} />
-      <div role="dialog" aria-label="Browse Notes" className={`z-20 flex flex-col rounded-panel border border-panel-border bg-panel shadow-panel ${TOP_PANEL.className}`}>
+      <div role="dialog" aria-label={t("Browse Notes")} className={`z-20 flex flex-col rounded-panel border border-panel-border bg-panel shadow-panel ${TOP_PANEL.className}`}>
         <input
           autoFocus
           spellCheck={false}
@@ -167,19 +168,19 @@ function BrowseNotes({
             setSelected(0);
           }}
           onKeyDown={onKeyDown}
-          placeholder="Search for notes..."
-          aria-label="Search for notes"
+          placeholder={t("Search for notes...")}
+          aria-label={t("Search for notes")}
           role="combobox"
           aria-expanded="true"
           aria-controls="browse-notes"
           aria-activedescendant={flat[active] ? `note-${active}` : undefined}
           className="h-[38px] shrink-0 border-b border-panel-separator bg-transparent px-[15px] text-13 text-fg caret-fg outline-none placeholder:text-fg-40"
         />
-        <div id="browse-notes" role="listbox" aria-label="Notes" className="max-h-[320px] overflow-y-auto [scrollbar-width:none] px-[7px] pt-[7px] pb-2">
-          {flat.length === 0 && <p className="flex h-8 items-center px-2 text-13 text-fg-60">No matching notes</p>}
+        <div id="browse-notes" role="listbox" aria-label={t("Notes")} className="max-h-[320px] overflow-y-auto [scrollbar-width:none] px-[7px] pt-[7px] pb-2">
+          {flat.length === 0 && <p className="flex h-8 items-center px-2 text-13 text-fg-60">{t("No matching notes")}</p>}
           {sections.map((section) => (
-            <div key={section.title} role="group" aria-label={section.title}>
-              <div className="flex h-6 items-center px-2 text-11 font-semibold text-fg-60">{section.title}</div>
+            <div key={section.title} role="group" aria-label={t(section.title)}>
+              <div className="flex h-6 items-center px-2 text-11 font-semibold text-fg-60">{t(section.title)}</div>
               {section.notes.map((note) => {
                 index += 1;
                 const i = index;
@@ -199,14 +200,14 @@ function BrowseNotes({
                       <span className="truncate text-13 font-medium text-fg">{noteTitle(note.text)}</span>
                       <span className="flex items-center gap-1 truncate text-12 text-fg-60">
                         {current && <span aria-hidden="true" className="size-[5px] shrink-0 rounded-full bg-red" />}
-                        {current ? `Current • ${count}` : `${updatedAgo(note.lastAccessedAt, now, "Opened")} • ${count}`}
+                        {current ? t("Current • {count}", { count }) : `${updatedAgo(note.lastAccessedAt, now, "Opened")} • ${count}`}
                       </span>
                     </div>
                     <div className={`flex gap-1 ${i === active ? "" : "invisible"}`}>
                       <button
                         type="button"
                         tabIndex={-1}
-                        aria-label={note.pinned ? "Unpin note" : "Pin note"}
+                        aria-label={note.pinned ? t("Unpin note") : t("Pin note")}
                         onClick={(e) => {
                           e.stopPropagation();
                           onPin(note);
@@ -218,7 +219,7 @@ function BrowseNotes({
                       <button
                         type="button"
                         tabIndex={-1}
-                        aria-label="Delete note"
+                        aria-label={t("Delete note")}
                         onClick={(e) => {
                           e.stopPropagation();
                           onDelete(note);
@@ -262,8 +263,8 @@ function LinkField({ initial, onSubmit, onClose }: { initial: string; onSubmit: 
               onClose();
             }
           }}
-          placeholder="Paste or type a link..."
-          aria-label="Link URL"
+          placeholder={t("Paste or type a link...")}
+          aria-label={t("Link URL")}
           className="h-[38px] min-w-0 flex-1 bg-transparent px-[15px] text-13 text-fg caret-fg outline-none placeholder:text-fg-40"
         />
       </form>
@@ -296,7 +297,7 @@ export function NotesWindow() {
     if (!saveTimer.current) return;
     window.clearTimeout(saveTimer.current);
     saveTimer.current = 0;
-    return saveNotes(notesRef.current).catch((e) => fail("Could not save note", e));
+    return saveNotes(notesRef.current).catch((e) => fail(t("Could not save note"), e));
   }
 
   function commit(next: Note[]) {
@@ -314,11 +315,11 @@ export function NotesWindow() {
       Markdown,
     ],
     editorProps: {
-      attributes: { "aria-label": "Note", spellcheck: "false" },
+      attributes: { "aria-label": t("Note"), spellcheck: "false" },
       handleClick(_view, _pos, event) {
         const anchor = (event.target as HTMLElement).closest("a");
         if (!anchor?.href) return false;
-        invoke("open_url", { url: anchor.href }).catch((e) => fail("Could not open link", e));
+        invoke("open_url", { url: anchor.href }).catch((e) => fail(t("Could not open link"), e));
         return true;
       },
     },
@@ -366,7 +367,7 @@ export function NotesWindow() {
   function create() {
     const empty = emptyNote(notesRef.current);
     if (empty?.id === currentRef.current) {
-      showToast({ variant: "failure", title: "You already have an empty note" });
+      showToast({ variant: "failure", title: t("You already have an empty note") });
       return;
     }
     if (empty) return open(empty.id);
@@ -392,7 +393,7 @@ export function NotesWindow() {
 
   function togglePin(note: Note) {
     commit(notesRef.current.map((n) => (n.id === note.id ? { ...n, pinned: !n.pinned } : n)));
-    showToast({ variant: "success", title: note.pinned ? "Unpinned Note" : "Pinned Note" });
+    showToast({ variant: "success", title: note.pinned ? t("Unpinned Note") : t("Pinned Note") });
   }
 
   function step(delta: number) {
@@ -405,8 +406,8 @@ export function NotesWindow() {
 
   function copyAs(title: string, text: string) {
     invoke("copy_text", { text }).then(
-      () => showToast({ variant: "success", title: `Copied as ${title}` }),
-      (e) => fail("Could not copy note", e),
+      () => showToast({ variant: "success", title: t("Copied as {title}", { title: t(title) }) }),
+      (e) => fail(t("Could not copy note"), e),
     );
   }
 
@@ -420,14 +421,14 @@ export function NotesWindow() {
   function deleteConfirmation(note: Note): Action {
     return {
       id: "delete",
-      title: "Delete Note",
+      title: t("Delete Note"),
       icon: Trash2,
       destructive: true,
       shortcut: SHORTCUTS.remove,
-      confirm: { title: "Delete Note?", message: `“${noteTitle(note.text)}” will be deleted. This can't be undone.`, confirmTitle: "Delete Note" },
+      confirm: { title: t("Delete Note?"), message: t("“{title}” will be deleted. This can't be undone.", { title: noteTitle(note.text) }), confirmTitle: t("Delete Note") },
       run: () => {
         remove(note.id);
-        showToast({ variant: "success", title: "Note deleted" });
+        showToast({ variant: "success", title: t("Note deleted") });
       },
     };
   }
@@ -441,30 +442,30 @@ export function NotesWindow() {
     const selected = () => editor.state.doc.cut(editor.state.selection.from, editor.state.selection.to);
     return keepOpen([
       [
-        { id: "new", title: "New Note", icon: Plus, shortcut: SHORTCUTS.create, disabled: empty, run: create },
+        { id: "new", title: t("New Note"), icon: Plus, shortcut: SHORTCUTS.create, disabled: empty, run: create },
         {
           id: "duplicate",
-          title: "Duplicate Note",
+          title: t("Duplicate Note"),
           icon: CopyPlus,
           disabled: empty,
           run: () => {
             const note = newNote(Date.now(), current.markdown, current.text);
             commit([...notesRef.current, note]);
             open(note.id);
-            showToast({ variant: "success", title: "Note duplicated" });
+            showToast({ variant: "success", title: t("Note duplicated") });
           },
         },
-        { id: "pin", title: current.pinned ? "Unpin Note" : "Pin Note", icon: current.pinned ? PinOff : Pin, shortcut: SHORTCUTS.pin, run: () => togglePin(current) },
+        { id: "pin", title: current.pinned ? t("Unpin Note") : t("Pin Note"), icon: current.pinned ? PinOff : Pin, shortcut: SHORTCUTS.pin, run: () => togglePin(current) },
       ],
       [
-        { id: "browse", title: "Browse Notes", icon: Files, shortcut: SHORTCUTS.browse, run: () => setBrowsing(true) },
-        { id: "back", title: "Go Back", icon: ArrowLeftCircle, shortcut: SHORTCUTS.back, disabled: history.index <= 0, run: () => step(-1) },
-        { id: "forward", title: "Go Forward", icon: ArrowRightCircle, shortcut: SHORTCUTS.forward, disabled: history.index >= history.stack.length - 1, run: () => step(1) },
+        { id: "browse", title: t("Browse Notes"), icon: Files, shortcut: SHORTCUTS.browse, run: () => setBrowsing(true) },
+        { id: "back", title: t("Go Back"), icon: ArrowLeftCircle, shortcut: SHORTCUTS.back, disabled: history.index <= 0, run: () => step(-1) },
+        { id: "forward", title: t("Go Forward"), icon: ArrowRightCircle, shortcut: SHORTCUTS.forward, disabled: history.index >= history.stack.length - 1, run: () => step(1) },
       ],
       [
         {
           id: "copy",
-          title: selection ? "Copy Selection As…" : "Copy Note As…",
+          title: selection ? t("Copy Selection As…") : t("Copy Note As…"),
           icon: Copy,
           shortcut: SHORTCUTS.copy,
           run: () => undefined,
@@ -474,34 +475,34 @@ export function NotesWindow() {
             const text = selection ? editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, "\n\n") : editor.getText();
             const html = selection ? new XMLSerializer().serializeToString(editor.view.serializeForClipboard(editor.state.selection.content()).dom) : editor.getHTML();
             return [
-              { id: "markdown", title: "Markdown", icon: FileCode, run: () => copyAs("Markdown", markdown) },
-              { id: "text", title: "Plain Text", icon: FileText, run: () => copyAs("Plain Text", text) },
-              { id: "html", title: "HTML", icon: Code, run: () => copyAs("HTML", html) },
+              { id: "markdown", title: t("Markdown"), icon: FileCode, run: () => copyAs("Markdown", markdown) },
+              { id: "text", title: t("Plain Text"), icon: FileText, run: () => copyAs("Plain Text", text) },
+              { id: "html", title: t("HTML"), icon: Code, run: () => copyAs("HTML", html) },
             ];
           },
         },
       ],
       [
-        { id: "format", title: "Format…", icon: Type, run: () => undefined, submenu: () => inlineFormats() },
-        { id: "heading", title: "Heading…", icon: Heading, run: () => undefined, submenu: () => headings() },
-        { id: "list", title: "List…", icon: List, run: () => undefined, submenu: () => lists() },
-        { id: "format-bar", title: formatBar ? "Hide Format Bar" : "Show Format Bar", icon: Type, shortcut: SHORTCUTS.formatBar, run: toggleFormatBar },
+        { id: "format", title: t("Format…"), icon: Type, run: () => undefined, submenu: () => inlineFormats() },
+        { id: "heading", title: t("Heading…"), icon: Heading, run: () => undefined, submenu: () => headings() },
+        { id: "list", title: t("List…"), icon: List, run: () => undefined, submenu: () => lists() },
+        { id: "format-bar", title: formatBar ? t("Hide Format Bar") : t("Show Format Bar"), icon: Type, shortcut: SHORTCUTS.formatBar, run: toggleFormatBar },
       ],
       [
         deleteConfirmation(current),
         {
           id: "delete-all",
-          title: "Delete All Notes",
+          title: t("Delete All Notes"),
           icon: Trash2,
           destructive: true,
           shortcut: SHORTCUTS.removeAll,
-          confirm: { title: "Delete All Notes?", message: "All notes will be deleted. This can't be undone.", confirmTitle: "Delete All Notes" },
+          confirm: { title: t("Delete All Notes?"), message: t("All notes will be deleted. This can't be undone."), confirmTitle: t("Delete All Notes") },
           run: () => {
             const note = newNote(Date.now());
             setHistory({ stack: [], index: -1 });
             commit([note]);
             open(note.id);
-            showToast({ variant: "success", title: "All notes deleted" });
+            showToast({ variant: "success", title: t("All notes deleted") });
           },
         },
       ],
@@ -515,29 +516,29 @@ export function NotesWindow() {
   function headings(): Action[] {
     if (!editor) return [];
     return [
-      { id: "text", title: "Text", icon: Pilcrow, shortcut: { key: "0", ctrl: true, alt: true }, run: () => void chain(editor).setParagraph().run() },
-      { id: "h1", title: "Heading 1", icon: Heading1, shortcut: { key: "1", ctrl: true, alt: true }, run: () => void chain(editor).toggleHeading({ level: 1 }).run() },
-      { id: "h2", title: "Heading 2", icon: Heading2, shortcut: { key: "2", ctrl: true, alt: true }, run: () => void chain(editor).toggleHeading({ level: 2 }).run() },
-      { id: "h3", title: "Heading 3", icon: Heading3, shortcut: { key: "3", ctrl: true, alt: true }, run: () => void chain(editor).toggleHeading({ level: 3 }).run() },
+      { id: "text", title: t("Text"), icon: Pilcrow, shortcut: { key: "0", ctrl: true, alt: true }, run: () => void chain(editor).setParagraph().run() },
+      { id: "h1", title: t("Heading 1"), icon: Heading1, shortcut: { key: "1", ctrl: true, alt: true }, run: () => void chain(editor).toggleHeading({ level: 1 }).run() },
+      { id: "h2", title: t("Heading 2"), icon: Heading2, shortcut: { key: "2", ctrl: true, alt: true }, run: () => void chain(editor).toggleHeading({ level: 2 }).run() },
+      { id: "h3", title: t("Heading 3"), icon: Heading3, shortcut: { key: "3", ctrl: true, alt: true }, run: () => void chain(editor).toggleHeading({ level: 3 }).run() },
     ];
   }
 
   function inlineFormats(): Action[] {
     if (!editor) return [];
     return [
-      { id: "bold", title: "Bold", icon: Bold, shortcut: { key: "b", ctrl: true }, run: () => void chain(editor).toggleBold().run() },
-      { id: "italic", title: "Italic", icon: Italic, shortcut: { key: "i", ctrl: true }, run: () => void chain(editor).toggleItalic().run() },
-      { id: "underline", title: "Underline", icon: Underline, shortcut: { key: "u", ctrl: true }, run: () => void chain(editor).toggleUnderline().run() },
-      { id: "strike", title: "Strikethrough", icon: Strikethrough, shortcut: { key: "s", ctrl: true, shift: true }, run: () => void chain(editor).toggleStrike().run() },
+      { id: "bold", title: t("Bold"), icon: Bold, shortcut: { key: "b", ctrl: true }, run: () => void chain(editor).toggleBold().run() },
+      { id: "italic", title: t("Italic"), icon: Italic, shortcut: { key: "i", ctrl: true }, run: () => void chain(editor).toggleItalic().run() },
+      { id: "underline", title: t("Underline"), icon: Underline, shortcut: { key: "u", ctrl: true }, run: () => void chain(editor).toggleUnderline().run() },
+      { id: "strike", title: t("Strikethrough"), icon: Strikethrough, shortcut: { key: "s", ctrl: true, shift: true }, run: () => void chain(editor).toggleStrike().run() },
     ];
   }
 
   function lists(): Action[] {
     if (!editor) return [];
     return [
-      { id: "bullet", title: "Bulleted List", icon: List, shortcut: { key: "8", ctrl: true, shift: true }, run: () => void chain(editor).toggleBulletList().run() },
-      { id: "ordered", title: "Numbered List", icon: ListOrdered, shortcut: { key: "7", ctrl: true, shift: true }, run: () => void chain(editor).toggleOrderedList().run() },
-      { id: "task", title: "Task List", icon: ListChecks, shortcut: { key: "9", ctrl: true, shift: true }, run: () => void chain(editor).toggleTaskList().run() },
+      { id: "bullet", title: t("Bulleted List"), icon: List, shortcut: { key: "8", ctrl: true, shift: true }, run: () => void chain(editor).toggleBulletList().run() },
+      { id: "ordered", title: t("Numbered List"), icon: ListOrdered, shortcut: { key: "7", ctrl: true, shift: true }, run: () => void chain(editor).toggleOrderedList().run() },
+      { id: "task", title: t("Task List"), icon: ListChecks, shortcut: { key: "9", ctrl: true, shift: true }, run: () => void chain(editor).toggleTaskList().run() },
     ];
   }
 
@@ -546,7 +547,7 @@ export function NotesWindow() {
   }
 
   function runAction(action: Action) {
-    host.run(action, { failTitle: `${action.title.replace(/…$/, "")} failed` });
+    host.run(action, { failTitle: t("{title} failed", { title: action.title.replace(/…$/, "") }) });
   }
 
   function handle(request: NotesRequest) {
@@ -571,7 +572,7 @@ export function NotesWindow() {
     if (!editor) return;
     ready.current = loadNotes()
       .catch((e) => {
-        fail("Could not load notes", e);
+        fail(t("Could not load notes"), e);
         return [];
       })
       .then((list) => {
@@ -598,7 +599,7 @@ export function NotesWindow() {
       if (overlayRef.current) return;
       if (matchesShortcut(event, SHORTCUTS.actions)) {
         event.preventDefault();
-        host.openPanel("Actions", groupsRef.current());
+        host.openPanel(t("Actions"), groupsRef.current());
         return;
       }
       const action = groupsRef.current().flat().find((a) => a.shortcut && matchesShortcut(event, a.shortcut));
@@ -618,25 +619,25 @@ export function NotesWindow() {
     };
   }, []);
 
-  const title = current ? noteTitle(current.text) : "Notes";
+  const title = current ? noteTitle(current.text) : t("Notes");
 
   return (
     <div className="flex h-full flex-col bg-bg text-fg">
       <header data-tauri-drag-region className="relative flex h-10 shrink-0 items-center gap-2 p-2">
-        <TipButton label="Action Panel" shortcut={SHORTCUTS.actions} onClick={() => host.openPanel("Actions", groups())} className={iconButton}>
+        <TipButton label={t("Action Panel")} shortcut={SHORTCUTS.actions} onClick={() => host.openPanel(t("Actions"), groups())} className={iconButton}>
           <Terminal className="size-4" />
         </TipButton>
-        <TipButton label="Browse Notes" shortcut={SHORTCUTS.browse} onClick={() => setBrowsing(true)} className={iconButton}>
+        <TipButton label={t("Browse Notes")} shortcut={SHORTCUTS.browse} onClick={() => setBrowsing(true)} className={iconButton}>
           <Files className="size-4" />
         </TipButton>
-        <TipButton label="Create Note" shortcut={SHORTCUTS.create} onClick={create} className={iconButton}>
+        <TipButton label={t("Create Note")} shortcut={SHORTCUTS.create} onClick={create} className={iconButton}>
           <Plus className="size-4" />
         </TipButton>
         <h1 className="pointer-events-none absolute inset-y-2 right-[108px] left-[108px] flex items-center justify-center font-['Segoe_UI','Segoe_UI_Variable',sans-serif] text-13 text-fg-60">
           <span className="truncate">{title}</span>
         </h1>
         <span data-tauri-drag-region className="flex-1 self-stretch" />
-        <button type="button" tabIndex={-1} aria-label="Close" title="Close" onClick={() => getCurrentWindow().close()} className={iconButton}>
+        <button type="button" tabIndex={-1} aria-label={t("Close")} title={t("Close")} onClick={() => getCurrentWindow().close()} className={iconButton}>
           <X className="size-4" />
         </button>
       </header>
@@ -648,38 +649,38 @@ export function NotesWindow() {
         {formatBar ? (
           <>
             <div className="flex flex-1 items-center justify-center gap-1">
-              <FormatButton label="Heading" menu active={active?.heading} onClick={() => openFormat("Heading", headings())}>
+              <FormatButton label={t("Heading")} menu active={active?.heading} onClick={() => openFormat(t("Heading"), headings())}>
                 <Heading className="size-4" />
               </FormatButton>
-              <FormatButton label="Format" menu active={active?.inline} onClick={() => openFormat("Format", inlineFormats())}>
+              <FormatButton label={t("Format")} menu active={active?.inline} onClick={() => openFormat(t("Format"), inlineFormats())}>
                 <Type className="size-4" />
               </FormatButton>
-              <FormatButton label="Link" active={active?.link} onClick={() => (active?.link ? editor && chain(editor).extendMarkRange("link").unsetLink().run() : setLinking(true))}>
+              <FormatButton label={t("Link")} active={active?.link} onClick={() => (active?.link ? editor && chain(editor).extendMarkRange("link").unsetLink().run() : setLinking(true))}>
                 <Link className="size-4" />
               </FormatButton>
-              <FormatButton label="Code" shortcut={{ key: "e", ctrl: true }} active={active?.code} onClick={() => editor && chain(editor).toggleCode().run()}>
+              <FormatButton label={t("Code")} shortcut={{ key: "e", ctrl: true }} active={active?.code} onClick={() => editor && chain(editor).toggleCode().run()}>
                 <Code className="size-4" />
               </FormatButton>
               <Divider />
-              <FormatButton label="Quote" shortcut={{ key: "b", ctrl: true, shift: true }} active={active?.quote} onClick={() => editor && chain(editor).toggleBlockquote().run()}>
+              <FormatButton label={t("Quote")} shortcut={{ key: "b", ctrl: true, shift: true }} active={active?.quote} onClick={() => editor && chain(editor).toggleBlockquote().run()}>
                 <TextQuote className="size-4" />
               </FormatButton>
-              <FormatButton label="Code Block" shortcut={{ key: "c", ctrl: true, alt: true }} active={active?.codeBlock} onClick={() => editor && chain(editor).toggleCodeBlock().run()}>
+              <FormatButton label={t("Code Block")} shortcut={{ key: "c", ctrl: true, alt: true }} active={active?.codeBlock} onClick={() => editor && chain(editor).toggleCodeBlock().run()}>
                 <SquareCode className="size-4" />
               </FormatButton>
               <Divider />
-              <FormatButton label="List" menu active={active?.list} onClick={() => openFormat("List", lists())}>
+              <FormatButton label={t("List")} menu active={active?.list} onClick={() => openFormat(t("List"), lists())}>
                 <List className="size-4" />
               </FormatButton>
             </div>
-            <TipButton label="Hide Format Buttons" shortcut={SHORTCUTS.formatBar} onClick={toggleFormatBar} className={`${formatButton} absolute right-2 w-6`}>
+            <TipButton label={t("Hide Format Buttons")} shortcut={SHORTCUTS.formatBar} onClick={toggleFormatBar} className={`${formatButton} absolute right-2 w-6`}>
               <CircleX className="size-4" />
             </TipButton>
           </>
         ) : (
           <>
             <TipButton
-              label="Toggle between character count and word count"
+              label={t("Toggle between character count and word count")}
               onClick={() =>
                 setUnit((u) => {
                   const next = u === "characters" ? "words" : "characters";
@@ -691,7 +692,7 @@ export function NotesWindow() {
             >
               {countLabel(current?.text ?? "", unit)}
             </TipButton>
-            <TipButton label="Show Format Buttons" shortcut={SHORTCUTS.formatBar} onClick={toggleFormatBar} className={`${formatButton} absolute right-2 w-6`}>
+            <TipButton label={t("Show Format Buttons")} shortcut={SHORTCUTS.formatBar} onClick={toggleFormatBar} className={`${formatButton} absolute right-2 w-6`}>
               <Type className="size-4" />
             </TipButton>
           </>
@@ -733,7 +734,7 @@ export function NotesWindow() {
         />
       )}
       {host.render(runAction)}
-      {formatHost.render((action) => formatHost.run(action, { failTitle: `${action.title} failed` }))}
+      {formatHost.render((action) => formatHost.run(action, { failTitle: t("{title} failed", { title: action.title }) }))}
     </div>
   );
 }

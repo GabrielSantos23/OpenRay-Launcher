@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { LanguageSetting } from "./i18n";
 
 export type ShowOn = "mouse-screen" | "active-screen" | "primary-screen";
 export type EscapeKeyBehavior = "pop-back-or-close" | "close-and-pop-to-root";
@@ -18,6 +19,7 @@ export interface Settings {
   escapeKeyBehavior: EscapeKeyBehavior;
   escapeKeyClosesWindow: boolean;
   appearance: "system" | "dark" | "light";
+  language: LanguageSetting;
   themeDarkId: string;
   themeLightId: string;
   notchEnabled: boolean;

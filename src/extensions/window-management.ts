@@ -105,7 +105,7 @@ export default defineExtension({
       title,
       icon: { glyph, tone: "blue" },
       subtitle: "Window Management",
-      keywords: ["window", "resize", "move", ...keywords],
+      keywords: ["window", "resize", "move", "janela", "janelas", "redimensionar", "mover", "organizar", ...keywords],
       kind: "Command",
       primaryActionTitle: "Run Command",
       run: () => invoke("window_layout", { layout: id }),

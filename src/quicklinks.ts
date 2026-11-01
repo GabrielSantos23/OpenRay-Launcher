@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export interface Quicklink {
   id: string;
   name: string;
@@ -22,7 +24,7 @@ export function linkArguments(link: string): LinkArgument[] {
   for (const match of link.matchAll(PLACEHOLDER)) {
     if (match[1].toLowerCase() !== "argument") continue;
     const attrs = attributes(match[2]);
-    const name = attrs.name ?? "Query";
+    const name = attrs.name ?? t("Query");
     if (!found.some((a) => a.name === name)) found.push({ name, defaultValue: attrs.default });
   }
   return found;
@@ -42,7 +44,7 @@ export function fillLink(link: string, values: Record<string, string>, context: 
     const attrs = attributes(attrText);
     switch (kind.toLowerCase()) {
       case "argument": {
-        const name = attrs.name ?? "Query";
+        const name = attrs.name ?? t("Query");
         return encode(values[name] || attrs.default || "");
       }
       case "clipboard":
@@ -66,7 +68,7 @@ export function fillLink(link: string, values: Record<string, string>, context: 
 export function displayLink(link: string, values: Record<string, string> = {}): string {
   return link.replace(PLACEHOLDER, (whole, kind: string, attrText: string) => {
     if (kind.toLowerCase() !== "argument") return whole;
-    return values[attributes(attrText).name ?? "Query"] || "_";
+    return values[attributes(attrText).name ?? t("Query")] || "_";
   });
 }
 

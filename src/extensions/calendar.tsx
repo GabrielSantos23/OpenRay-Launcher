@@ -25,6 +25,7 @@ import {
 import { Switch } from "../controls";
 import { Dropdown, type DropdownOption } from "../Dropdown";
 import { defineExtension, type Action, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { GlyphTile } from "../icons";
 import { ListView, Metadata, type ListSection } from "../ListView";
 import { copyAndClose } from "../output";
@@ -55,18 +56,18 @@ function footer(title: string) {
 
 function EventDetail({ event, calendar }: { event: CalendarEvent; calendar?: CalendarInfo }) {
   const rows = [
-    { label: "When", value: whenText(event) },
-    ...(calendar ? [{ label: "Calendar", value: <><Dot color={calendar.color} />{calendar.title}</> }] : []),
-    ...(event.location ? [{ label: "Location", value: event.location }] : []),
-    ...(event.organizer ? [{ label: "Organizer", value: event.organizer }] : []),
-    ...(event.attendees ? [{ label: "Attendees", value: event.attendees }] : []),
+    { label: t("When"), value: whenText(event) },
+    ...(calendar ? [{ label: t("Calendar"), value: <><Dot color={calendar.color} />{calendar.title}</> }] : []),
+    ...(event.location ? [{ label: t("Location"), value: event.location }] : []),
+    ...(event.organizer ? [{ label: t("Organizer"), value: event.organizer }] : []),
+    ...(event.attendees ? [{ label: t("Attendees"), value: event.attendees }] : []),
   ];
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
-        <h2 className={`text-15 font-semibold text-fg ${event.canceled ? "line-through" : ""}`}>{event.title || "Untitled event"}</h2>
+        <h2 className={`text-15 font-semibold text-fg ${event.canceled ? "line-through" : ""}`}>{event.title || t("Untitled event")}</h2>
         {event.link && <p className="truncate text-13 text-fg-60">{event.link}</p>}
-        {event.notes ? <p className="text-13 whitespace-pre-wrap text-fg">{event.notes}</p> : <p className="text-13 text-fg-40">No notes</p>}
+        {event.notes ? <p className="text-13 whitespace-pre-wrap text-fg">{event.notes}</p> : <p className="text-13 text-fg-40">{t("No notes")}</p>}
       </div>
       <Metadata rows={rows} />
     </>
@@ -76,27 +77,27 @@ function EventDetail({ event, calendar }: { event: CalendarEvent; calendar?: Cal
 function eventActions(event: CalendarEvent, calendar: CalendarInfo | undefined, create: () => void, reload: () => void): Action[][] {
   return [
     [
-      { id: "open", title: "Open in Calendar", icon: CalendarDays, run: () => invoke<void>("calendar_open") },
-      ...(event.link ? [{ id: "open-link", title: "Open Link", icon: ExternalLink, shortcut: { key: "l", ctrl: true, shift: true }, run: () => invoke<void>("open_url", { url: event.link, appPath: null }) }] : []),
+      { id: "open", title: t("Open in Calendar"), icon: CalendarDays, run: () => invoke<void>("calendar_open") },
+      ...(event.link ? [{ id: "open-link", title: t("Open Link"), icon: ExternalLink, shortcut: { key: "l", ctrl: true, shift: true }, run: () => invoke<void>("open_url", { url: event.link, appPath: null }) }] : []),
     ],
-    [{ id: "create", title: "Create Event", icon: CalendarPlus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: create }],
+    [{ id: "create", title: t("Create Event"), icon: CalendarPlus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: create }],
     [
-      { id: "copy-details", title: "Copy Event Details", icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(eventDetails(event, calendar), "Copied event details") },
-      { id: "copy-title", title: "Copy Event Title", icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(event.title, "Copied event title") },
-      ...(event.link ? [{ id: "copy-url", title: "Copy Event URL", icon: Link, shortcut: { key: "c", alt: true, shift: true }, run: () => copyAndClose(event.link, "Copied event URL") }] : []),
+      { id: "copy-details", title: t("Copy Event Details"), icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(eventDetails(event, calendar), t("Copied event details")) },
+      { id: "copy-title", title: t("Copy Event Title"), icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(event.title, t("Copied event title")) },
+      ...(event.link ? [{ id: "copy-url", title: t("Copy Event URL"), icon: Link, shortcut: { key: "c", alt: true, shift: true }, run: () => copyAndClose(event.link, t("Copied event URL")) }] : []),
     ],
     [
       {
         id: "delete",
-        title: "Delete Event",
+        title: t("Delete Event"),
         icon: Trash2,
         destructive: true,
         keepOpen: true,
         shortcut: { key: "d", ctrl: true, shift: true },
-        confirm: { title: "Delete Event?", message: event.instanceStart ? "Only this occurrence will be deleted." : `"${event.title}" will be deleted from ${calendar?.title ?? "your calendar"}.`, confirmTitle: "Delete" },
+        confirm: { title: t("Delete Event?"), message: event.instanceStart ? t("Only this occurrence will be deleted.") : t('"{title}" will be deleted from {calendar}.', { title: event.title, calendar: calendar?.title ?? t("your calendar") }), confirmTitle: t("Delete") },
         run: async () => {
           await invoke("calendar_delete", { calendarId: event.calendarId, id: event.id, instanceStart: event.instanceStart });
-          showToast({ variant: "success", title: "Deleted event" });
+          showToast({ variant: "success", title: t("Deleted event") });
           reload();
         },
       },
@@ -141,14 +142,14 @@ function MySchedule({ pop }: ViewProps) {
     const visible = (events ?? []).filter((e) => (filter === ALL || e.calendarId === filter) && e.title.toLowerCase().includes(wanted));
     const eventByItem = new Map<string, CalendarEvent>();
     const sections = sectionsFor(visible, now).map<ListSection>((s) => ({
-      title: s.title,
+      title: t(s.title),
       subtitle: s.subtitle,
       items: s.events.map<Item>((e) => {
         const id = `${s.id}:${e.calendarId}:${e.id}:${e.start}`;
         eventByItem.set(id, e);
         return {
           id,
-          title: e.title || "Untitled event",
+          title: e.title || t("Untitled event"),
           icon: (
             <span className={`flex shrink-0 items-center gap-2.5 ${e.canceled || e.end < now.getTime() ? "opacity-50" : ""}`}>
               <Dot color={byId.get(e.calendarId)?.color} />
@@ -164,39 +165,39 @@ function MySchedule({ pop }: ViewProps) {
   }, [events, filter, text, byId, create, reload]);
 
   const options = useMemo<DropdownOption<string>[]>(
-    () => [{ value: ALL, label: "All Calendars", icon: <CalendarDays aria-hidden="true" className="size-4 shrink-0" /> }, ...calendars.map((c) => ({ value: c.id, label: c.title, icon: <Dot color={c.color} /> }))],
+    () => [{ value: ALL, label: t("All Calendars"), icon: <CalendarDays aria-hidden="true" className="size-4 shrink-0" /> }, ...calendars.map((c) => ({ value: c.id, label: c.title, icon: <Dot color={c.color} /> }))],
     [calendars],
   );
 
   if (creating) return <CreateEvent pop={() => { setCreating(false); reload(); }} />;
 
   const empty = error
-    ? { text: "Couldn't read your calendars", description: error }
+    ? { text: t("Couldn't read your calendars"), description: error }
     : calendars.length === 0 && events
-      ? { text: "No calendars found", description: "Add an account with a calendar in Windows Settings > Accounts > Email & accounts." }
+      ? { text: t("No calendars found"), description: t("Add an account with a calendar in Windows Settings > Accounts > Email & accounts.") }
       : text || filter !== ALL
-        ? { text: "No Events", description: "No events match this filter." }
-        : { text: "No Events", description: "Your schedule is clear." };
+        ? { text: t("No Events"), description: t("No events match this filter.") }
+        : { text: t("No Events"), description: t("Your schedule is clear.") };
 
   return (
     <ListView
-      placeholder="Filter by title…"
+      placeholder={t("Filter by title…")}
       sections={sections}
       onBack={pop}
       searchText={text}
       onSearchTextChange={setText}
       filtering={false}
-      footerTitle="My Schedule"
+      footerTitle={t("My Schedule")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={events === null}
       emptyText={empty.text}
       emptyDescription={empty.description}
-      emptyActions={[[{ id: "create", title: "Create Event", icon: CalendarPlus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: create }]]}
+      emptyActions={[[{ id: "create", title: t("Create Event"), icon: CalendarPlus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: create }]]}
       accessory={
         calendars.length > 1 ? (
           <div className="w-[197px] shrink-0">
             <span id="calendar-filter" className="sr-only">
-              Filter by Calendar
+              {t("Filter by Calendar")}
             </span>
             <Dropdown size="field" labelledBy="calendar-filter" value={filter} options={options} onChange={setFilter} />
           </div>
@@ -228,7 +229,7 @@ function CreateEvent({ pop }: ViewProps) {
   const ids = useId();
 
   useEffect(() => {
-    invoke<CalendarInfo[]>("calendar_list").then(setCalendars).catch((e) => fail("Couldn't read your calendars", e));
+    invoke<CalendarInfo[]>("calendar_list").then(setCalendars).catch((e) => fail(t("Couldn't read your calendars"), e));
   }, []);
 
   const set = (patch: Partial<EventDraft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -247,30 +248,30 @@ function CreateEvent({ pop }: ViewProps) {
   async function save() {
     if (saving) return;
     if (!draft.title.trim()) {
-      setError("Title is required");
+      setError(t("Title is required"));
       document.getElementById(`${ids}-title`)?.focus();
       return;
     }
     setSaving(true);
     try {
       await invoke("calendar_create", { event: draftToEvent(draft) });
-      showToast({ variant: "success", title: "Created event" });
+      showToast({ variant: "success", title: t("Created event") });
       pop();
     } catch (e) {
-      fail("Failed to create event", e);
+      fail(t("Failed to create event"), e);
     } finally {
       setSaving(false);
     }
   }
 
-  const calendarOptions: DropdownOption<string>[] = [{ value: "", label: "Default Calendar" }, ...calendars.map((c) => ({ value: c.id, label: c.title, icon: <Dot color={c.color} /> }))];
+  const calendarOptions: DropdownOption<string>[] = [{ value: "", label: t("Default Calendar") }, ...calendars.map((c) => ({ value: c.id, label: c.title, icon: <Dot color={c.color} /> }))];
   const durationOptions = DURATIONS.some((d) => Number(d.value) === duration) ? DURATIONS : [...DURATIONS, { value: String(duration), label: formatDuration(duration) }];
   const dateType = draft.allDay ? "date" : "datetime-local";
 
   return (
-    <FormShell title="Create Event" primaryTitle="Create Event" onSave={save} onBack={pop} footer={footer("Create Event")}>
+    <FormShell title={t("Create Event")} primaryTitle={t("Create Event")} onSave={save} onBack={pop} footer={footer(t("Create Event"))}>
       <label htmlFor={`${ids}-title`} className={label}>
-        Title
+        {t("Title")}
       </label>
       <div className="flex flex-col gap-1.5">
         <input
@@ -281,7 +282,7 @@ function CreateEvent({ pop }: ViewProps) {
             set({ title: e.target.value });
             setError(undefined);
           }}
-          placeholder="Event title"
+          placeholder={t("Event title")}
           aria-invalid={!!error}
           aria-describedby={error ? `${ids}-title-error` : undefined}
           className={`${field} ${error ? "border-red" : ""}`}
@@ -293,43 +294,43 @@ function CreateEvent({ pop }: ViewProps) {
         )}
       </div>
       <span id={`${ids}-calendar`} className={label}>
-        Calendar
+        {t("Calendar")}
       </span>
       <Dropdown size="field" labelledBy={`${ids}-calendar`} value={draft.calendarId} options={calendarOptions} onChange={(calendarId) => set({ calendarId })} />
       <label htmlFor={`${ids}-start`} className={label}>
-        Start
+        {t("Start")}
       </label>
       <input id={`${ids}-start`} type={dateType} value={toLocalInput(draft.start, draft.allDay)} onChange={(e) => setStart(fromLocalInput(e.target.value))} className={field} />
       <label htmlFor={`${ids}-end`} className={label}>
-        End
+        {t("End")}
       </label>
       <input id={`${ids}-end`} type={dateType} value={toLocalInput(draft.end, draft.allDay)} onChange={(e) => setEnd(fromLocalInput(e.target.value))} className={field} />
       {!draft.allDay && (
         <>
           <span id={`${ids}-duration`} className={label}>
-            Duration
+            {t("Duration")}
           </span>
-          <Dropdown size="field" labelledBy={`${ids}-duration`} value={String(duration)} options={durationOptions} onChange={(value) => set({ end: draft.start + Number(value) })} />
+          <Dropdown size="field" labelledBy={`${ids}-duration`} value={String(duration)} options={durationOptions.map((d) => ({ ...d, label: t(d.label) }))} onChange={(value) => set({ end: draft.start + Number(value) })} />
         </>
       )}
       <span id={`${ids}-allday`} className={label}>
-        All Day
+        {t("All Day")}
       </span>
       <div className="flex h-[34px] items-center">
         <Switch checked={draft.allDay} labelledBy={`${ids}-allday`} onChange={(allDay) => set({ allDay, end: allDay ? draft.start : draft.start + HOUR_MS })} />
       </div>
       <label htmlFor={`${ids}-location`} className={label}>
-        Location
+        {t("Location")}
       </label>
-      <input id={`${ids}-location`} value={draft.location} onChange={(e) => set({ location: e.target.value })} placeholder="Add location" className={field} />
+      <input id={`${ids}-location`} value={draft.location} onChange={(e) => set({ location: e.target.value })} placeholder={t("Add location")} className={field} />
       <label htmlFor={`${ids}-notes`} className={label}>
-        Notes
+        {t("Notes")}
       </label>
       <textarea
         id={`${ids}-notes`}
         value={draft.notes}
         onChange={(e) => set({ notes: e.target.value })}
-        placeholder="Add notes"
+        placeholder={t("Add notes")}
         rows={3}
         className={`${field} h-auto resize-none py-2`}
       />
@@ -346,7 +347,7 @@ export default defineExtension({
       id: "mySchedule",
       title: "My Schedule",
       subtitle: "Calendar",
-      keywords: ["calendar", "agenda", "events", "meetings", "schedule"],
+      keywords: ["calendar", "agenda", "events", "meetings", "schedule", "calendário", "eventos", "compromissos"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: MySchedule,
@@ -356,7 +357,7 @@ export default defineExtension({
       title: "Create Event",
       icon: { glyph: CalendarPlus, tone: ICON.tone },
       subtitle: "Calendar",
-      keywords: ["calendar", "event", "meeting", "new", "add"],
+      keywords: ["calendar", "event", "meeting", "new", "add", "calendário", "evento", "criar evento"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: CreateEvent,

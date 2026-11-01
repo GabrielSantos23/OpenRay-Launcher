@@ -1,6 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, PhysicalSize } from "@tauri-apps/api/window";
 import { useEffect, useRef } from "react";
+import { t } from "./i18n";
 import { showHUD } from "./toast";
 
 export function PinWindow() {
@@ -18,14 +19,14 @@ export function PinWindow() {
   return (
     <div
       role="img"
-      aria-label="Pinned screenshot. Drag to move, scroll to zoom, Ctrl+C to copy, Esc or double-click to close."
+      aria-label={t("Pinned screenshot. Drag to move, scroll to zoom, Ctrl+C to copy, Esc or double-click to close.")}
       tabIndex={-1}
       ref={(el) => el?.focus()}
       data-tauri-drag-region
       onDoubleClick={close}
       onKeyDown={(event) => {
         if (event.key === "Escape") close();
-        else if (event.ctrlKey && event.key.toLowerCase() === "c") invoke("pin_copy", { label }).then(() => showHUD({ variant: "success", title: "Copied Image to Clipboard" }));
+        else if (event.ctrlKey && event.key.toLowerCase() === "c") invoke("pin_copy", { label }).then(() => showHUD({ variant: "success", title: t("Copied Image to Clipboard") }));
       }}
       onWheel={(event) => {
         if (!base.current) return;

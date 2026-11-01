@@ -8,6 +8,7 @@ import {
   formatTimeIn,
   isExpression,
   numberToWords,
+  numberToWordsPt,
   parseColor,
   parseCurrency,
   parseTimeQuery,
@@ -71,14 +72,29 @@ describe("currency", () => {
   it("converts through the base currency", () => {
     expect(convertCurrency({ amount: 10, from: "EUR", to: "BRL" }, { USD: 1, EUR: 0.5, BRL: 5 })).toBe(100);
   });
+
+  it("parses Portuguese queries with currency words", () => {
+    expect(parseCurrency("100 dolares para brl", known)).toEqual({ amount: 100, from: "USD", to: "BRL" });
+    expect(parseCurrency("100,50 reais em dolares", known)).toEqual({ amount: 100.5, from: "BRL", to: "USD" });
+    expect(parseCurrency("10 dólares para real", known)).toEqual({ amount: 10, from: "USD", to: "BRL" });
+    expect(parseCurrency("1 euro pra real", known)).toEqual({ amount: 1, from: "EUR", to: "BRL" });
+    expect(parseCurrency("100 xyz para brl", known)).toBeNull();
+  });
 });
 
 describe("time zones", () => {
   it("finds countries and cities", () => {
-    const index = places(["en"]);
+    const index = places(["en", "pt"]);
     expect(parseTimeQuery("time in china", index)?.timeZone).toBe("Asia/Shanghai");
     expect(parseTimeQuery("Tokyo time", index)?.timeZone).toBe("Asia/Tokyo");
     expect(parseTimeQuery("time in nowhere", index)).toBeNull();
+  });
+
+  it("finds places from Portuguese queries", () => {
+    const index = places(["en", "pt"]);
+    expect(parseTimeQuery("hora em brasil", index)?.name).toBe("Brasil");
+    expect(parseTimeQuery("que horas em china", index)?.timeZone).toBe("Asia/Shanghai");
+    expect(parseTimeQuery("hora em lugar nenhum", index)).toBeNull();
   });
 
   it("formats the date like the reference", () => {
@@ -104,5 +120,23 @@ describe("colors", () => {
     expect(formats.find((f) => f.id === "hex")?.value).toBe("#FF0000");
     expect(formats.find((f) => f.id === "hsl")?.value).toBe("hsl(0deg, 100%, 50%)");
     expect(formats.find((f) => f.id === "rgbCss4")?.value).toBe("rgb(255, 0, 0)");
+  });
+});
+
+describe("numberToWordsPt", () => {
+  it("spells integers in Portuguese", () => {
+    expect(numberToWordsPt(0)).toBe("Zero");
+    expect(numberToWordsPt(5)).toBe("cinco");
+    expect(numberToWordsPt(21)).toBe("vinte e um");
+    expect(numberToWordsPt(100)).toBe("cem");
+    expect(numberToWordsPt(150)).toBe("cento e cinquenta");
+    expect(numberToWordsPt(1000)).toBe("mil");
+    expect(numberToWordsPt(1100)).toBe("mil e cem");
+    expect(numberToWordsPt(1123)).toBe("mil cento e vinte e três");
+    expect(numberToWordsPt(2100)).toBe("dois mil e cem");
+    expect(numberToWordsPt(1_000_000)).toBe("um milhão");
+    expect(numberToWordsPt(21_000_000)).toBe("vinte e um milhões");
+    expect(numberToWordsPt(-40)).toBe("menos quarenta");
+    expect(numberToWordsPt(2.5)).toBeNull();
   });
 });

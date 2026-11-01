@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export const AUTO = "auto";
 export const DEFAULT_TARGET = "en";
 export const DEBOUNCE_MS = 1000;
@@ -181,5 +183,5 @@ export function swapLanguages({ source, target }: LanguagePair, detected: string
 export function countLabel(text: string): string {
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   const characters = [...text].length;
-  return `${words} ${words === 1 ? "Word" : "Words"} · ${characters} ${characters === 1 ? "Character" : "Characters"}`;
+  return `${words} ${t(words === 1 ? "Word" : "Words")} · ${characters} ${t(characters === 1 ? "Character" : "Characters")}`;
 }

@@ -8,6 +8,7 @@ export interface Toast {
   title: string;
   message?: string;
   icon?: string;
+  params?: Record<string, string | number>;
 }
 
 let current: Toast | null = null;

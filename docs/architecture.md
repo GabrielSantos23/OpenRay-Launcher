@@ -201,6 +201,15 @@ interface Action {
 - Built-ins are registered through `defineExtension` in `src/extensions/index.ts`, and nothing else is special-cased.
 - Planned additions, when real features need them: preferences.
 
+## i18n
+
+Openray is localized in English and Brazilian Portuguese through a small custom module, `src/i18n.ts` (no runtime dependency).
+
+- **Keys are the English strings themselves.** `t("Copy Answer")` returns the pt-BR translation from `src/i18n/pt.ts` when the language is `pt`, and the key itself otherwise. English stays byte-identical and missing translations degrade to English silently.
+- **Dictionaries are split by area** (`src/i18n/pt-core.ts`, `pt-settings.ts`, `pt-windows.ts`, `pt-extensions-a.ts`, `pt-extensions-b.ts`, `pt-flowkey.ts`) and merged in `src/i18n/pt.ts`. `{name}` placeholders are filled by `t(key, { name })`.
+- **Settings.** `language` (`system` | `en` | `pt`) lives in settings.json next to appearance; `system` follows `navigator.language`. `main.tsx` applies the setting in every window (`useApplyLanguage`) and re-renders the window when it changes.
+- **Boundaries.** Extension/command data keeps English titles, subtitles and confirmations; they are localized where they are displayed (`localizeCommand` in `App.tsx`, the Settings tables, the confirm dialog, the HUD). Search matches the localized titles, and extensions additionally carry Portuguese keywords.
+
 ## FlowKey extension host
 
 Openray runs extensions built with the user's FlowKey CLI unchanged. This does not reopen ADR-001: built-in features still use the internal API above, and each FlowKey extension is adapted into it as one Openray extension keyed `flowkey.<id>`.

@@ -28,6 +28,7 @@ import { FlowKeyDialog } from "./flowkey/Dialog";
 import { FlowKeyIcon } from "./flowkey/FlowKeyIcon";
 import { FlowKeyDetails, FlowKeyInstallCard } from "./flowkey/SettingsPanel";
 import type { Failure } from "./flowkey/extensions";
+import { t } from "./i18n";
 import { loadCommands } from "./registry";
 import { DICTIONARY_LANGUAGES, loadDictionary, saveDictionary, type DictionaryLanguage } from "./dictionary";
 import { Dropdown as Select } from "./Dropdown";
@@ -95,12 +96,12 @@ function Tile({ children, className = "bg-control" }: { children: ReactNode; cla
 }
 
 const PAGES: Page[] = [
-  { id: "general", title: "General", icon: <Tile><Gear className="size-3.5" /></Tile>, keywords: ["open at login", "system tray", "hotkey", "updates", "check for updates", "version"] },
-  { id: "launcher", title: "Launcher", icon: <Tile><Rocket className="size-3.5" /></Tile>, keywords: ["show openray on", "screen"] },
-  { id: "shortcuts", title: "Shortcuts", icon: <Tile><Command className="size-3.5" /></Tile>, keywords: ["alias", "hotkey", "commands"] },
-  { id: "notch", title: "Notch", icon: <Tile><PanelTop className="size-3.5" /></Tile>, keywords: ["notch", "now playing", "fullscreen", "widgets", "volume"] },
-  { id: "keyboard", title: "Keyboard", icon: <Tile><Keyboard className="size-3.5" /></Tile>, keywords: ["escape key"] },
-  { id: "extensions", title: "Extensions", icon: <Tile><Puzzle className="size-3.5" /></Tile>, keywords: ["install", "flowkey", "package", "uninstall"] },
+  { id: "general", title: "General", icon: <Tile><Gear className="size-3.5" /></Tile>, keywords: ["open at login", "system tray", "hotkey", "updates", "check for updates", "version", "language", "idioma", "idiomas", "geral", "inicializacao", "bandeja", "atualizacoes", "aparencia", "tema"] },
+  { id: "launcher", title: "Launcher", icon: <Tile><Rocket className="size-3.5" /></Tile>, keywords: ["show openray on", "screen", "tela", "mostrar"] },
+  { id: "shortcuts", title: "Shortcuts", icon: <Tile><Command className="size-3.5" /></Tile>, keywords: ["alias", "hotkey", "commands", "atalhos", "atalho", "comandos", "aliás"] },
+  { id: "notch", title: "Notch", icon: <Tile><PanelTop className="size-3.5" /></Tile>, keywords: ["notch", "now playing", "fullscreen", "widgets", "volume", "tela cheia"] },
+  { id: "keyboard", title: "Keyboard", icon: <Tile><Keyboard className="size-3.5" /></Tile>, keywords: ["escape key", "teclado", "tecla", "esc"] },
+  { id: "extensions", title: "Extensions", icon: <Tile><Puzzle className="size-3.5" /></Tile>, keywords: ["install", "flowkey", "package", "uninstall", "extensoes", "extensões", "instalar", "desinstalar", "pacote"] },
 ];
 
 function extensionIcon(extension: Extension) {
@@ -146,29 +147,29 @@ function UpdatesRow() {
 
   const description =
     status.state === "checking"
-      ? "Checking for updates..."
+      ? t("Checking for updates...")
       : status.state === "current"
-        ? `Openray ${version} is up to date`
+        ? t("Openray {version} is up to date", { version })
         : status.state === "available"
-          ? `Openray ${status.update.version} is available. You have ${version}.`
+          ? t("Openray {updateVersion} is available. You have {version}.", { updateVersion: status.update.version, version })
           : status.state === "installing"
-            ? "Downloading and installing. Openray restarts when it finishes."
+            ? t("Downloading and installing. Openray restarts when it finishes.")
             : status.state === "failed"
-              ? `Could not check for updates: ${status.error}`
-              : version && `Version ${version}`;
+              ? t("Could not check for updates: {error}", { error: status.error })
+              : version && t("Version {version}", { version });
 
   return (
-    <Row id="updates" title="Updates" description={description || undefined}>
+    <Row id="updates" title={t("Updates")} description={description || undefined}>
       <span aria-live="polite" className="sr-only">
         {status.state === "idle" ? "" : description}
       </span>
       {status.state === "available" ? (
         <button type="button" onClick={() => install(status.update)} className={TEXT_BUTTON}>
-          Install Update
+          {t("Install Update")}
         </button>
       ) : (
         <button type="button" disabled={status.state === "checking" || status.state === "installing"} onClick={runCheck} className={TEXT_BUTTON}>
-          {status.state === "failed" ? "Try Again" : "Check for Updates"}
+          {status.state === "failed" ? t("Try Again") : t("Check for Updates")}
         </button>
       )}
     </Row>
@@ -191,20 +192,20 @@ function FocusSettings() {
   return (
     <>
       <Card>
-        <Row id="focus-snooze" title="Snooze Duration" description="Choose how long blocked apps and websites stay snoozed.">
+        <Row id="focus-snooze" title={t("Snooze Duration")} description={t("Choose how long blocked apps and websites stay snoozed.")}>
           <Select labelledBy="focus-snooze" value={String(prefs.snoozeMs ?? 0)} options={SNOOZE_OPTIONS} onChange={(value) => update({ snoozeMs: Number(value) || null })} />
         </Row>
-        <Row id="focus-sound" title="Play Sound" description="Play sounds for Focus notifications.">
+        <Row id="focus-sound" title={t("Play Sound")} description={t("Play sounds for Focus notifications.")}>
           <Switch labelledBy="focus-sound" checked={prefs.playSound} onChange={(playSound) => update({ playSound })} />
         </Row>
       </Card>
       <Card>
-        <Row id="focus-allow-all" title="Allow all Websites" description="Allow all websites when a browser is allowed but no specific websites are listed.">
+        <Row id="focus-allow-all" title={t("Allow all Websites")} description={t("Allow all websites when a browser is allowed but no specific websites are listed.")}>
           <Switch labelledBy="focus-allow-all" checked={prefs.allowAllWebsites} onChange={(allowAllWebsites) => update({ allowAllWebsites })} />
         </Row>
       </Card>
       <Card>
-        <Row id="focus-restore" title="Restore Terminated Apps" description="Reopen apps Openray Focus closed when the session ends.">
+        <Row id="focus-restore" title={t("Restore Terminated Apps")} description={t("Reopen apps Openray Focus closed when the session ends.")}>
           <Switch labelledBy="focus-restore" checked={prefs.restoreApps} onChange={(restoreApps) => update({ restoreApps })} />
         </Row>
       </Card>
@@ -220,7 +221,7 @@ function DictionarySettings() {
   if (!language) return null;
   return (
     <Card>
-      <Row id="dictionary-language" title="Language" description="Language of the words and definitions in Define Word.">
+      <Row id="dictionary-language" title={t("Language")} description={t("Language of the words and definitions in Define Word.")}>
         <Select
           labelledBy="dictionary-language"
           value={language}
@@ -261,17 +262,17 @@ function ScreenshotSettings() {
   };
   return (
     <Card>
-      <Row id="screenshots-folder" title="Save Screenshots To" description={error ?? `${folder.path}${folder.custom ? "" : " (default)"}`}>
+      <Row id="screenshots-folder" title={t("Save Screenshots To")} description={error ?? `${folder.path}${folder.custom ? "" : t(" (default)")}`}>
         <button type="button" onClick={() => invoke("launch_app", { path: folder.path }).catch((e) => setError(String(e)))} className={TEXT_BUTTON}>
-          Open
+          {t("Open")}
         </button>
         {folder.custom && (
           <button type="button" onClick={() => apply(null)} className={TEXT_BUTTON}>
-            Use Default
+            {t("Use Default")}
           </button>
         )}
         <button type="button" aria-describedby="screenshots-folder" onClick={choose} className={TEXT_BUTTON}>
-          Change…
+          {t("Change…")}
         </button>
       </Row>
     </Card>
@@ -304,26 +305,38 @@ function GeneralPage({ settings, save, recorder }: { settings: SettingsData; sav
   return (
     <>
       <Card>
-      <Row id="open-at-login" title="Open at Login" description={loginError ?? undefined}>
+      <Row id="open-at-login" title={t("Open at Login")} description={loginError ?? undefined}>
         <Switch labelledBy="open-at-login" checked={!!openAtLogin} onChange={toggleLogin} />
       </Row>
-      <Row id="show-in-tray" title="Show in System Tray">
+      <Row id="show-in-tray" title={t("Show in System Tray")}>
         <Switch labelledBy="show-in-tray" checked={settings.showInTray} onChange={(showInTray) => save({ ...settings, showInTray })} />
       </Row>
-      <Row id="openray-hotkey" title="Openray Hotkey">
+      <Row id="language" title="Language">
+        <Select
+          labelledBy="language"
+          value={settings.language}
+          onChange={(language) => save({ ...settings, language })}
+          options={[
+            { value: "system", label: t("System") },
+            { value: "en", label: "English" },
+            { value: "pt", label: "Português" },
+          ]}
+        />
+      </Row>
+      <Row id="openray-hotkey" title={t("Openray Hotkey")}>
         {settings.hotkey === START_MENU_HOTKEY ? null : (
           <>
             <button type="button" onClick={() => save({ ...settings, hotkey: START_MENU_HOTKEY })} className={`${TEXT_BUTTON} flex items-center gap-1.5`}>
-              Replace Start Menu
+              {t("Replace Start Menu")}
               <LayoutGrid aria-hidden="true" className="size-3" />
             </button>
-            <HotkeyRecorder variant="button" label="Openray Hotkey" value={settings.hotkey} {...recorder(LAUNCHER_OWNER)} />
+            <HotkeyRecorder variant="button" label={t("Openray Hotkey")} value={settings.hotkey} {...recorder(LAUNCHER_OWNER)} />
           </>
         )}
         <button
           type="button"
-          aria-label="Reset hotkey to Alt+Space"
-          title="Reset to Alt+Space"
+          aria-label={t("Reset hotkey to Alt+Space")}
+          title={t("Reset to Alt+Space")}
           disabled={settings.hotkey === DEFAULT_HOTKEY}
           onClick={() => save({ ...settings, hotkey: DEFAULT_HOTKEY })}
           className="flex size-6 items-center justify-center rounded-[5px] bg-control text-fg outline-offset-2 hover:bg-control-hover disabled:text-fg-40"
@@ -333,9 +346,9 @@ function GeneralPage({ settings, save, recorder }: { settings: SettingsData; sav
       </Row>
       <UpdatesRow />
       </Card>
-      <Section id="appearance" title="Appearance">
+      <Section id="appearance" title={t("Appearance")}>
         <Card>
-          <Row id="follow-system" title="Follow System Appearance">
+          <Row id="follow-system" title={t("Follow System Appearance")}>
             <Switch
               labelledBy="follow-system"
               checked={settings.appearance === "system"}
@@ -344,7 +357,7 @@ function GeneralPage({ settings, save, recorder }: { settings: SettingsData; sav
               }
             />
           </Row>
-          <Row id="dark-theme" title="Dark Theme">
+          <Row id="dark-theme" title={t("Dark Theme")}>
             <Select
               labelledBy="dark-theme"
               value={settings.themeDarkId}
@@ -352,7 +365,7 @@ function GeneralPage({ settings, save, recorder }: { settings: SettingsData; sav
               onChange={(themeDarkId) => save({ ...settings, themeDarkId, appearance: keepAppearance("dark") })}
             />
           </Row>
-          <Row id="light-theme" title="Light Theme">
+          <Row id="light-theme" title={t("Light Theme")}>
             <Select
               labelledBy="light-theme"
               value={settings.themeLightId}
@@ -369,15 +382,15 @@ function GeneralPage({ settings, save, recorder }: { settings: SettingsData; sav
 function LauncherPage({ settings, save }: { settings: SettingsData; save: Save }) {
   return (
     <Card>
-      <Row id="show-on" title="Show Openray on">
+      <Row id="show-on" title={t("Show Openray on")}>
         <Select
           labelledBy="show-on"
           value={settings.showOn}
           onChange={(showOn) => save({ ...settings, showOn })}
           options={[
-            { value: "mouse-screen", label: "Screen containing mouse" },
-            { value: "active-screen", label: "Screen with active window" },
-            { value: "primary-screen", label: "Primary screen" },
+            { value: "mouse-screen", label: t("Screen containing mouse") },
+            { value: "active-screen", label: t("Screen with active window") },
+            { value: "primary-screen", label: t("Primary screen") },
           ]}
         />
       </Row>
@@ -388,10 +401,10 @@ function LauncherPage({ settings, save }: { settings: SettingsData; save: Save }
 function NotchPage({ settings, save }: { settings: SettingsData; save: Save }) {
   return (
     <Card>
-      <Row id="notch-enabled" title="Enable Notch" description="Show a notch at the top of the primary screen. Hover it for media, calendar, clipboard and capture shortcuts.">
+      <Row id="notch-enabled" title={t("Enable Notch")} description={t("Show a notch at the top of the primary screen. Hover it for media, calendar, clipboard and capture shortcuts.")}>
         <Switch labelledBy="notch-enabled" checked={settings.notchEnabled} onChange={(notchEnabled) => save({ ...settings, notchEnabled })} />
       </Row>
-      <Row id="notch-fullscreen" title="Show in Fullscreen" description="Keep the notch visible over fullscreen apps and games.">
+      <Row id="notch-fullscreen" title={t("Show in Fullscreen")} description={t("Keep the notch visible over fullscreen apps and games.")}>
         <Switch labelledBy="notch-fullscreen" checked={settings.notchShowInFullscreen} onChange={(notchShowInFullscreen) => save({ ...settings, notchShowInFullscreen })} />
       </Row>
     </Card>
@@ -403,20 +416,20 @@ function KeyboardPage({ settings, save }: { settings: SettingsData; save: Save }
     <Card>
       <Row
         id="escape-behavior"
-        title="Escape Key Behavior"
-        description="Preferred behavior for the launcher when the Escape key is pressed. The default clears the search, then closes the window."
+        title={t("Escape Key Behavior")}
+        description={t("Preferred behavior for the launcher when the Escape key is pressed. The default clears the search, then closes the window.")}
       >
         <Select
           labelledBy="escape-behavior"
           value={settings.escapeKeyBehavior}
           onChange={(escapeKeyBehavior) => save({ ...settings, escapeKeyBehavior })}
           options={[
-            { value: "pop-back-or-close", label: "Navigate back or close window" },
-            { value: "close-and-pop-to-root", label: "Close window and pop to root" },
+            { value: "pop-back-or-close", label: t("Navigate back or close window") },
+            { value: "close-and-pop-to-root", label: t("Close window and pop to root") },
           ]}
         />
       </Row>
-      <Row id="escape-closes" title="Escape Key Closes Window" description="Dismiss windows such as Settings by pressing the Escape key.">
+      <Row id="escape-closes" title={t("Escape Key Closes Window")} description={t("Dismiss windows such as Settings by pressing the Escape key.")}>
         <Switch
           labelledBy="escape-closes"
           checked={settings.escapeKeyClosesWindow}
@@ -456,18 +469,18 @@ function ExtensionTable({
           <ChevronDown aria-hidden="true" className={`size-3 text-fg-60 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
         </button>
         <span className="ml-auto">
-          <Checkbox label={`Enable ${extension.title}`} checked={extensionEnabled} onChange={(on) => save(withCommandPrefs(settings, extension.id, { disabled: !on }))} />
+          <Checkbox label={t("Enable {title}", { title: extension.title })} checked={extensionEnabled} onChange={(on) => save(withCommandPrefs(settings, extension.id, { disabled: !on }))} />
         </span>
       </div>
       {!collapsed && commands.length > 0 && (
         <table className={`w-full table-fixed border-collapse ${extensionEnabled ? "" : "opacity-50"}`}>
           <thead>
             <tr className="h-6 border-b border-card-separator text-left text-12 text-fg-60">
-              <th className="pl-3 font-semibold">Name</th>
-              <th className="w-[108px] font-semibold">Alias</th>
-              <th className="w-[133px] font-semibold">Hotkey</th>
+              <th className="pl-3 font-semibold">{t("Name")}</th>
+              <th className="w-[108px] font-semibold">{t("Alias")}</th>
+              <th className="w-[133px] font-semibold">{t("Hotkey")}</th>
               <th className="w-10">
-                <span className="sr-only">Enabled</span>
+                <span className="sr-only">{t("Enabled")}</span>
               </th>
             </tr>
           </thead>
@@ -485,8 +498,8 @@ function ExtensionTable({
                   <td>
                     <input
                       defaultValue={prefs.alias}
-                      placeholder="Add Alias"
-                      aria-label={`Alias for ${command.title}`}
+                      placeholder={t("Add Alias")}
+                      aria-label={t("Alias for {title}", { title: command.title })}
                       spellCheck={false}
                       onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                       onBlur={(e) => {
@@ -499,7 +512,7 @@ function ExtensionTable({
                   <td>
                     <HotkeyRecorder
                       variant="cell"
-                      label={`Hotkey for ${command.title}`}
+                      label={t("Hotkey for {title}", { title: command.title })}
                       value={prefs.hotkey}
                       onClear={() => save(withCommandPrefs(settings, command.key, { hotkey: "" }))}
                       {...recorder(command.key)}
@@ -508,7 +521,7 @@ function ExtensionTable({
                   <td className="pr-3">
                     <span className="flex justify-end">
                       <Checkbox
-                        label={`Enable ${command.title}`}
+                        label={t("Enable {title}", { title: command.title })}
                         checked={!prefs.disabled}
                         onChange={(on) => save(withCommandPrefs(settings, command.key, { disabled: !on }))}
                       />
@@ -600,7 +613,8 @@ export function SettingsWindow() {
     },
     onSave: (hotkey, overwrite) => (settings ? save(withHotkey(settings, owner, hotkey, overwrite)) : Promise.resolve()),
   });
-  const title = PAGES.find((p) => p.id === page)?.title ?? extensionPage?.title ?? "";
+  const pageTitle = PAGES.find((p) => p.id === page)?.title;
+  const title = pageTitle ? t(pageTitle) : extensionPage?.title ?? "";
 
   const navLink = (id: string, label: string, icon: ReactNode) => (
     <button
@@ -619,12 +633,12 @@ export function SettingsWindow() {
     <div className="flex h-full flex-col text-13 text-fg">
       <header data-tauri-drag-region className="relative flex h-10 shrink-0 items-stretch bg-titlebar after:absolute after:inset-x-0 after:bottom-px after:h-px after:bg-titlebar-line">
         <span data-tauri-drag-region className="flex w-[230px] shrink-0 items-center pl-4 font-['Segoe_UI_Variable','Segoe_UI',sans-serif] text-fg-60">
-          Settings
+          {t("Settings")}
         </span>
         <span className="flex items-center gap-1 pl-4">
           <button
             type="button"
-            aria-label="Back"
+            aria-label={t("Back")}
             disabled={history.index === 0}
             onClick={() => setHistory((h) => ({ ...h, index: h.index - 1 }))}
             className="rounded p-0.5 text-fg-60 hover:bg-control disabled:text-fg-40 disabled:hover:bg-transparent"
@@ -633,7 +647,7 @@ export function SettingsWindow() {
           </button>
           <button
             type="button"
-            aria-label="Forward"
+            aria-label={t("Forward")}
             disabled={history.index === history.stack.length - 1}
             onClick={() => setHistory((h) => ({ ...h, index: h.index + 1 }))}
             className="rounded p-0.5 text-fg-60 hover:bg-control disabled:text-fg-40 disabled:hover:bg-transparent"
@@ -655,14 +669,14 @@ export function SettingsWindow() {
                   setCommandFilter("");
                   setSearchingCommands(false);
                 }}
-                placeholder="Search commands..."
-                aria-label="Search commands"
+                placeholder={t("Search commands...")}
+                aria-label={t("Search commands")}
                 className="h-6 w-48 rounded-[5px] border border-control-hover bg-transparent px-2 text-fg outline-offset-2 placeholder:text-fg-40"
               />
             ) : (
               <button
                 type="button"
-                aria-label="Search commands"
+                aria-label={t("Search commands")}
                 onClick={() => setSearchingCommands(true)}
                 className="flex size-6 items-center justify-center rounded-[5px] border border-control-hover text-fg hover:bg-control"
               >
@@ -671,40 +685,40 @@ export function SettingsWindow() {
             )}
             <span className="flex items-center">
               <span id="extension-filter" className="sr-only">
-                Extension
+                {t("Extension")}
               </span>
               <Select
                 labelledBy="extension-filter"
                 size="small"
                 value={extensionFilter}
                 onChange={setExtensionFilter}
-                options={[{ value: "all", label: "All Extensions" }, ...allExtensions.map((e) => ({ value: e.id, label: e.title }))]}
+                options={[{ value: "all", label: t("All Extensions") }, ...allExtensions.map((e) => ({ value: e.id, label: e.title }))]}
               />
             </span>
           </span>
         )}
-        <TitleBarButton label="Minimize" onClick={() => getCurrentWindow().minimize()}>
+        <TitleBarButton label={t("Minimize")} onClick={() => getCurrentWindow().minimize()}>
           <Minus className="size-4" strokeWidth={1.5} />
         </TitleBarButton>
-        <TitleBarButton label="Close" danger onClick={() => getCurrentWindow().close()}>
+        <TitleBarButton label={t("Close")} danger onClick={() => getCurrentWindow().close()}>
           <X className="size-4" strokeWidth={1.5} />
         </TitleBarButton>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <nav aria-label="Settings" className="flex w-[230px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-sidebar-border px-[9px] pt-4 pb-2.5">
+        <nav aria-label={t("Settings")} className="flex w-[230px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-sidebar-border px-[9px] pt-4 pb-2.5">
           <label className="relative flex items-center">
             <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 size-4 text-fg-60" />
             <input
               value={navFilter}
               onChange={(e) => setNavFilter(e.target.value)}
-              placeholder="Search settings..."
-              aria-label="Search settings"
+              placeholder={t("Search settings...")}
+              aria-label={t("Search settings")}
               spellCheck={false}
               className="h-8 w-full rounded-md bg-field pr-2 pl-8 text-fg outline-offset-[-2px] placeholder:text-fg-60"
             />
           </label>
-          <div className="flex flex-col gap-0.5">{PAGES.filter((p) => matches(p.title, p.keywords)).map((p) => navLink(p.id, p.title, p.icon))}</div>
+          <div className="flex flex-col gap-0.5">{PAGES.filter((p) => matches(p.title, p.keywords)).map((p) => navLink(p.id, t(p.title), p.icon))}</div>
           <div className="flex flex-col gap-0.5">
             {allExtensions.filter((e) => matches(e.title)).map((e) => navLink(`extension:${e.id}`, e.title, extensionIcon(e)))}
           </div>

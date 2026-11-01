@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { addDays, CREATE_AT_EVENT, CREATE_EVENT_KEY, eventsOn, type CalendarEvent } from "./calendar";
 import { entryTitle, type ClipboardEntry } from "./clipboardHistory";
 import { formatTimer, remainingMs, type FocusSession } from "./focus";
+import { t } from "./i18n";
 import {
   formatClock,
   litSegments,
@@ -90,8 +91,8 @@ function NowPlaying({ media }: { media: NotchMedia | null }) {
           <Music className="size-7" />
         </span>
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-13 font-medium text-fg">Nothing playing</span>
-          <span className="text-12 text-fg-60">Start music or a video and it shows up here.</span>
+          <span className="text-13 font-medium text-fg">{t("Nothing playing")}</span>
+          <span className="text-12 text-fg-60">{t("Start music or a video and it shows up here.")}</span>
         </div>
       </div>
     );
@@ -107,13 +108,13 @@ function NowPlaying({ media }: { media: NotchMedia | null }) {
         <span className="truncate text-12 text-fg-60">{media.artist || media.album || " "}</span>
         {media.source && <span className="truncate text-11 text-fg-40">{media.source}</span>}
         <div className="mt-1 flex items-center gap-1">
-          <IconButton label="Previous track" onClick={() => run(invoke("flowkey_media_control", { command: "previous" }), "previous")}>
+          <IconButton label={t("Previous track")} onClick={() => run(invoke("flowkey_media_control", { command: "previous" }), "previous")}>
             <SkipBack className="size-4 fill-current" />
           </IconButton>
-          <IconButton label={media.playing ? "Pause" : "Play"} onClick={() => run(invoke("flowkey_media_control", { command: "playPause" }), "play/pause")}>
+          <IconButton label={media.playing ? t("Pause") : t("Play")} onClick={() => run(invoke("flowkey_media_control", { command: "playPause" }), "play/pause")}>
             {media.playing ? <Pause className="size-4 fill-current" /> : <Play className="size-4 fill-current" />}
           </IconButton>
-          <IconButton label="Next track" onClick={() => run(invoke("flowkey_media_control", { command: "next" }), "next")}>
+          <IconButton label={t("Next track")} onClick={() => run(invoke("flowkey_media_control", { command: "next" }), "next")}>
             <SkipForward className="size-4 fill-current" />
           </IconButton>
         </div>
@@ -160,7 +161,7 @@ function CalendarStrip({ focus, expanded }: { focus: FocusSession | null; expand
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex items-end gap-2">
         <span className="text-18 leading-none font-semibold text-fg">{month}</span>
-        <ol className="flex flex-1 justify-between" aria-label="This week">
+        <ol className="flex flex-1 justify-between" aria-label={t("This week")}>
           {weekStrip(today).map((d, i) => (
             <li key={d.key}>
               <button
@@ -180,40 +181,40 @@ function CalendarStrip({ focus, expanded }: { focus: FocusSession | null; expand
       {focus && (
         <div className="flex items-center gap-2 rounded-xl bg-control px-3 py-2">
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-12 font-medium text-fg">{focus.title || "Focus"}</span>
+            <span className="truncate text-12 font-medium text-fg">{focus.title || t("Focus")}</span>
             <span className="text-11 text-fg-60 tabular-nums">
-              {focus.status === "paused" ? "Paused · " : ""}
-              {focus.durationMs ? `${formatTimer(remainingMs(focus, now))} left` : "No time limit"}
+              {focus.status === "paused" ? t("Paused · ") : ""}
+              {focus.durationMs ? t("{time} left", { time: formatTimer(remainingMs(focus, now)) }) : t("No time limit")}
             </span>
           </div>
           <IconButton
-            label={focus.status === "paused" ? "Resume focus" : "Pause focus"}
+            label={focus.status === "paused" ? t("Resume focus") : t("Pause focus")}
             onClick={() => run(invoke(focus.status === "paused" ? "focus_resume" : "focus_pause", focus.status === "paused" ? {} : { durationMs: null }), "focus")}
           >
             {focus.status === "paused" ? <Play className="size-3.5 fill-current" /> : <Pause className="size-3.5 fill-current" />}
           </IconButton>
-          <IconButton label="Complete focus session" onClick={() => run(invoke("focus_complete"), "focus_complete")}>
+          <IconButton label={t("Complete focus session")} onClick={() => run(invoke("focus_complete"), "focus_complete")}>
             <Check className="size-3.5" />
           </IconButton>
         </div>
       )}
       <div className="flex min-w-0 items-start gap-2">
         {dayEvents.length ? (
-          <ul className="flex min-w-0 flex-1 flex-col gap-0.5" aria-label="Events">
+          <ul className="flex min-w-0 flex-1 flex-col gap-0.5" aria-label={t("Events")}>
             {dayEvents.map((e) => (
               <li key={`${e.calendarId}:${e.id}:${e.start}`} className="flex min-w-0 items-center gap-2 text-12">
                 <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-accent" />
-                <span className="shrink-0 text-fg-60 tabular-nums">{e.allDay ? "All day" : time.format(e.start)}</span>
-                <span className="truncate text-fg">{e.title || "Untitled event"}</span>
+                <span className="shrink-0 text-fg-60 tabular-nums">{e.allDay ? t("All day") : time.format(e.start)}</span>
+                <span className="truncate text-fg">{e.title || t("Untitled event")}</span>
               </li>
             ))}
           </ul>
         ) : (
           <span className="min-w-0 flex-1 truncate text-12 text-fg-40">
-            {offset === 0 ? "Nothing for today" : `Nothing for ${new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(selected)}`}
+            {offset === 0 ? t("Nothing for today") : t("Nothing for {day}", { day: new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(selected) })}
           </span>
         )}
-        <IconButton label="Create event" onClick={() => run(create(), "create event")} className="-my-1 size-6">
+        <IconButton label={t("Create event")} onClick={() => run(create(), "create event")} className="-my-1 size-6">
           <Plus className="size-3.5" />
         </IconButton>
       </div>
@@ -230,7 +231,7 @@ const CAPTURES = [
 
 function Captures() {
   return (
-    <div className="grid grid-cols-2 gap-1.5" aria-label="Capture">
+    <div className="grid grid-cols-2 gap-1.5" aria-label={t("Capture")}>
       {CAPTURES.map(({ label, glyph: Glyph, run: start }) => (
         <button
           key={label}
@@ -239,7 +240,7 @@ function Captures() {
           className="flex h-[42px] flex-col items-center justify-center gap-0.5 rounded-xl bg-control text-11 text-fg-60 outline-offset-1 hover:bg-control-hover hover:text-fg focus-visible:outline-2 focus-visible:outline-accent"
         >
           <Glyph aria-hidden="true" className="size-4 text-fg" />
-          {label}
+          {t(label)}
         </button>
       ))}
     </div>
@@ -247,19 +248,19 @@ function Captures() {
 }
 
 function Tray({ entries }: { entries: ClipboardEntry[] | null }) {
-  if (entries && !entries.length) return <p className="py-6 text-center text-12 text-fg-60">Copy something and it appears here, ready to paste.</p>;
+  if (entries && !entries.length) return <p className="py-6 text-center text-12 text-fg-60">{t("Copy something and it appears here, ready to paste.")}</p>;
   return (
-    <ul className="grid grid-cols-3 gap-1.5" aria-label="Recent clipboard items">
+    <ul className="grid grid-cols-3 gap-1.5" aria-label={t("Recent clipboard items")}>
       {(entries ?? []).slice(0, CLIPBOARD_SHOWN).map((entry) => (
         <li key={entry.id} className="min-w-0">
           <button
             type="button"
-            title={`Paste ${entryTitle(entry)}`}
+            title={t("Paste {title}", { title: entryTitle(entry) })}
             onClick={() => run(invoke("clipboard_paste", { id: entry.id }), "clipboard_paste")}
             className="flex h-[52px] w-full min-w-0 flex-col items-start justify-center gap-0.5 rounded-xl bg-control px-3 text-left outline-offset-1 hover:bg-control-hover focus-visible:outline-2 focus-visible:outline-accent"
           >
             <span className="w-full truncate text-12 text-fg">{entryTitle(entry)}</span>
-            <span className="w-full truncate text-11 text-fg-40">{entry.sourceName || "Clipboard"}</span>
+            <span className="w-full truncate text-11 text-fg-40">{entry.sourceName || t("Clipboard")}</span>
           </button>
         </li>
       ))}
@@ -269,7 +270,7 @@ function Tray({ entries }: { entries: ClipboardEntry[] | null }) {
 
 function WidgetBody({ widget }: { widget: NotchWidget }) {
   if (widget.error) return <p className="text-11 text-red">{widget.error}</p>;
-  if (!widget.tree) return <p className="text-11 text-fg-40">Loading…</p>;
+  if (!widget.tree) return <p className="text-11 text-fg-40">{t("Loading…")}</p>;
   const tree: UiTree = widget.tree;
   if (tree.type === "detail") {
     return (
@@ -285,7 +286,7 @@ function WidgetBody({ widget }: { widget: NotchWidget }) {
     );
   }
   const items = notchItems(tree).slice(0, 3);
-  if (!items.length) return <p className="text-11 text-fg-40">{tree.type !== "form" && tree.emptyView?.title ? tree.emptyView.title : "Nothing to show"}</p>;
+  if (!items.length) return <p className="text-11 text-fg-40">{tree.type !== "form" && tree.emptyView?.title ? tree.emptyView.title : t("Nothing to show")}</p>;
   return (
     <ul className="flex min-w-0 flex-col">
       {items.map((item) => {
@@ -328,7 +329,7 @@ function BatteryChip({ battery }: { battery: { percent: number; charging: boolea
   return (
     <span className={`flex items-center gap-1 text-11 tabular-nums ${battery.percent <= 20 && !battery.charging ? "text-red" : "text-fg-60"}`}>
       <Glyph aria-hidden="true" className="size-4" />
-      {battery.percent}%<span className="sr-only">{battery.charging ? " charging" : " battery"}</span>
+      {battery.percent}%<span className="sr-only">{battery.charging ? t(" charging") : t(" battery")}</span>
     </span>
   );
 }
@@ -336,14 +337,14 @@ function BatteryChip({ battery }: { battery: { percent: number; charging: boolea
 function VolumeView({ volume }: { volume: { percent: number; muted: boolean } }) {
   const lit = volume.muted ? 0 : litSegments(volume.percent, VOLUME_SEGMENTS);
   return (
-    <div role="status" aria-label={volume.muted ? "Volume muted" : `Volume ${volume.percent}%`} className="flex h-full items-center gap-3 px-5">
+    <div role="status" aria-label={volume.muted ? t("Volume muted") : t("Volume {n}%", { n: volume.percent })} className="flex h-full items-center gap-3 px-5">
       {volume.muted ? <VolumeX aria-hidden="true" className="size-5 shrink-0 text-fg" /> : <Volume2 aria-hidden="true" className="size-5 shrink-0 text-fg" />}
       <span aria-hidden="true" className="flex h-4 flex-1 items-center gap-[2px]">
         {Array.from({ length: VOLUME_SEGMENTS }, (_, i) => (
           <span key={i} className={`h-full flex-1 rounded-full ${i < lit ? "bg-fg" : "bg-control"}`} />
         ))}
       </span>
-      <span className="w-10 shrink-0 text-right text-12 font-medium text-fg tabular-nums">{volume.muted ? "Muted" : `${volume.percent}%`}</span>
+      <span className="w-10 shrink-0 text-right text-12 font-medium text-fg tabular-nums">{volume.muted ? t("Muted") : `${volume.percent}%`}</span>
     </div>
   );
 }
@@ -413,9 +414,9 @@ export function NotchWindow() {
   }, [size.width, size.height]);
 
   const tabs: { id: Tab; label: string; glyph: ReactNode }[] = [
-    { id: "nook", label: "Nook", glyph: <Music aria-hidden="true" className="size-3.5" /> },
-    { id: "tray", label: "Tray", glyph: <ClipboardList aria-hidden="true" className="size-3.5" /> },
-    ...(widgets.length ? [{ id: "widgets" as Tab, label: "Widgets", glyph: <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" /> }] : []),
+    { id: "nook", label: t("Nook"), glyph: <Music aria-hidden="true" className="size-3.5" /> },
+    { id: "tray", label: t("Tray"), glyph: <ClipboardList aria-hidden="true" className="size-3.5" /> },
+    ...(widgets.length ? [{ id: "widgets" as Tab, label: t("Widgets"), glyph: <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" /> }] : []),
   ];
   const expandedSize = notchSize("expanded", playing);
   const volumeSize = notchSize("volume", playing);
@@ -451,7 +452,7 @@ export function NotchWindow() {
           style={{ width: expandedSize.width, height: expandedSize.height }}
         >
           <header className="flex h-7 shrink-0 items-center justify-between">
-            <div role="tablist" aria-label="Notch sections" className="flex items-center gap-1">
+            <div role="tablist" aria-label={t("Notch sections")} className="flex items-center gap-1">
               {tabs.map((t) => (
                 <button
                   key={t.id}
@@ -468,7 +469,7 @@ export function NotchWindow() {
             </div>
             <div className="flex items-center gap-2">
               <BatteryChip battery={battery} />
-              <IconButton label="Open Openray settings" onClick={() => run(invoke("open_settings"), "open_settings")}>
+              <IconButton label={t("Open Openray settings")} onClick={() => run(invoke("open_settings"), "open_settings")}>
                 <Settings className="size-4" />
               </IconButton>
             </div>

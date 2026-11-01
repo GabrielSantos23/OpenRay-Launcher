@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { fail, Footer } from "../ActionHost";
 import { matchesShortcut } from "../actions";
 import { defineExtension, type Action, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { GlyphTile } from "../icons";
 import { BackButton, ListView, Metadata } from "../ListView";
 import { copyAndClose, frontmostApp, pasteTitle, type AppInfo } from "../output";
@@ -59,9 +60,9 @@ function SnippetForm({ initial, title, onDone, onBack }: { initial?: Partial<Sni
     try {
       const list = await loadSnippets();
       const next = {
-        text: text ? undefined : "Snippet cannot be empty",
-        name: name.trim() ? undefined : "Name cannot be empty",
-        keyword: keywordInUse(keyword, list, initial?.id) ? "This keyword is already in use" : undefined,
+        text: text ? undefined : t("Snippet cannot be empty"),
+        name: name.trim() ? undefined : t("Name cannot be empty"),
+        keyword: keywordInUse(keyword, list, initial?.id) ? t("This keyword is already in use") : undefined,
       };
       setErrors(next);
       if (next.text) return textRef.current?.focus();
@@ -79,10 +80,10 @@ function SnippetForm({ initial, title, onDone, onBack }: { initial?: Partial<Sni
         modifiedAt: now,
       };
       await saveSnippets(base ? list.map((s) => (s.id === snippet.id ? snippet : s)) : [...list, snippet]);
-      showToast({ variant: "success", title: base ? "Snippet updated" : "Created snippet" });
+      showToast({ variant: "success", title: base ? t("Snippet updated") : t("Created snippet") });
       onDone();
     } catch (e) {
-      fail(editing ? "Failed to update snippet" : "Failed to create snippet", e);
+      fail(editing ? t("Failed to update snippet") : t("Failed to create snippet"), e);
     }
   }
 
@@ -112,7 +113,7 @@ function SnippetForm({ initial, title, onDone, onBack }: { initial?: Partial<Sni
         }}
       >
         <label htmlFor={`${ids}-text`} className="pt-2 text-right text-13 text-fg-60">
-          Snippet
+          {t("Snippet")}
         </label>
         <div className="flex flex-col gap-1.5">
           <textarea
@@ -127,11 +128,11 @@ function SnippetForm({ initial, title, onDone, onBack }: { initial?: Partial<Sni
             className={`${field} h-[120px] resize-none py-2 font-mono ${border(errors.text)}`}
           />
           <p id={`${ids}-text-help`} className={`text-12 ${errors.text ? "text-red" : "text-fg-60"}`}>
-            {errors.text ?? "Include {clipboard}, {date}, {time}, {datetime}, {day}, {uuid}, {cursor} or {snippet name=\"…\"} to fill them in when it's inserted."}
+            {errors.text ?? t("Include {clipboard}, {date}, {time}, {datetime}, {day}, {uuid}, {cursor} or {snippet name=\"…\"} to fill them in when it's inserted.")}
           </p>
         </div>
         <label htmlFor={`${ids}-name`} className="pt-2 text-right text-13 text-fg-60">
-          Name
+          {t("Name")}
         </label>
         <div className="flex flex-col gap-1.5">
           <input
@@ -141,14 +142,14 @@ function SnippetForm({ initial, title, onDone, onBack }: { initial?: Partial<Sni
             spellCheck={false}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Snippet name"
+            placeholder={t("Snippet name")}
             aria-invalid={!!errors.name}
             className={`${field} h-[34px] ${border(errors.name)}`}
           />
           {errors.name && <p className="text-12 text-red">{errors.name}</p>}
         </div>
         <label htmlFor={`${ids}-keyword`} className="pt-2 text-right text-13 text-fg-60">
-          Keyword
+          {t("Keyword")}
         </label>
         <div className="flex flex-col gap-1.5">
           <input
@@ -157,13 +158,13 @@ function SnippetForm({ initial, title, onDone, onBack }: { initial?: Partial<Sni
             spellCheck={false}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            placeholder="Optional keyword"
+            placeholder={t("Optional keyword")}
             aria-invalid={!!errors.keyword}
             aria-describedby={`${ids}-keyword-help`}
             className={`${field} h-[34px] font-mono ${border(errors.keyword)}`}
           />
           <p id={`${ids}-keyword-help`} className={`text-12 ${errors.keyword ? "text-red" : "text-fg-60"}`}>
-            {errors.keyword ?? "Type it in any app to replace it with the snippet."}
+            {errors.keyword ?? t("Type it in any app to replace it with the snippet.")}
           </p>
         </div>
       </form>
@@ -174,7 +175,7 @@ function SnippetForm({ initial, title, onDone, onBack }: { initial?: Partial<Sni
             {title}
           </span>
         }
-        primaryTitle="Save Snippet"
+        primaryTitle={t("Save Snippet")}
         primaryKeys={["Ctrl", "↵"]}
         showActions={false}
         panelOpen={false}
@@ -185,7 +186,7 @@ function SnippetForm({ initial, title, onDone, onBack }: { initial?: Partial<Sni
 }
 
 function when(ms?: number): string {
-  return ms ? new Date(ms).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "Never";
+  return ms ? new Date(ms).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : t("Never");
 }
 
 type Editing = { snippet?: Partial<Snippet>; title: string } | null;
@@ -200,7 +201,7 @@ function SearchSnippets({ pop }: ViewProps) {
       .then(setList)
       .catch((e) => {
         setList([]);
-        fail("Could not load Snippets", e);
+        fail(t("Could not load Snippets"), e);
       });
   }, []);
   useEffect(() => {
@@ -231,50 +232,50 @@ function SearchSnippets({ pop }: ViewProps) {
           },
           {
             id: "copy",
-            title: "Copy to Clipboard",
+            title: t("Copy to Clipboard"),
             icon: Clipboard,
             shortcut: { key: "Enter", ctrl: true },
             run: async () => {
               const { text } = await resolve(snippet, all);
               await markUsed(snippet.id);
-              await copyAndClose(text, "Copied snippet to clipboard");
+              await copyAndClose(text, t("Copied snippet to clipboard"));
             },
           },
         ],
         [
           snippet.pinned
-            ? { id: "unpin", title: "Unpin Snippet", icon: PinOff, shortcut: { key: ".", ctrl: true }, keepOpen: true, run: () => update(all.map((s) => (s.id === snippet.id ? { ...s, pinned: false } : s)), "Unpinned Snippet") }
-            : { id: "pin", title: "Pin Snippet", icon: Pin, shortcut: { key: ".", ctrl: true }, keepOpen: true, run: () => update(all.map((s) => (s.id === snippet.id ? { ...s, pinned: true } : s)), "Pinned Snippet") },
-          { id: "edit", title: "Edit Snippet", icon: Pencil, shortcut: { key: "e", ctrl: true }, keepOpen: true, run: () => setEditing({ snippet, title: "Edit Snippet" }) },
+            ? { id: "unpin", title: t("Unpin Snippet"), icon: PinOff, shortcut: { key: ".", ctrl: true }, keepOpen: true, run: () => update(all.map((s) => (s.id === snippet.id ? { ...s, pinned: false } : s)), t("Unpinned Snippet")) }
+            : { id: "pin", title: t("Pin Snippet"), icon: Pin, shortcut: { key: ".", ctrl: true }, keepOpen: true, run: () => update(all.map((s) => (s.id === snippet.id ? { ...s, pinned: true } : s)), t("Pinned Snippet")) },
+          { id: "edit", title: t("Edit Snippet"), icon: Pencil, shortcut: { key: "e", ctrl: true }, keepOpen: true, run: () => setEditing({ snippet, title: t("Edit Snippet") }) },
           {
             id: "duplicate",
-            title: "Duplicate Snippet",
+            title: t("Duplicate Snippet"),
             icon: CopyPlus,
             keepOpen: true,
-            run: () => setEditing({ snippet: { name: `${snippet.name} Copy`, text: snippet.text }, title: "Create Snippet" }),
+            run: () => setEditing({ snippet: { name: `${snippet.name} Copy`, text: snippet.text }, title: t("Create Snippet") }),
           },
-          { id: "create", title: "Create Snippet", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing({ title: "Create Snippet" }) },
+          { id: "create", title: t("Create Snippet"), icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing({ title: t("Create Snippet") }) },
         ],
         [
           {
             id: "delete",
-            title: "Delete Snippet",
+            title: t("Delete Snippet"),
             icon: Trash2,
             destructive: true,
             keepOpen: true,
             shortcut: { key: "d", ctrl: true },
-            confirm: { title: "Delete Snippet?", message: `“${snippet.name}” will be deleted. This can't be undone.`, confirmTitle: "Delete" },
-            run: () => update(all.filter((s) => s.id !== snippet.id), "Deleted Snippet"),
+            confirm: { title: t("Delete Snippet?"), message: t("“{name}” will be deleted. This can't be undone.", { name: snippet.name }), confirmTitle: t("Delete") },
+            run: () => update(all.filter((s) => s.id !== snippet.id), t("Deleted Snippet")),
           },
           {
             id: "delete-all",
-            title: "Delete All Snippets",
+            title: t("Delete All Snippets"),
             icon: Trash2,
             destructive: true,
             keepOpen: true,
             shortcut: { key: "d", ctrl: true, shift: true },
-            confirm: { title: "Delete All Snippets?", message: `All ${all.length} snippets will be deleted. This can't be undone.`, confirmTitle: "Delete All" },
-            run: () => update([], "Deleted All Snippets"),
+            confirm: { title: t("Delete All Snippets?"), message: t("All {count} snippets will be deleted. This can't be undone.", { count: all.length }), confirmTitle: t("Delete All") },
+            run: () => update([], t("Deleted All Snippets")),
           },
         ],
       ];
@@ -284,8 +285,8 @@ function SearchSnippets({ pop }: ViewProps) {
     const pinned = all.filter((s) => s.pinned);
     const rest = all.filter((s) => !s.pinned).sort((a, b) => used(b) - used(a));
     return [
-      { title: "Pinned", items: pinned.map(toItem) },
-      { title: "Snippets", items: rest.map(toItem) },
+      { title: t("Pinned"), items: pinned.map(toItem) },
+      { title: t("Snippets"), items: rest.map(toItem) },
     ].filter((section) => section.items.length > 0);
   }, [list, app, reload]);
 
@@ -299,25 +300,25 @@ function SearchSnippets({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Search snippets…"
+      placeholder={t("Search snippets…")}
       sections={sections}
       onBack={pop}
-      footerTitle="Search Snippets"
+      footerTitle={t("Search Snippets")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={list === null}
-      emptyText={list?.length ? "No Snippets Found" : "Write faster by storing and inserting frequently used text."}
-      emptyDescription={list?.length ? undefined : "Press Ctrl+N to create your first snippet."}
+      emptyText={list?.length ? t("No Snippets Found") : t("Write faster by storing and inserting frequently used text.")}
+      emptyDescription={list?.length ? undefined : t("Press Ctrl+N to create your first snippet.")}
       detail={(item) => {
         const snippet = list?.find((s) => s.id === item.id);
         if (!snippet) return null;
         const rows = [
-          { label: "Name", value: <span className="truncate">{snippet.name}</span> },
-          ...(snippet.keyword ? [{ label: "Keyword", value: <span className="truncate font-mono">{snippet.keyword}</span> }] : []),
-          { label: "Content Type", value: "Text" },
-          { label: "Times Copied", value: snippet.copyCount ?? 0 },
-          { label: "Last Copied", value: when(snippet.copiedAt) },
-          { label: "Modified", value: when(snippet.modifiedAt) },
-          { label: "Created", value: when(snippet.createdAt) },
+          { label: t("Name"), value: <span className="truncate">{snippet.name}</span> },
+          ...(snippet.keyword ? [{ label: t("Keyword"), value: <span className="truncate font-mono">{snippet.keyword}</span> }] : []),
+          { label: t("Content Type"), value: t("Text") },
+          { label: t("Times Copied"), value: snippet.copyCount ?? 0 },
+          { label: t("Last Copied"), value: when(snippet.copiedAt) },
+          { label: t("Modified"), value: when(snippet.modifiedAt) },
+          { label: t("Created"), value: when(snippet.createdAt) },
         ];
         return (
           <>
@@ -331,7 +332,7 @@ function SearchSnippets({ pop }: ViewProps) {
 }
 
 function CreateSnippet({ pop }: ViewProps) {
-  return <SnippetForm title="Create Snippet" onDone={pop} onBack={pop} />;
+  return <SnippetForm title={t("Create Snippet")} onDone={pop} onBack={pop} />;
 }
 
 async function importSnippets() {
@@ -346,7 +347,7 @@ async function importSnippets() {
   const { snippets, added, skipped } = mergeImport(await loadSnippets(), incoming, Date.now(), () => crypto.randomUUID());
   await saveSnippets(snippets);
   const plural = (n: number) => (n === 1 ? "snippet" : "snippets");
-  showToast({ variant: added > 0 ? "success" : "failure", title: `${added} ${plural(added)} added`, message: skipped > 0 ? `${skipped} ${plural(skipped)} skipped` : undefined });
+  showToast({ variant: added > 0 ? "success" : "failure", title: t(`{count} ${plural(added)} added`, { count: added }), message: skipped > 0 ? t(`{count} ${plural(skipped)} skipped`, { count: skipped }) : undefined });
 }
 
 async function exportAll() {
@@ -369,7 +370,7 @@ export default defineExtension({
       title: "Create Snippet",
       subtitle: "Snippets",
       icon: { glyph: Plus, tone: "blue" },
-      keywords: ["new snippet", "text", "expand"],
+      keywords: ["new snippet", "text", "expand", "novo snippet", "trecho"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: CreateSnippet,
@@ -378,7 +379,7 @@ export default defineExtension({
       id: "search",
       title: "Search Snippets",
       subtitle: "Snippets",
-      keywords: ["snippet", "text", "expand", "keyword"],
+      keywords: ["snippet", "text", "expand", "keyword", "snippets", "trechos"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SearchSnippets,
@@ -388,7 +389,7 @@ export default defineExtension({
       title: "Import Snippets",
       subtitle: "Snippets",
       icon: { glyph: Download, tone: "blue" },
-      keywords: ["snippet", "json"],
+      keywords: ["snippet", "json", "importar"],
       kind: "Command",
       primaryActionTitle: "Run Command",
       run: importSnippets,
@@ -398,7 +399,7 @@ export default defineExtension({
       title: "Export Snippets",
       subtitle: "Snippets",
       icon: { glyph: Upload, tone: "blue" },
-      keywords: ["snippet", "json", "backup"],
+      keywords: ["snippet", "json", "backup", "exportar"],
       kind: "Command",
       primaryActionTitle: "Run Command",
       run: exportAll,

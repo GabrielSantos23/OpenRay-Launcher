@@ -3,6 +3,7 @@ import { Clipboard, Mail, MapPin, Phone, User } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { displayName, initials, sectionsFor, type Labeled, type Person } from "../contacts";
 import { defineExtension, type Action, type IconSpec, type Shortcut, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { GlyphTile } from "../icons";
 import { ListView, Metadata, type ListSection } from "../ListView";
 import { copyAndClose } from "../output";
@@ -20,11 +21,11 @@ function Avatar({ person, large = false }: { person: Person; large?: boolean }) 
 function multi(items: Labeled[], title: string, icon: ComponentType<{ className?: string }>, shortcut: Shortcut, run: (value: string) => Promise<void> | void): Action[] {
   if (!items.length) return [];
   const id = title.toLowerCase().replace(/\s+/g, "-");
-  if (items.length === 1) return [{ id, title, icon, shortcut, run: () => run(items[0].value) }];
+  if (items.length === 1) return [{ id, title: t(title), icon, shortcut, run: () => run(items[0].value) }];
   return [
     {
       id,
-      title: `${title}…`,
+      title: `${t(title)}…`,
       icon,
       shortcut,
       keepOpen: true,
@@ -36,14 +37,14 @@ function multi(items: Labeled[], title: string, icon: ComponentType<{ className?
 
 function personActions(person: Person): Action[][] {
   const open = (scheme: string) => (value: string) => invoke<void>("open_url", { url: `${scheme}:${scheme === "tel" ? value.replace(/[^\d+]/g, "") : value}`, appPath: null });
-  const copied = (what: string) => (value: string) => copyAndClose(value, `Copied ${what}`);
+  const copied = (what: string) => (value: string) => copyAndClose(value, t("Copied {what}", { what: t(what) }));
   return [
     [
       ...multi(person.emailAddresses, "Send Email", Mail, { key: "e", ctrl: true, shift: true }, open("mailto")),
       ...multi(person.phoneNumbers, "Call via Phone", Phone, { key: "p", ctrl: true, shift: true }, open("tel")),
     ],
     [
-      ...(person.name ? [{ id: "copy-name", title: "Copy Full Name", icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copied("name")(person.name) }] : []),
+      ...(person.name ? [{ id: "copy-name", title: t("Copy Full Name"), icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copied("name")(person.name) }] : []),
       ...multi(person.phoneNumbers, "Copy Phone Number", Phone, { key: "c", ctrl: true, alt: true }, copied("phone number")),
       ...multi(person.emailAddresses, "Copy Email Address", Mail, { key: "c", alt: true, shift: true }, copied("email address")),
       ...multi(person.postalAddresses, "Copy Postal Address", MapPin, { key: "c", ctrl: true, alt: true, shift: true }, copied("postal address")),
@@ -96,20 +97,20 @@ function SearchContacts({ pop }: ViewProps) {
   );
 
   const empty = error
-    ? { text: "Couldn't read your contacts", description: error }
+    ? { text: t("Couldn't read your contacts"), description: error }
     : people?.length === 0
-      ? { text: "No contacts found", description: "Windows has no contacts yet. Add an account with contacts in Settings > Accounts > Email & accounts." }
-      : { text: "No Contacts Found", description: "Try another name, email or phone number." };
+      ? { text: t("No contacts found"), description: t("Windows has no contacts yet. Add an account with contacts in Settings > Accounts > Email & accounts.") }
+      : { text: t("No Contacts Found"), description: t("Try another name, email or phone number.") };
 
   return (
     <ListView
-      placeholder="Search contacts…"
+      placeholder={t("Search contacts…")}
       sections={sections}
       onBack={pop}
       searchText={text}
       onSearchTextChange={setText}
       filtering={false}
-      footerTitle="Search Contacts"
+      footerTitle={t("Search Contacts")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={people === null}
       emptyText={empty.text}
@@ -135,7 +136,7 @@ export default defineExtension({
       id: "search",
       title: "Search Contacts",
       subtitle: "Contacts",
-      keywords: ["contacts", "people", "phone", "email", "address book"],
+      keywords: ["contacts", "people", "phone", "email", "address book", "contatos", "pessoas", "agenda"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SearchContacts,

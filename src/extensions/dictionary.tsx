@@ -21,6 +21,7 @@ import {
   type Suggestion,
 } from "../dictionary";
 import { defineExtension, type Action, type IconSpec, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { GlyphTile } from "../icons";
 import { BackButton, ListView, type ListSection } from "../ListView";
 import { copyAndClose, frontmostApp, pasteTitle, type AppInfo } from "../output";
@@ -96,19 +97,19 @@ function Definition({ word, language, app, onBack }: { word: string; language: D
   const groups = useMemo<Action[][]>(
     () => [
       [
-        { id: "copy-word", title: "Copy Word to Clipboard", icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(word, "Copied word to clipboard") },
+        { id: "copy-word", title: t("Copy Word to Clipboard"), icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(word, t("Copied word to clipboard")) },
         { id: "paste", title: pasteTitle(app), icon: ClipboardPaste, shortcut: { key: "Enter", ctrl: true }, run: () => invoke<void>("paste_text", { text: word }) },
-        ...(entries?.length ? [{ id: "copy-definition", title: "Copy Definition", icon: BookText, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(definitionText(entries), "Copied definition") }] : []),
+        ...(entries?.length ? [{ id: "copy-definition", title: t("Copy Definition"), icon: BookText, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(definitionText(entries), t("Copied definition")) }] : []),
       ],
-      ...(error ? [[{ id: "retry", title: "Try Again", icon: RotateCw, shortcut: { key: "r", ctrl: true }, keepOpen: true, run: () => setAttempt((n) => n + 1) }]] : []),
-      ...(source ? [[{ id: "open-source", title: "Open in Browser", icon: ExternalLink, shortcut: { key: "o", ctrl: true }, run: () => invoke<void>("open_url", { url: source, appPath: null }) }]] : []),
+      ...(error ? [[{ id: "retry", title: t("Try Again"), icon: RotateCw, shortcut: { key: "r", ctrl: true }, keepOpen: true, run: () => setAttempt((n) => n + 1) }]] : []),
+      ...(source ? [[{ id: "open-source", title: t("Open in Browser"), icon: ExternalLink, shortcut: { key: "o", ctrl: true }, run: () => invoke<void>("open_url", { url: source, appPath: null }) }]] : []),
     ],
     [word, app, entries, source, error],
   );
   const primary = groups[0][0];
 
   function runAction(action: Action) {
-    host.run(action, { failTitle: `${action.title} failed` });
+    host.run(action, { failTitle: t("{title} failed", { title: action.title }) });
   }
 
   function onKeyDown(event: React.KeyboardEvent) {
@@ -141,8 +142,8 @@ function Definition({ word, language, app, onBack }: { word: string; language: D
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
         {entries?.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-13">
-            <p className="font-medium text-fg">{error ? "Couldn't load the definition" : "No Definitions Found"}</p>
-            <p className="max-w-[420px] text-fg-60">{error ?? `The dictionary has no entry for "${word}". Copy the word or try another spelling.`}</p>
+            <p className="font-medium text-fg">{error ? t("Couldn't load the definition") : t("No Definitions Found")}</p>
+            <p className="max-w-[420px] text-fg-60">{error ? t(error) : t('The dictionary has no entry for "{word}". Copy the word or try another spelling.', { word })}</p>
           </div>
         )}
         {entries?.map((entry, i) => (
@@ -164,7 +165,7 @@ function Definition({ word, language, app, onBack }: { word: string; language: D
                 </ol>
                 {meaning.synonyms.length > 0 && (
                   <p className="text-12 text-fg-60">
-                    <span className="font-medium">Synonyms: </span>
+                    <span className="font-medium">{t("Synonyms:")} </span>
                     {meaning.synonyms.slice(0, 8).join(", ")}
                   </p>
                 )}
@@ -219,7 +220,7 @@ function DefineWord({ pop }: ViewProps) {
     const timer = window.setTimeout(() => {
       suggest(text, language)
         .then((r) => id === seq.current && setResults(r))
-        .catch((e) => id === seq.current && fail("Failed to get dictionary suggestions", e))
+        .catch((e) => id === seq.current && fail(t("Failed to get dictionary suggestions"), e))
         .finally(() => id === seq.current && setLoading(false));
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
@@ -236,7 +237,7 @@ function DefineWord({ pop }: ViewProps) {
         [
           {
             id: "details",
-            title: "Show Details",
+            title: t("Show Details"),
             icon: PanelRight,
             keepOpen: true,
             run: () => {
@@ -245,7 +246,7 @@ function DefineWord({ pop }: ViewProps) {
             },
           },
           { id: "paste", title: pasteTitle(app), icon: ClipboardPaste, shortcut: { key: "Enter", ctrl: true, shift: true }, run: () => invoke<void>("paste_text", { text: s.word }) },
-          { id: "copy", title: "Copy Word to Clipboard", icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(s.word, "Copied word to clipboard") },
+          { id: "copy", title: t("Copy Word to Clipboard"), icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(s.word, t("Copied word to clipboard")) },
         ],
         ...(searching
           ? []
@@ -253,38 +254,38 @@ function DefineWord({ pop }: ViewProps) {
               [
                 {
                   id: "remove",
-                  title: "Remove from Recent",
+                  title: t("Remove from Recent"),
                   icon: Trash2,
                   destructive: true,
                   keepOpen: true,
                   shortcut: { key: "d", ctrl: true },
                   run: () => {
                     saveRecent(recent.filter((w) => w.word !== s.word));
-                    showToast({ variant: "success", title: "Removed from recent words" });
+                    showToast({ variant: "success", title: t("Removed from recent words") });
                   },
                 },
                 {
                   id: "clear",
-                  title: "Clear All Recent Words",
+                  title: t("Clear All Recent Words"),
                   icon: Trash2,
                   destructive: true,
                   keepOpen: true,
                   shortcut: { key: "d", ctrl: true, alt: true },
                   run: () => {
                     saveRecent([]);
-                    showToast({ variant: "success", title: "Cleared recent words" });
+                    showToast({ variant: "success", title: t("Cleared recent words") });
                   },
                 },
               ],
             ]),
       ],
     });
-    if (!searching) return recent.length ? [{ title: "Recent Words", items: recent.map((s) => item(s, "recent")) }] : [];
+    if (!searching) return recent.length ? [{ title: t("Recent Words"), items: recent.map((s) => item(s, "recent")) }] : [];
     const found = results.filter((r) => !r.isGuess);
     const guesses = results.filter((r) => r.isGuess);
     return [
-      ...(found.length ? [{ title: "Results", items: found.map((s) => item(s, "result")) }] : []),
-      ...(guesses.length ? [{ title: "Did you mean?", items: guesses.map((s) => item(s, "guess")) }] : []),
+      ...(found.length ? [{ title: t("Results"), items: found.map((s) => item(s, "result")) }] : []),
+      ...(guesses.length ? [{ title: t("Did you mean?"), items: guesses.map((s) => item(s, "guess")) }] : []),
     ];
   }, [searching, recent, results, app, saveRecent]);
 
@@ -292,17 +293,17 @@ function DefineWord({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Search word…"
+      placeholder={t("Search word…")}
       sections={sections}
       onBack={pop}
       searchText={text}
       onSearchTextChange={setText}
       filtering={false}
-      footerTitle="Define Word"
+      footerTitle={t("Define Word")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={loading}
-      emptyText={searching ? "No Results Found" : "Type a word to look up in dictionary"}
-      emptyDescription={searching ? "Check the spelling or try another word." : language === "pt" ? "Portuguese definitions, pronunciations and examples from Wiktionary." : "English definitions, pronunciations and examples."}
+      emptyText={searching ? t("No Results Found") : t("Type a word to look up in dictionary")}
+      emptyDescription={searching ? t("Check the spelling or try another word.") : language === "pt" ? t("Portuguese definitions, pronunciations and examples from Wiktionary.") : t("English definitions, pronunciations and examples.")}
     />
   );
 }
@@ -316,7 +317,7 @@ export default defineExtension({
       id: "defineWord",
       title: "Define Word",
       subtitle: "Dictionary",
-      keywords: ["dictionary", "define", "lexicon", "thesaurus", "glossary", "spell", "meaning"],
+      keywords: ["dictionary", "define", "lexicon", "thesaurus", "glossary", "spell", "meaning", "dicionário", "definir", "significado"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: DefineWord,

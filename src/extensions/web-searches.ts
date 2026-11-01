@@ -18,7 +18,7 @@ export default defineExtension({
       title: engine.title,
       subtitle: "Web Searches",
       icon: `https://www.google.com/s2/favicons?domain=${engine.domain}&sz=64`,
-      keywords: ["search", "web"],
+      keywords: ["search", "web", "pesquisa", "busca na web"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       run: () => invoke("open_url", { url: engine.home }),

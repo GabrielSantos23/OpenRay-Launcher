@@ -6,6 +6,7 @@ import { fail } from "../ActionHost";
 import { formatBytes } from "../clipboardHistory";
 import { Dropdown } from "../Dropdown";
 import { defineExtension, type Action, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { shortLocation, type FileHit, type FileInfo, type FileResults } from "../fileSearch";
 import { GlyphTile } from "../icons";
 import { ListView, Metadata } from "../ListView";
@@ -81,20 +82,20 @@ function Detail({ file, home }: { file: FileHit; home: string }) {
   }, [file.path]);
 
   const rows: { label: string; value: ReactNode }[] = [
-    { label: "Name", value: <span className="truncate">{file.name}</span> },
-    { label: "Where", value: <span className="truncate">{shortLocation(file.path, home)}</span> },
+    { label: t("Name"), value: <span className="truncate">{file.name}</span> },
+    { label: t("Where"), value: <span className="truncate">{shortLocation(file.path, home)}</span> },
   ];
   if (info) {
-    rows.push({ label: "Type", value: <span className="truncate">{info.typeName}</span> });
-    if (info.size !== null) rows.push({ label: "Size", value: formatBytes(info.size) });
-    rows.push({ label: "Created", value: when(info.created) }, { label: "Modified", value: when(info.modified) }, { label: "Accessed", value: when(info.accessed) });
+    rows.push({ label: t("Type"), value: <span className="truncate">{info.typeName}</span> });
+    if (info.size !== null) rows.push({ label: t("Size"), value: formatBytes(info.size) });
+    rows.push({ label: t("Created"), value: when(info.created) }, { label: t("Modified"), value: when(info.modified) }, { label: t("Accessed"), value: when(info.accessed) });
   }
 
   return (
     <>
       <div className="flex min-h-0 flex-1 items-center justify-center p-4">
         {error ? (
-          <p className="text-13 text-fg-60">This file is no longer available.</p>
+          <p className="text-13 text-fg-60">{t("This file is no longer available.")}</p>
         ) : text !== null ? (
           <pre className="size-full overflow-auto font-mono text-12 break-words whitespace-pre-wrap text-fg">{text}</pre>
         ) : (
@@ -109,37 +110,37 @@ function Detail({ file, home }: { file: FileHit; home: string }) {
 function fileActions(file: FileHit, toggleDetails: () => void, reload: () => void): Action[][] {
   return [
     [
-      { id: "open", title: "Open", icon: ExternalLink, run: () => invoke("launch_app", { path: file.path }) },
-      { id: "show-in-explorer", title: "Show in File Explorer", icon: Folder, shortcut: { key: "Enter", ctrl: true }, run: () => invoke("show_in_explorer", { path: file.path }) },
-      { id: "toggle-details", title: "Toggle Info Panel", icon: PanelRight, shortcut: { key: "i", ctrl: true, shift: true }, keepOpen: true, run: toggleDetails },
+      { id: "open", title: t("Open"), icon: ExternalLink, run: () => invoke("launch_app", { path: file.path }) },
+      { id: "show-in-explorer", title: t("Show in File Explorer"), icon: Folder, shortcut: { key: "Enter", ctrl: true }, run: () => invoke("show_in_explorer", { path: file.path }) },
+      { id: "toggle-details", title: t("Toggle Info Panel"), icon: PanelRight, shortcut: { key: "i", ctrl: true, shift: true }, keepOpen: true, run: toggleDetails },
     ],
     [
       {
         id: "copy-file",
-        title: "Copy File",
+        title: t("Copy File"),
         icon: Clipboard,
         shortcut: { key: "c", ctrl: true, shift: true },
         run: async () => {
           await invoke("copy_rich", { paths: [file.path] });
           await invoke("hide_launcher", { restoreFocus: true });
-          showHUD({ variant: "success", title: "Copied File to Clipboard" });
+          showHUD({ variant: "success", title: t("Copied File to Clipboard") });
         },
       },
-      { id: "copy-name", title: "Copy Name", icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(file.name, "Copied Name to Clipboard") },
-      { id: "copy-path", title: "Copy Path", icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true, shift: true }, run: () => copyAndClose(`"${file.path}"`, "Copied Path to Clipboard") },
+      { id: "copy-name", title: t("Copy Name"), icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true }, run: () => copyAndClose(file.name, t("Copied Name to Clipboard")) },
+      { id: "copy-path", title: t("Copy Path"), icon: Clipboard, shortcut: { key: "c", ctrl: true, alt: true, shift: true }, run: () => copyAndClose(`"${file.path}"`, t("Copied Path to Clipboard")) },
     ],
     [
       {
         id: "delete",
-        title: "Delete",
+        title: t("Delete"),
         icon: Trash2,
         destructive: true,
         keepOpen: true,
         shortcut: { key: "d", ctrl: true },
-        confirm: { title: "Delete", message: `Are you sure you want to delete ${file.name}? It will be moved to the Recycle Bin.`, confirmTitle: "Delete" },
+        confirm: { title: t("Delete"), message: t("Are you sure you want to delete {name}? It will be moved to the Recycle Bin.", { name: file.name }), confirmTitle: t("Delete") },
         run: async () => {
           await invoke("flowkey_fs", { op: "trash", path: file.path });
-          showToast({ variant: "success", title: "Moved to Recycle Bin", message: file.name });
+          showToast({ variant: "success", title: t("Moved to Recycle Bin"), message: file.name });
           reload();
         },
       },
@@ -147,7 +148,7 @@ function fileActions(file: FileHit, toggleDetails: () => void, reload: () => voi
     [
       {
         id: "index-files",
-        title: "Index Files",
+        title: t("Index Files"),
         icon: RefreshCw,
         keepOpen: true,
         run: async () => {
@@ -171,7 +172,7 @@ function SearchFiles({ pop }: ViewProps) {
     const request = ++latest.current;
     invoke<FileResults>("file_search", { query: text, kind })
       .then((result) => request === latest.current && setResults(result))
-      .catch((e) => fail("Could not search files", e));
+      .catch((e) => fail(t("Could not search files"), e));
   }, [text, kind, version]);
 
   useEffect(() => {
@@ -196,7 +197,7 @@ function SearchFiles({ pop }: ViewProps) {
   const sections = useMemo(
     () => [
       {
-        title: text.trim() ? "" : "Recently Used",
+        title: text.trim() ? "" : t("Recently Used"),
         items: files.map(
           (file): Item => ({
             id: file.path,
@@ -215,23 +216,23 @@ function SearchFiles({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Search files…"
+      placeholder={t("Search files…")}
       sections={sections}
       onBack={pop}
       searchText={text}
       onSearchTextChange={setText}
       filtering={false}
-      footerTitle="Search Files"
+      footerTitle={t("Search Files")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={results === null || results.building}
-      emptyText={indexingFirst ? "File Search is indexing…" : text.trim() ? "No Files Found" : "No Recent Files"}
-      emptyDescription={indexingFirst ? "Results will appear as soon as your files are indexed." : undefined}
+      emptyText={indexingFirst ? t("File Search is indexing…") : text.trim() ? t("No Files Found") : t("No Recent Files")}
+      emptyDescription={indexingFirst ? t("Results will appear as soon as your files are indexed.") : undefined}
       accessory={
         <div className="w-[197px] shrink-0">
           <span id="file-search-kind" className="sr-only">
-            Filter by Type
+            {t("Filter by Type")}
           </span>
-          <Dropdown size="field" labelledBy="file-search-kind" value={kind} options={KINDS} onChange={setKind} />
+          <Dropdown size="field" labelledBy="file-search-kind" value={kind} options={KINDS.map((k) => ({ ...k, label: t(k.label) }))} onChange={setKind} />
         </div>
       }
       detail={
@@ -260,19 +261,19 @@ function QuickLook({ pop }: ViewProps) {
   const files = useMemo(() => (paths ?? []).map((path): FileHit => ({ path, name: path.split("\\").pop() || path, dir: false })), [paths]);
   const home = useMemo(() => files[0]?.path.match(/^[a-z]:\\users\\[^\\]+/i)?.[0] ?? "", [files]);
   const sections = useMemo(
-    () => [{ title: "Selection", items: files.map((file): Item => ({ id: file.path, title: file.name, icon: <FileIcon path={file.path} dir={false} />, actions: fileActions(file, () => {}, () => {}).slice(0, 2) })) }],
+    () => [{ title: t("Selection"), items: files.map((file): Item => ({ id: file.path, title: file.name, icon: <FileIcon path={file.path} dir={false} />, actions: fileActions(file, () => {}, () => {}).slice(0, 2) })) }],
     [files],
   );
   return (
     <ListView
-      placeholder="Filter selection…"
+      placeholder={t("Filter selection…")}
       sections={sections}
       onBack={pop}
-      footerTitle="Quick Look"
+      footerTitle={t("Quick Look")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={paths === null}
-      emptyText={error ?? "Nothing selected"}
-      emptyDescription={error ? "Open File Explorer, select a file and run Quick Look again." : undefined}
+      emptyText={error ?? t("Nothing selected")}
+      emptyDescription={error ? t("Open File Explorer, select a file and run Quick Look again.") : undefined}
       detail={(item) => {
         const file = files.find((f) => f.path === item.id);
         return file ? <Detail file={file} home={home} /> : null;
@@ -291,8 +292,8 @@ export default defineExtension({
     return [
       {
         id: "indexing",
-        title: "File Search is indexing…",
-        subtitle: `Indexing ${count.toLocaleString("en-US")} files`,
+        title: t("File Search is indexing…"),
+        subtitle: t("Indexing {count} files", { count: count.toLocaleString("en-US") }),
         keywords: ["files", "index", "search"],
         kind: "Command",
         primaryActionTitle: "Open File Search",
@@ -306,7 +307,7 @@ export default defineExtension({
       title: "Quick Look",
       subtitle: "File Search",
       icon: { glyph: Eye, tone: "blue" },
-      keywords: ["preview", "explorer", "selection", "peek"],
+      keywords: ["preview", "explorer", "selection", "peek", "visualizar", "prévia", "seleção"],
       kind: "Command",
       primaryActionTitle: "Quick Look",
       view: QuickLook,
@@ -315,7 +316,7 @@ export default defineExtension({
       id: "search-files",
       title: "Search Files",
       subtitle: "File Search",
-      keywords: ["files", "folders", "find", "explorer", "documents"],
+      keywords: ["files", "folders", "find", "explorer", "documents", "arquivos", "buscar arquivos", "pastas"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SearchFiles,

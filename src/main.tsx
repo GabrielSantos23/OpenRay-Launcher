@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { lazy, StrictMode, Suspense, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
+import { useApplyLanguage, useLanguage } from "./i18n";
 import { ThemeRoot } from "./theme";
 import "./styles.css";
 
@@ -28,11 +29,17 @@ const views: Record<string, () => Promise<{ default: ComponentType }>> = {
 const label = windowLabel();
 const View = lazy(label.startsWith("pin-") ? () => import("./PinWindow").then((m) => ({ default: m.PinWindow })) : (views[label] ?? (() => import("./App"))));
 
+function Localized() {
+  useApplyLanguage();
+  const lang = useLanguage();
+  return <View key={lang} />;
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeRoot>
       <Suspense>
-        <View />
+        <Localized />
       </Suspense>
     </ThemeRoot>
   </StrictMode>,

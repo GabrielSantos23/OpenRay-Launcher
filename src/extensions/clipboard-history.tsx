@@ -37,6 +37,7 @@ import {
 import { Dropdown } from "../Dropdown";
 import { GlyphTile } from "../icons";
 import { defineExtension, type Action, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { ListView, Metadata } from "../ListView";
 import { copyAndClose, frontmostApp, pasteTitle, type AppInfo } from "../output";
 import { showHUD, showToast } from "../toast";
@@ -105,7 +106,7 @@ function Detail({ entry }: { entry: ClipboardEntry }) {
   const rows: { label: string; value: ReactNode }[] = [];
   if (entry.sourceName) {
     rows.push({
-      label: "Source",
+      label: t("Source"),
       value: (
         <>
           {entry.sourcePath && <img src={fileIcon(entry.sourcePath, 16)} alt="" className="size-4 shrink-0" />}
@@ -114,16 +115,16 @@ function Detail({ entry }: { entry: ClipboardEntry }) {
       ),
     });
   }
-  rows.push({ label: "Type", value: type });
+  rows.push({ label: t("Type"), value: type });
   if (entry.kind === "text") {
-    rows.push({ label: "Characters", value: [...text].length.toLocaleString("en-US") }, { label: "Words", value: wordCount(text).toLocaleString("en-US") });
+    rows.push({ label: t("Characters"), value: [...text].length.toLocaleString("en-US") }, { label: t("Words"), value: wordCount(text).toLocaleString("en-US") });
   } else if (entry.kind === "image") {
-    rows.push({ label: "Dimensions", value: `${entry.width}×${entry.height}` }, { label: "Image size", value: formatBytes(entry.bytes ?? 0) });
+    rows.push({ label: t("Dimensions"), value: `${entry.width}×${entry.height}` }, { label: t("Image size"), value: formatBytes(entry.bytes ?? 0) });
   } else {
-    rows.push({ label: entry.paths?.length === 1 ? "Path" : "Files", value: <span className="truncate">{entry.paths?.length === 1 ? entry.paths[0] : entry.paths?.length}</span> });
+    rows.push({ label: entry.paths?.length === 1 ? t("Path") : t("Files"), value: <span className="truncate">{entry.paths?.length === 1 ? entry.paths[0] : entry.paths?.length}</span> });
   }
-  if (entry.copyCount === 1) rows.push({ label: "Copied", value: when(entry.createdAt) });
-  else rows.push({ label: "Times copied", value: entry.copyCount }, { label: "Last copied", value: when(entry.updatedAt) }, { label: "First copied", value: when(entry.createdAt) });
+  if (entry.copyCount === 1) rows.push({ label: t("Copied"), value: when(entry.createdAt) });
+  else rows.push({ label: t("Times copied"), value: entry.copyCount }, { label: t("Last copied"), value: when(entry.updatedAt) }, { label: t("First copied"), value: when(entry.createdAt) });
 
   let preview: ReactNode;
   if (entry.kind === "image") preview = <img src={imageSrc(entry)} alt={entryTitle(entry)} className="max-h-full max-w-full object-contain" />;
@@ -162,7 +163,7 @@ function entryActions(entry: ClipboardEntry, app: AppInfo | null, reload: () => 
   if (type === "Color") {
     secondary.push({
       id: "copy-color",
-      title: "Copy Color as…",
+      title: t("Copy Color as…"),
       icon: Clipboard,
       shortcut: { key: "c", ctrl: true, alt: true },
       submenu: () =>
@@ -170,66 +171,66 @@ function entryActions(entry: ClipboardEntry, app: AppInfo | null, reload: () => 
           id: format.id,
           title: format.label,
           accessory: format.value,
-          run: () => copyAndClose(format.value, `Copied ${format.label} to Clipboard`),
+          run: () => copyAndClose(format.value, t("Copied {label} to Clipboard", { label: format.label })),
         })),
       run: () => {},
     });
   }
-  if (type === "Link") secondary.push({ id: "open-link", title: "Open in Browser", icon: ExternalLink, shortcut: { key: "o", ctrl: true }, run: () => invoke("open_url", { url: text.trim() }) });
-  if (type === "Email") secondary.push({ id: "send-email", title: "Compose Email", icon: AtSign, shortcut: { key: "o", ctrl: true }, run: () => invoke("open_url", { url: text.trim().startsWith("mailto:") ? text.trim() : `mailto:${text.trim()}` }) });
+  if (type === "Link") secondary.push({ id: "open-link", title: t("Open in Browser"), icon: ExternalLink, shortcut: { key: "o", ctrl: true }, run: () => invoke("open_url", { url: text.trim() }) });
+  if (type === "Email") secondary.push({ id: "send-email", title: t("Compose Email"), icon: AtSign, shortcut: { key: "o", ctrl: true }, run: () => invoke("open_url", { url: text.trim().startsWith("mailto:") ? text.trim() : `mailto:${text.trim()}` }) });
   if (entry.kind === "files" && entry.paths?.length === 1) {
     secondary.push(
-      { id: "open-file", title: "Open", icon: ExternalLink, shortcut: { key: "o", ctrl: true }, run: () => invoke("launch_app", { path: entry.paths![0] }) },
-      { id: "show-in-explorer", title: "Show in File Explorer", icon: Folder, shortcut: { key: "o", ctrl: true, shift: true }, run: () => invoke("show_in_explorer", { path: entry.paths![0] }) },
+      { id: "open-file", title: t("Open"), icon: ExternalLink, shortcut: { key: "o", ctrl: true }, run: () => invoke("launch_app", { path: entry.paths![0] }) },
+      { id: "show-in-explorer", title: t("Show in File Explorer"), icon: Folder, shortcut: { key: "o", ctrl: true, shift: true }, run: () => invoke("show_in_explorer", { path: entry.paths![0] }) },
     );
   }
   secondary.push(
     entry.pinned === null
-      ? { id: "pin", title: "Pin Entry", icon: Pin, shortcut: { key: ".", ctrl: true }, keepOpen: true, run: () => changed("Pinned Entry")(invoke("clipboard_pin", { id: entry.id, pinned: true })) }
-      : { id: "unpin", title: "Unpin Entry", icon: PinOff, shortcut: { key: ".", ctrl: true }, keepOpen: true, run: () => changed("Unpinned Entry")(invoke("clipboard_pin", { id: entry.id, pinned: false })) },
+      ? { id: "pin", title: t("Pin Entry"), icon: Pin, shortcut: { key: ".", ctrl: true }, keepOpen: true, run: () => changed(t("Pinned Entry"))(invoke("clipboard_pin", { id: entry.id, pinned: true })) }
+      : { id: "unpin", title: t("Unpin Entry"), icon: PinOff, shortcut: { key: ".", ctrl: true }, keepOpen: true, run: () => changed(t("Unpinned Entry"))(invoke("clipboard_pin", { id: entry.id, pinned: false })) },
   );
   return [
     [
       { id: "paste", title: pasteTitle(app), icon: ClipboardPaste, run: () => invoke("clipboard_paste", { id: entry.id }) },
       {
         id: "copy",
-        title: "Copy to Clipboard",
+        title: t("Copy to Clipboard"),
         icon: Clipboard,
         shortcut: { key: "Enter", ctrl: true },
         run: async () => {
           await invoke("clipboard_copy", { id: entry.id });
           await invoke("hide_launcher", { restoreFocus: true });
-          showHUD({ variant: "success", title: "Copied Entry to Clipboard" });
+          showHUD({ variant: "success", title: t("Copied Entry to Clipboard") });
         },
       },
     ],
     secondary,
     [
-      { id: "delete", title: "Delete Entry", icon: Trash2, destructive: true, keepOpen: true, shortcut: { key: "d", ctrl: true }, run: () => changed("Deleted Entry")(invoke("clipboard_delete", { id: entry.id })) },
+      { id: "delete", title: t("Delete Entry"), icon: Trash2, destructive: true, keepOpen: true, shortcut: { key: "d", ctrl: true }, run: () => changed(t("Deleted Entry"))(invoke("clipboard_delete", { id: entry.id })) },
       {
         id: "delete-recent",
-        title: "Delete Recent Entries…",
+        title: t("Delete Recent Entries…"),
         icon: Clock,
         destructive: true,
         shortcut: { key: "d", ctrl: true, shift: true },
         submenu: () =>
           RECENT.map(([title, minutes]) => ({
             id: `delete-${minutes}`,
-            title,
+            title: t(title),
             keepOpen: true,
-            run: () => changed("Deleted Recent Entries")(invoke("clipboard_delete_since", { since: Date.now() - minutes * 60_000 })),
+            run: () => changed(t("Deleted Recent Entries"))(invoke("clipboard_delete_since", { since: Date.now() - minutes * 60_000 })),
           })),
         run: () => {},
       },
       {
         id: "delete-all",
-        title: "Delete All Entries",
+        title: t("Delete All Entries"),
         icon: Trash2,
         destructive: true,
         keepOpen: true,
         shortcut: { key: "d", ctrl: true, alt: true },
-        confirm: { title: "Delete All Entries?", message: "Every entry except pinned ones will be removed from Clipboard History. This can't be undone.", confirmTitle: "Delete All Entries" },
-        run: () => changed("Deleted All Entries")(invoke("clipboard_delete_all")),
+        confirm: { title: t("Delete All Entries?"), message: t("Every entry except pinned ones will be removed from Clipboard History. This can't be undone."), confirmTitle: t("Delete All Entries") },
+        run: () => changed(t("Deleted All Entries"))(invoke("clipboard_delete_all")),
       },
     ],
   ];
@@ -245,7 +246,7 @@ function ClipboardHistory({ pop }: ViewProps) {
       .then(setEntries)
       .catch((e) => {
         setEntries([]);
-        fail("Could not load Clipboard History", e);
+        fail(t("Could not load Clipboard History"), e);
       });
   }, []);
 
@@ -260,11 +261,11 @@ function ClipboardHistory({ pop }: ViewProps) {
 
   const sections = useMemo(() => {
     return groupEntries((entries ?? []).filter((e) => matchesFilter(e, filter)), Date.now()).map((group) => ({
-      title: group.title,
+      title: t(group.title),
       items: group.entries.map(
         (entry): Item => ({
           id: entry.id,
-          title: entryTitle(entry) || "Empty Text",
+          title: entryTitle(entry) || t("Empty Text"),
           keywords: [entry.text ?? "", ...(entry.paths ?? [])],
           icon: <EntryIcon entry={entry} />,
           actions: entryActions(entry, app, reload),
@@ -277,19 +278,19 @@ function ClipboardHistory({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Type to filter entries…"
+      placeholder={t("Type to filter entries…")}
       sections={sections}
       onBack={pop}
-      footerTitle="Clipboard History"
+      footerTitle={t("Clipboard History")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={entries === null}
-      emptyText={filter === "all" ? "Copy text, images or files and they will show up here." : "No entries of this type."}
+      emptyText={filter === "all" ? t("Copy text, images or files and they will show up here.") : t("No entries of this type.")}
       accessory={
         <div className="w-[197px] shrink-0">
           <span id="clipboard-filter" className="sr-only">
-            Filter by Type
+            {t("Filter by Type")}
           </span>
-          <Dropdown size="field" labelledBy="clipboard-filter" value={filter} options={FILTERS} onChange={setFilter} />
+          <Dropdown size="field" labelledBy="clipboard-filter" value={filter} options={FILTERS.map((f) => ({ ...f, label: t(f.label) }))} onChange={setFilter} />
         </div>
       }
       detail={(item) => {
@@ -309,7 +310,7 @@ export default defineExtension({
       id: "history",
       title: "Clipboard History",
       subtitle: "Clipboard History",
-      keywords: ["clipboard", "copy", "paste", "history"],
+      keywords: ["clipboard", "copy", "paste", "history", "histórico", "área de transferência", "colar"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: ClipboardHistory,
@@ -319,11 +320,11 @@ export default defineExtension({
       title: "Paste Sequentially",
       icon: { glyph: ListOrdered, tone: ICON.tone },
       subtitle: "Clipboard History",
-      keywords: ["clipboard", "paste", "sequence", "next"],
+      keywords: ["clipboard", "paste", "sequence", "next", "colar", "sequência", "próximo"],
       kind: "Command",
       primaryActionTitle: "Run Command",
       run: async () => {
-        if (!(await invoke<boolean>("clipboard_paste_next"))) showHUD({ variant: "failure", title: "No clipboard item found to paste." });
+        if (!(await invoke<boolean>("clipboard_paste_next"))) showHUD({ variant: "failure", title: t("No clipboard item found to paste.") });
       },
     },
     {
@@ -331,13 +332,13 @@ export default defineExtension({
       title: "Reset Paste Sequence",
       icon: { glyph: RotateCcw, tone: ICON.tone },
       subtitle: "Clipboard History",
-      keywords: ["clipboard", "paste", "sequence"],
+      keywords: ["clipboard", "paste", "sequence", "colar", "sequência", "redefinir"],
       kind: "Command",
       primaryActionTitle: "Run Command",
       run: async () => {
         await invoke("clipboard_reset_sequence");
         await invoke("hide_launcher", { restoreFocus: true });
-        showHUD({ variant: "success", title: "Paste sequence reset" });
+        showHUD({ variant: "success", title: t("Paste sequence reset") });
       },
     },
   ],

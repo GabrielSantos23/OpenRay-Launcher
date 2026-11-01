@@ -5,6 +5,7 @@ import { Footer, Loader, useActionHost } from "../ActionHost";
 import { matchesShortcut } from "../actions";
 import { Dropdown } from "../Dropdown";
 import type { Action, Item, Shortcut } from "../extension-api";
+import { t } from "../i18n";
 import { BackButton, ListView, type ListSection } from "../ListView";
 import { actionIcon, FlowKeyIcon, resolveImage } from "./FlowKeyIcon";
 import { Markdown } from "./Markdown";
@@ -157,7 +158,7 @@ function Pane({ pane, extension }: { pane: UiPane; extension: InstalledExtension
         {pane.preview && <Markdown source={pane.preview} extension={extension} />}
       </div>
       {pane.fields && pane.fields.length > 0 && (
-        <section aria-label="Information" className="max-h-[50%] shrink-0 overflow-y-auto border-t border-separator px-4 py-2">
+        <section aria-label={t("Information")} className="max-h-[50%] shrink-0 overflow-y-auto border-t border-separator px-4 py-2">
           <MetadataList fields={pane.fields.map((f) => ({ ...f, kind: "text" as const }))} extension={extension} valueIcons />
         </section>
       )}
@@ -192,7 +193,7 @@ function CollectionView({
   const sections: ListSection[] = useMemo(() => {
     panes.current.clear();
     return rawSections.map((section, s) => ({
-      title: section.title ?? "",
+      title: t(section.title ?? ""),
       items: section.items.map((item): Item => {
         const id = `${s}:${item.id}`;
         if (item.pane) panes.current.set(id, item.pane);
@@ -223,7 +224,7 @@ function CollectionView({
   );
   return (
     <ListView
-      placeholder={tree.searchBarPlaceholder ?? (/^search/i.test(command.title) ? `${command.title}...` : `Search ${grid && tree.title ? tree.title : command.title}...`)}
+      placeholder={tree.searchBarPlaceholder ?? (/^search/i.test(command.title) ? `${command.title}...` : t("Search {title}...", { title: grid && tree.title ? tree.title : command.title }))}
       sections={sections}
       onBack={onBack}
       footerTitle={command.title}
@@ -239,13 +240,13 @@ function CollectionView({
         filter.length > 0 ? (
           <>
             <span id="flowkey-filter" className="sr-only">
-              Filter
+              {t("Filter")}
             </span>
             <Dropdown value={entry.filterValue ?? filter[0].value} options={filter.map((o) => ({ value: o.value, label: o.label }))} onChange={onFilter} labelledBy="flowkey-filter" size="small" />
           </>
         ) : undefined
       }
-      emptyText={entry.error ? "Something went wrong" : (tree.emptyView?.title ?? "No Results")}
+      emptyText={entry.error ? t("Something went wrong") : (tree.emptyView?.title ?? t("No Results"))}
       emptyDescription={entry.error ? entry.error.message : tree.emptyView?.description}
       isLoading={!!tree.isLoading}
       onSelectionChange={pagination ? onSelectionChange : undefined}
@@ -279,7 +280,7 @@ function DetailView({ tree, extension, command, onBack, run }: { tree: DetailTre
   const host = useActionHost(() => rootRef.current?.focus());
   const groups = useMemo(() => toActions(tree.actions, run), [tree.actions, run]);
   const primary = groups[0]?.[0];
-  const runAction = (action: Action) => host.run(action, { failTitle: `${action.title.replace(/…$/, "")} failed` });
+  const runAction = (action: Action) => host.run(action, { failTitle: t("{title} failed", { title: action.title.replace(/…$/, "") }) });
   const onKeyDown = keyHandler(groups, runAction, onBack, () => groups.length && host.openPanel(tree.title, groups), host.panelOpen);
   const image = resolveImage(tree.imageUri, extension);
   useEffect(() => rootRef.current?.focus(), []);
@@ -297,7 +298,7 @@ function DetailView({ tree, extension, command, onBack, run }: { tree: DetailTre
           {tree.description && <Markdown source={tree.description} extension={extension} />}
         </div>
         {tree.fields.length > 0 && (
-          <aside aria-label="Information" className="w-[260px] shrink-0 overflow-y-auto border-l border-separator px-4 py-3">
+          <aside aria-label={t("Information")} className="w-[260px] shrink-0 overflow-y-auto border-l border-separator px-4 py-3">
             <MetadataList fields={tree.fields} extension={extension} />
           </aside>
         )}
@@ -377,9 +378,9 @@ function FormInput({ field, value, onChange, invalid }: { field: FormField; valu
             }}
             className="h-[30px] shrink-0 rounded-[6px] bg-control px-3 text-13 font-medium text-fg hover:bg-control-hover"
           >
-            {field.canChooseDirectories && field.canChooseFiles === false ? "Choose Folder…" : "Choose File…"}
+            {field.canChooseDirectories && field.canChooseFiles === false ? t("Choose Folder…") : t("Choose File…")}
           </button>
-          <span className="min-w-0 truncate text-12 text-fg-60">{paths.join(", ") || "Nothing selected"}</span>
+          <span className="min-w-0 truncate text-12 text-fg-60">{paths.join(", ") || t("Nothing selected")}</span>
         </div>
       );
     }
@@ -411,7 +412,7 @@ function FormView({ tree, extension, command, onBack, run }: { tree: FormTree; e
   }, [tree.fields]);
   const actions = useMemo(() => {
     const declared = tree.actions ?? [];
-    const submit = tree.submitActionId && !declared.some((a) => a.id === tree.submitActionId) ? [{ id: tree.submitActionId, title: "Submit", primary: true }] : [];
+    const submit = tree.submitActionId && !declared.some((a) => a.id === tree.submitActionId) ? [{ id: tree.submitActionId, title: t("Submit"), primary: true }] : [];
     return [...submit, ...declared];
   }, [tree.actions, tree.submitActionId]);
   const groups = useMemo(
@@ -428,7 +429,7 @@ function FormView({ tree, extension, command, onBack, run }: { tree: FormTree; e
     [actions, run, tree.fields],
   );
   const primary = groups[0]?.[0];
-  const runAction = (action: Action) => host.run(action, { failTitle: `${action.title.replace(/…$/, "")} failed` });
+  const runAction = (action: Action) => host.run(action, { failTitle: t("{title} failed", { title: action.title.replace(/…$/, "") }) });
   const onKeyDown = keyHandler(groups, runAction, onBack, () => groups.length && host.openPanel(tree.title, groups), host.panelOpen);
   useEffect(() => {
     rootRef.current?.querySelector<HTMLElement>("input,textarea,button[id]")?.focus();
@@ -457,7 +458,7 @@ function FormView({ tree, extension, command, onBack, run }: { tree: FormTree; e
                 </label>
                 <div className="min-w-0">
                   <FormInput field={field} value={values[field.id]} invalid={invalid.includes(field.id)} onChange={(value) => setValues((v) => ({ ...v, [field.id]: value }))} />
-                  {invalid.includes(field.id) && <p className="pt-1 text-12 text-red">Required</p>}
+                  {invalid.includes(field.id) && <p className="pt-1 text-12 text-red">{t("Required")}</p>}
                 </div>
               </div>
             ),
@@ -505,7 +506,7 @@ export function LoadingView({ command, onBack, error }: { command: ManifestComma
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center text-13">
         {error && (
           <>
-            <p className="font-medium text-fg">{command.title} failed to load</p>
+            <p className="font-medium text-fg">{t("{title} failed to load", { title: command.title })}</p>
             <p className="max-w-[460px] text-fg-60 select-text">{error.message}</p>
           </>
         )}

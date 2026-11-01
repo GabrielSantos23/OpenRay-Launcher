@@ -4,6 +4,7 @@ import { Footer, Loader, useActionHost } from "../ActionHost";
 import { matchesShortcut } from "../actions";
 import { Dropdown } from "../Dropdown";
 import type { Action } from "../extension-api";
+import { t } from "../i18n";
 import { BackButton } from "../ListView";
 import { preferencesOf } from "./extensions";
 import { actionIcon, FlowKeyIcon } from "./FlowKeyIcon";
@@ -189,7 +190,7 @@ export function WebCommandView({ extension, command, args, pop }: { extension: I
   }
 
   const filters = view.filters ?? [];
-  const placeholder = view.searchPlaceholder ?? (/^search\b/i.test(command.title) ? `${command.title}...` : `Search ${command.title}...`);
+  const placeholder = view.searchPlaceholder ?? (/^search\b/i.test(command.title) ? `${command.title}...` : t("Search {title}...", { title: command.title }));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="relative flex h-header shrink-0 items-center gap-3 border-b border-separator px-search-inset">
@@ -208,7 +209,7 @@ export function WebCommandView({ extension, command, args, pop }: { extension: I
         {filters.length > 0 && (
           <>
             <span id="web-filter" className="sr-only">
-              Filter
+              {t("Filter")}
             </span>
             <Dropdown value={filterValue ?? filters[0].value} options={filters.map((f) => ({ value: f.value, label: f.label ?? f.value }))} onChange={setFilterValue} labelledBy="web-filter" size="small" />
           </>
@@ -228,7 +229,7 @@ export function WebCommandView({ extension, command, args, pop }: { extension: I
         showActions={groups.length > 0}
         onTogglePanel={() => (host.panelOpen ? host.closePanel() : openPanel())}
       />
-      {host.render((action) => host.run(action, { failTitle: `${action.title} failed` }))}
+      {host.render((action) => host.run(action, { failTitle: t("{title} failed", { title: action.title }) }))}
     </div>
   );
 }

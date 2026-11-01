@@ -9,6 +9,7 @@ const settings = (patch: Partial<Settings>): Settings => ({
   escapeKeyBehavior: "pop-back-or-close",
   escapeKeyClosesWindow: true,
   appearance: "system",
+  language: "system",
   themeDarkId: "bundled-sky",
   notchEnabled: true,
   notchShowInFullscreen: false,

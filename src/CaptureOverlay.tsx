@@ -2,6 +2,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { clampToScreen, MODE_HINTS, measure, rectFrom, targetAt, type CaptureStart, type Rect } from "./capture";
+import { t } from "./i18n";
 import { showHUD } from "./toast";
 
 const ZOOM_PIXELS = 15;
@@ -93,7 +94,7 @@ export function CaptureOverlay() {
   return (
     <div
       role="application"
-      aria-label={`Openray capture: ${MODE_HINTS[mode]}`}
+      aria-label={t("Openray capture: {mode}", { mode: t(MODE_HINTS[mode]) })}
       tabIndex={-1}
       ref={(el) => el?.focus()}
       onKeyDown={(event) => {
@@ -102,7 +103,7 @@ export function CaptureOverlay() {
           cancel();
         } else if (event.key === "Enter" && mode === "ruler" && ruler) {
           event.preventDefault();
-          invoke("copy_text", { text: `${ruler.w}x${ruler.h}` }).then(() => showHUD({ variant: "success", title: `Copied ${ruler.w}x${ruler.h}` }));
+          invoke("copy_text", { text: `${ruler.w}x${ruler.h}` }).then(() => showHUD({ variant: "success", title: t("Copied {size}", { size: `${ruler.w}x${ruler.h}` }) }));
           cancel();
         }
       }}
@@ -119,7 +120,7 @@ export function CaptureOverlay() {
         draggable={false}
         onLoad={() => invoke("capture_ready")}
         onError={() => {
-          showHUD({ variant: "failure", title: "Could not start the capture" });
+          showHUD({ variant: "failure", title: t("Could not start the capture") });
           cancel();
         }}
         className="pointer-events-none absolute inset-0 size-full"
@@ -177,8 +178,8 @@ export function CaptureOverlay() {
         className="pointer-events-none absolute -translate-x-1/2 rounded-[8px] border border-panel-border bg-panel px-3 py-1.5 text-13 text-fg shadow-panel"
         style={{ left: css(monitor.x + monitor.w / 2), top: css(monitor.y) + 16 }}
       >
-        {MODE_HINTS[mode]}
-        <span className="ml-2 text-fg-60">{mode === "ruler" ? "Enter to copy · Esc to close" : "Esc to cancel"}</span>
+        {t(MODE_HINTS[mode])}
+        <span className="ml-2 text-fg-60">{mode === "ruler" ? t("Enter to copy · Esc to close") : t("Esc to cancel")}</span>
       </div>
     </div>
   );

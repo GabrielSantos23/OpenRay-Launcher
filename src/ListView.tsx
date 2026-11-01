@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Footer, Loader, useActionHost } from "./ActionHost";
@@ -54,8 +55,8 @@ export function BackButton({ onBack }: { onBack: () => void }) {
     <button
       type="button"
       tabIndex={-1}
-      aria-label="Back"
-      title="Back"
+      aria-label={t("Back")}
+      title={t("Back")}
       onClick={onBack}
       className="flex size-[22px] shrink-0 items-center justify-center rounded-[5px] bg-control text-fg hover:bg-control-hover"
     >
@@ -246,7 +247,7 @@ export function ListView({
         >
           {flat.length === 0 && !isLoading && (
             <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center text-13">
-              <p className={emptyDescription ? "font-medium text-fg" : "text-fg-60"}>{emptyText}</p>
+              <p className={emptyDescription ? "font-medium text-fg" : "text-fg-60"}>{t(emptyText)}</p>
               {emptyDescription && <p className="max-w-[420px] text-fg-60">{emptyDescription}</p>}
             </div>
           )}

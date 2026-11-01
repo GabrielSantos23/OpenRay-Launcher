@@ -5,6 +5,7 @@ import { fail, Footer, Loader, useActionHost } from "../ActionHost";
 import { matchesShortcut } from "../actions";
 import { Dropdown } from "../Dropdown";
 import { defineExtension, type Action, type Command, type IconSpec, type Item, type ViewProps } from "../extension-api";
+import { t } from "../i18n";
 import { GlyphTile } from "../icons";
 import { BackButton, ListView } from "../ListView";
 import { copyAndClose } from "../output";
@@ -43,11 +44,11 @@ async function runQuietly(script: Script, args: string[]) {
   const line = lastLine(output.stdout);
   if (script.mode === "silent") {
     await invoke("hide_launcher", { restoreFocus: true });
-    showHUD({ variant: "success", title: line || `Ran ${script.title}` });
-  } else showToast({ variant: "success", title: line || `Ran ${script.title}` });
+    showHUD({ variant: "success", title: line || t("Ran {title}", { title: script.title }) });
+  } else showToast({ variant: "success", title: line || t("Ran {title}", { title: script.title }) });
 }
 
-const confirmation = (script: Script) => (script.needsConfirmation ? { title: `Run ${script.title}?`, message: "This script asks for confirmation before it runs.", confirmTitle: "Run Script" } : undefined);
+const confirmation = (script: Script) => (script.needsConfirmation ? { title: t("Run {title}?", { title: script.title }), message: t("This script asks for confirmation before it runs."), confirmTitle: t("Run Script") } : undefined);
 
 function ScriptIcon({ script }: { script: Script }) {
   if (isEmojiIcon(script.icon)) return <span className="flex size-[22px] shrink-0 items-center justify-center text-[16px]">{script.icon}</span>;
@@ -74,8 +75,8 @@ function OutputView({ script, args, onBack }: { script: Script; args: string[]; 
 
   const text = error ?? (output ? [output.stdout.trimEnd(), output.stderr.trimEnd()].filter(Boolean).join("\n") : "");
   const actions: Action[] = [
-    { id: "copy", title: "Copy Output", icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(text, "Copied Output") },
-    { id: "again", title: "Run Again", icon: RefreshCw, shortcut: { key: "r", ctrl: true }, keepOpen: true, run: () => setRound((r) => r + 1) },
+    { id: "copy", title: t("Copy Output"), icon: Clipboard, shortcut: { key: "c", ctrl: true, shift: true }, run: () => copyAndClose(text, t("Copied Output")) },
+    { id: "again", title: t("Run Again"), icon: RefreshCw, shortcut: { key: "r", ctrl: true }, keepOpen: true, run: () => setRound((r) => r + 1) },
   ];
 
   return (
@@ -88,7 +89,7 @@ function OutputView({ script, args, onBack }: { script: Script; args: string[]; 
         const action = actions.find((a) => a.shortcut && matchesShortcut(event, a.shortcut));
         if (action) {
           event.preventDefault();
-          host.run(action, { failTitle: `${action.title} failed` });
+          host.run(action, { failTitle: t("{title} failed", { title: action.title }) });
         } else if (matchesShortcut(event, { key: "k", ctrl: true })) {
           event.preventDefault();
           host.openPanel(script.title, [actions]);
@@ -104,23 +105,23 @@ function OutputView({ script, args, onBack }: { script: Script; args: string[]; 
         <Loader active={!output && !error} />
       </header>
       <pre className="min-h-0 flex-1 overflow-auto p-4 font-mono text-13 break-words whitespace-pre-wrap text-fg">
-        {output && output.code !== 0 && <span className="text-red">{`Exited with code ${output.code}\n`}</span>}
-        {output || error ? text || "No output" : ""}
+        {output && output.code !== 0 && <span className="text-red">{`${t("Exited with code {code}", { code: String(output.code) })}\n`}</span>}
+        {output || error ? text || t("No output") : ""}
       </pre>
       <Footer
         left={
           <span className="flex items-center gap-2 text-fg-60">
             <GlyphTile spec={ICON} small />
-            {script.packageName || "Script Commands"}
+            {script.packageName || t("Script Commands")}
           </span>
         }
-        primaryTitle="Copy Output"
+        primaryTitle={t("Copy Output")}
         primaryKeys={["Ctrl", "Shift", "C"]}
         showActions
         panelOpen={host.panelOpen}
         onTogglePanel={() => (host.panelOpen ? host.closePanel() : host.openPanel(script.title, [actions]))}
       />
-      {host.render((action) => host.run(action, { failTitle: `${action.title} failed` }))}
+      {host.render((action) => host.run(action, { failTitle: t("{title} failed", { title: action.title }) }))}
     </div>
   );
 }
@@ -137,7 +138,7 @@ function SearchScripts({ pop, selectPath }: ViewProps & { selectPath?: string })
       .then(setScripts)
       .catch((e) => {
         setScripts([]);
-        fail("Could not load Script Commands", e);
+        fail(t("Could not load Script Commands"), e);
       });
   }, []);
   useEffect(reload, [reload]);
@@ -147,18 +148,18 @@ function SearchScripts({ pop, selectPath }: ViewProps & { selectPath?: string })
 
   const addFolder: Action = {
     id: "add-directory",
-    title: "Add Script Directory",
+    title: t("Add Script Directory"),
     icon: FolderPlus,
     keepOpen: true,
     run: async () => {
       const dir = await pickDirectory();
       if (!dir) return;
       await addDirectory(dir);
-      showToast({ variant: "success", title: "Added Script Directory" });
+      showToast({ variant: "success", title: t("Added Script Directory") });
       reload();
     },
   };
-  const create: Action = { id: "create", title: "Create Script Command", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setCreating(true) };
+  const create: Action = { id: "create", title: t("Create Script Command"), icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setCreating(true) };
 
   const items = useMemo<Item[]>(
     () =>
@@ -167,7 +168,7 @@ function SearchScripts({ pop, selectPath }: ViewProps & { selectPath?: string })
         const missing = script.arguments[0] && !script.arguments[0].optional && args.length === 0;
         const run: Action = {
           id: "run",
-          title: "Run Script",
+          title: t("Run Script"),
           icon: Play,
           keepOpen: script.mode !== "silent",
           confirm: confirmation(script),
@@ -181,20 +182,20 @@ function SearchScripts({ pop, selectPath }: ViewProps & { selectPath?: string })
           id: script.path,
           title: script.title,
           subtitle: script.packageName || undefined,
-          keywords: ["script", script.packageName, script.description, script.path.split(/[\\/]/).pop() ?? ""],
+          keywords: ["script", "script", script.packageName, script.description, script.path.split(/[\\/]/).pop() ?? ""],
           icon: <ScriptIcon script={script} />,
-          accessory: <span className="text-13 text-fg-60">{MODES.find((m) => m.value === script.mode)?.label ?? script.mode}</span>,
+          accessory: <span className="text-13 text-fg-60">{t(MODES.find((m) => m.value === script.mode)?.label ?? script.mode)}</span>,
           actions: [
             [run],
             [
-              { id: "reveal", title: "Show in File Explorer", icon: Folder, shortcut: { key: "Enter", ctrl: true }, run: () => invoke<void>("show_in_explorer", { path: script.path }) },
-              { id: "open-with", title: "Open With…", icon: SquarePen, shortcut: { key: "o", ctrl: true }, run: () => invoke<void>("open_with", { path: script.path }) },
+              { id: "reveal", title: t("Show in File Explorer"), icon: Folder, shortcut: { key: "Enter", ctrl: true }, run: () => invoke<void>("show_in_explorer", { path: script.path }) },
+              { id: "open-with", title: t("Open With…"), icon: SquarePen, shortcut: { key: "o", ctrl: true }, run: () => invoke<void>("open_with", { path: script.path }) },
               {
                 id: "copy-contents",
-                title: "Copy Script Contents",
+                title: t("Copy Script Contents"),
                 icon: Clipboard,
                 shortcut: { key: "c", ctrl: true, alt: true },
-                run: async () => copyAndClose((await invoke<{ content: string }>("flowkey_fs", { op: "readText", path: script.path })).content, "Copied Script Contents"),
+                run: async () => copyAndClose((await invoke<{ content: string }>("flowkey_fs", { op: "readText", path: script.path })).content, t("Copied Script Contents")),
               },
             ],
             [create, addFolder],
@@ -217,20 +218,20 @@ function SearchScripts({ pop, selectPath }: ViewProps & { selectPath?: string })
 
   return (
     <ListView
-      placeholder="Search script commands…"
-      sections={[{ title: "Script Commands", items }]}
+      placeholder={t("Search script commands…")}
+      sections={[{ title: t("Script Commands"), items }]}
       onBack={pop}
-      footerTitle="Search Script Commands"
+      footerTitle={t("Search Script Commands")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={scripts === null}
-      emptyText="No Script Commands"
-      emptyDescription="Press Ctrl+N to create one, or add a folder with scripts from the actions."
+      emptyText={t("No Script Commands")}
+      emptyDescription={t("Press Ctrl+N to create one, or add a folder with scripts from the actions.")}
       emptyActions={[[create, addFolder]]}
       selectedId={selectPath}
       onSelectionChange={setCurrent}
       argument={
         selected && firstArgument
-          ? { placeholder: firstArgument.placeholder ?? "Argument", value: values[selected.path] ?? "", onChange: (value) => setValues((v) => ({ ...v, [selected.path]: value })) }
+          ? { placeholder: firstArgument.placeholder ?? t("Argument"), value: values[selected.path] ?? "", onChange: (value) => setValues((v) => ({ ...v, [selected.path]: value })) }
           : undefined
       }
     />
@@ -259,10 +260,10 @@ function CreateScript({ onBack }: { onBack: () => void }) {
       await invoke("flowkey_fs", { op: "writeText", path, content });
       await addDirectory(dir);
       await invoke<void>("show_in_explorer", { path });
-      showHUD({ variant: "success", title: "Script command created" });
+      showHUD({ variant: "success", title: t("Script command created") });
       await invoke("hide_launcher", { restoreFocus: false });
     } catch (e) {
-      fail("Failed to create script", e);
+      fail(t("Failed to create script"), e);
     }
   }
 
@@ -283,7 +284,7 @@ function CreateScript({ onBack }: { onBack: () => void }) {
     >
       <header className="flex h-header shrink-0 items-center gap-3 border-b border-separator px-search-inset">
         <BackButton onBack={onBack} />
-        <h2 className="text-13 font-medium text-fg-60">Create Script Command</h2>
+        <h2 className="text-13 font-medium text-fg-60">{t("Create Script Command")}</h2>
       </header>
       <form
         className="grid min-h-0 flex-1 auto-rows-min grid-cols-[175px_360px] content-start gap-x-5 gap-y-4 overflow-y-auto pt-1.5 pb-4"
@@ -293,36 +294,36 @@ function CreateScript({ onBack }: { onBack: () => void }) {
         }}
       >
         <span id={`${ids}-template`} className={label}>
-          Template
+          {t("Template")}
         </span>
         <Dropdown size="field" labelledBy={`${ids}-template`} value={template} options={TEMPLATES} onChange={setTemplate} />
         <span id={`${ids}-mode`} className={label}>
-          Mode
+          {t("Mode")}
         </span>
         <Dropdown size="field" labelledBy={`${ids}-mode`} value={mode} options={MODES} onChange={setMode} />
         <label htmlFor={`${ids}-title`} className={label}>
-          Title
+          {t("Title")}
         </label>
-        <input id={`${ids}-title`} autoFocus spellCheck={false} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Command Title" className={field} />
+        <input id={`${ids}-title`} autoFocus spellCheck={false} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("Command Title")} className={field} />
         <label htmlFor={`${ids}-description`} className={label}>
-          Description
+          {t("Description")}
         </label>
-        <input id={`${ids}-description`} spellCheck={false} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descriptive summary" className={field} />
+        <input id={`${ids}-description`} spellCheck={false} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("Descriptive summary")} className={field} />
         <label htmlFor={`${ids}-package`} className={label}>
-          Package Name
+          {t("Package Name")}
         </label>
-        <input id={`${ids}-package`} spellCheck={false} value={packageName} onChange={(e) => setPackageName(e.target.value)} placeholder="E.g., Developer Utils" className={field} />
+        <input id={`${ids}-package`} spellCheck={false} value={packageName} onChange={(e) => setPackageName(e.target.value)} placeholder={t("E.g., Developer Utils")} className={field} />
         {!inline && (
           <>
             <span />
             <label className="flex items-center gap-2 text-13 text-fg-60">
-              <Checkbox checked={needsConfirmation} onChange={setNeedsConfirmation} label="Needs confirmation" />
-              Needs confirmation
+              <Checkbox checked={needsConfirmation} onChange={setNeedsConfirmation} label={t("Needs confirmation")} />
+              {t("Needs confirmation")}
             </label>
             <span />
             <label className="flex items-center gap-2 text-13 text-fg-60">
-              <Checkbox checked={withArgument} onChange={setWithArgument} label="With argument" />
-              With argument
+              <Checkbox checked={withArgument} onChange={setWithArgument} label={t("With argument")} />
+              {t("With argument")}
             </label>
           </>
         )}
@@ -331,10 +332,10 @@ function CreateScript({ onBack }: { onBack: () => void }) {
         left={
           <span className="flex items-center gap-2 text-fg-60">
             <GlyphTile spec={ICON} small />
-            Create Script Command
+            {t("Create Script Command")}
           </span>
         }
-        primaryTitle="Create Script"
+        primaryTitle={t("Create Script")}
         primaryKeys={["Ctrl", "↵"]}
         showActions={false}
         panelOpen={false}
@@ -357,7 +358,7 @@ function scriptCommand(script: Script): Command {
     confirm: confirmation(script),
   };
   if (script.mode === "fullOutput") return { ...base, view: (props: ViewProps) => (arg ? <SearchScripts {...props} selectPath={script.path} /> : <OutputView script={script} args={[]} onBack={props.pop} />) };
-  if (arg) return { ...base, argument: { placeholder: arg.placeholder ?? "Argument", optional: !!arg.optional, run: (value) => runQuietly(script, value.trim() ? [value.trim()] : []) } };
+  if (arg) return { ...base, argument: { placeholder: arg.placeholder ?? t("Argument"), optional: !!arg.optional, run: (value) => runQuietly(script, value.trim() ? [value.trim()] : []) } };
   return { ...base, run: () => runQuietly(script, []) };
 }
 
@@ -366,13 +367,13 @@ export default defineExtension({
   title: "Script Commands",
   icon: ICON,
   commands: [
-    { id: "search", title: "Search Script Commands", subtitle: "Script Commands", keywords: ["find", "browse", "scripts"], kind: "Command", primaryActionTitle: "Open Command", view: SearchScripts },
+    { id: "search", title: "Search Script Commands", subtitle: "Script Commands", keywords: ["find", "browse", "scripts", "scripts", "comandos"], kind: "Command", primaryActionTitle: "Open Command", view: SearchScripts },
     {
       id: "create",
       title: "Create Script Command",
       subtitle: "Script Commands",
       icon: { glyph: Plus, tone: "slate" },
-      keywords: ["new", "create", "script", "template"],
+      keywords: ["new", "create", "script", "template", "novo", "criar"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: ({ pop }) => <CreateScript onBack={pop} />,
@@ -382,12 +383,12 @@ export default defineExtension({
       title: "Reload Script Commands",
       subtitle: "Script Commands",
       icon: { glyph: RefreshCw, tone: "slate" },
-      keywords: ["refresh", "rescan", "reload"],
+      keywords: ["refresh", "rescan", "reload", "recarregar"],
       kind: "Command",
       primaryActionTitle: "Reload",
       run: async () => {
         const scripts = await loadScripts();
-        showHUD({ variant: "success", title: `Reloaded ${scripts.length} script command${scripts.length === 1 ? "" : "s"}` });
+        showHUD({ variant: "success", title: t(`Reloaded {count} script command${scripts.length === 1 ? "" : "s"}`, { count: scripts.length }) });
       },
     },
   ],

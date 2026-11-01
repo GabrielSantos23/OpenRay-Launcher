@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fail } from "../ActionHost";
 import { defineExtension, type IconSpec, type Item, type ViewProps } from "../extension-api";
 import { GlyphTile } from "../icons";
+import { t } from "../i18n";
 import { ListView, Metadata } from "../ListView";
 import { browseSections, countLabel, loadNotes, noteTitle, type Note, type NotesRequest } from "../notes";
 import { updatedAgo } from "./calculator";
@@ -20,14 +21,14 @@ function SearchNotes({ pop }: ViewProps) {
   useEffect(() => {
     loadNotes().then(setNotes, (e) => {
       setNotes([]);
-      fail("Could not load notes", e);
+      fail(t("Could not load notes"), e);
     });
   }, []);
 
   const sections = useMemo(
     () =>
       browseSections(notes ?? []).map((section) => ({
-        title: section.title,
+        title: t(section.title),
         items: section.notes.map(
           (note): Item => ({
             id: note.id,
@@ -35,8 +36,8 @@ function SearchNotes({ pop }: ViewProps) {
             keywords: [note.text],
             actions: [
               [
-                { id: "open", title: "Open Note", icon: SquarePen, run: () => showNotes({ id: note.id }) },
-                { id: "create", title: "Create Note", icon: Plus, shortcut: { key: "n", ctrl: true }, run: () => showNotes({ create: true }) },
+                { id: "open", title: t("Open Note"), icon: SquarePen, run: () => showNotes({ id: note.id }) },
+                { id: "create", title: t("Create Note"), icon: Plus, shortcut: { key: "n", ctrl: true }, run: () => showNotes({ create: true }) },
               ],
             ],
           }),
@@ -47,13 +48,13 @@ function SearchNotes({ pop }: ViewProps) {
 
   return (
     <ListView
-      placeholder="Search for notes..."
+      placeholder={t("Search for notes...")}
       sections={sections}
       onBack={pop}
-      footerTitle="Search Notes"
+      footerTitle={t("Search Notes")}
       footerIcon={<GlyphTile spec={ICON} small />}
       isLoading={notes === null}
-      emptyText="No notes yet. Press Ctrl+N to create one."
+      emptyText={t("No notes yet. Press Ctrl+N to create one.")}
       detail={(item) => {
         const note = notes?.find((n) => n.id === item.id);
         if (!note) return null;
@@ -62,9 +63,9 @@ function SearchNotes({ pop }: ViewProps) {
             <div className="min-h-0 flex-1 overflow-y-auto p-4 text-13 break-words whitespace-pre-wrap text-fg">{note.text}</div>
             <Metadata
               rows={[
-                { label: "Characters", value: countLabel(note.text, "characters") },
-                { label: "Words", value: countLabel(note.text, "words") },
-                { label: "Last opened", value: updatedAgo(note.lastAccessedAt, Date.now(), "Opened") },
+                { label: t("Characters"), value: countLabel(note.text, "characters") },
+                { label: t("Words"), value: countLabel(note.text, "words") },
+                { label: t("Last opened"), value: updatedAgo(note.lastAccessedAt, Date.now(), "Opened") },
               ]}
             />
           </>
@@ -83,7 +84,7 @@ export default defineExtension({
       id: "open",
       title: "Openray Notes",
       subtitle: "Notes",
-      keywords: ["notes", "scratchpad", "markdown"],
+      keywords: ["notes", "scratchpad", "markdown", "notas"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       run: () => showNotes({}),
@@ -92,7 +93,7 @@ export default defineExtension({
       id: "search",
       title: "Search Notes",
       subtitle: "Notes",
-      keywords: ["notes", "find"],
+      keywords: ["notes", "find", "notas", "buscar"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: SearchNotes,
@@ -101,7 +102,7 @@ export default defineExtension({
       id: "create",
       title: "Create Note",
       subtitle: "Notes",
-      keywords: ["notes", "new"],
+      keywords: ["notes", "new", "notas", "criar nota"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       run: () => showNotes({ create: true }),

@@ -27,6 +27,7 @@ import {
   type FocusSession,
 } from "../focus";
 import { GlyphTile } from "../icons";
+import { t } from "../i18n";
 import { BackButton, ListView } from "../ListView";
 import { showToast } from "../toast";
 
@@ -144,7 +145,7 @@ function TokenField({
             <button
               type="button"
               tabIndex={-1}
-              aria-label={`Remove ${token.label}`}
+              aria-label={t("Remove {label}", { label: token.label })}
               onClick={() => onChange(value.filter((v) => v !== token.value))}
               className="flex size-5 items-center justify-center rounded text-fg-60 hover:bg-control-hover hover:text-fg"
             >
@@ -230,7 +231,7 @@ export function FormShell({ title, primaryTitle, onSave, onBack, children, foote
           footer ?? (
             <span className="flex items-center gap-2 text-fg-60">
               <GlyphTile spec={FOCUS_ICON} small />
-              Focus
+              {t("Focus")}
             </span>
           )
         }
@@ -259,7 +260,7 @@ function FocusSessionForm({ variant, pop }: ViewProps & { variant: "start" | "ed
   const ids = useId();
 
   useEffect(() => {
-    loadCategories().then(setCategories).catch((e) => fail("Could not load focus categories", e));
+    loadCategories().then(setCategories).catch((e) => fail(t("Could not load focus categories"), e));
     if (variant === "start") {
       loadLastForm()
         .then(setForm)
@@ -268,7 +269,7 @@ function FocusSessionForm({ variant, pop }: ViewProps & { variant: "start" | "ed
     }
     invoke<FocusSession | null>("focus_get").then((session) => {
       if (!session) {
-        showToast({ variant: "failure", title: "Failed to edit focus session", message: "No focus session is running." });
+        showToast({ variant: "failure", title: t("Failed to edit focus session"), message: t("No focus session is running.") });
         pop();
         return;
       }
@@ -284,7 +285,7 @@ function FocusSessionForm({ variant, pop }: ViewProps & { variant: "start" | "ed
     [categories, apps],
   );
 
-  const title = variant === "start" ? "Start Focus Session" : "Update Session";
+  const title = variant === "start" ? t("Start Focus Session") : t("Update Session");
 
   async function save() {
     if (!form) return;
@@ -293,13 +294,13 @@ function FocusSessionForm({ variant, pop }: ViewProps & { variant: "start" | "ed
       if (variant === "start") {
         await invoke("focus_start", { input });
         await saveLastForm(form);
-        await closeWith(title, "Focus session started.");
+        await closeWith(title, t("Focus session started."));
       } else {
         await invoke("focus_update", { input });
-        await closeWith(title, "Focus session updated.");
+        await closeWith(title, t("Focus session updated."));
       }
     } catch (e) {
-      fail(`Failed to ${variant === "start" ? "start" : "update"} focus session`, e);
+      fail(variant === "start" ? t("Failed to start focus session") : t("Failed to update focus session"), e);
     }
   }
 
@@ -309,7 +310,7 @@ function FocusSessionForm({ variant, pop }: ViewProps & { variant: "start" | "ed
   return (
     <FormShell title={title} primaryTitle={title} onSave={save} onBack={pop}>
       <label htmlFor={`${ids}-goal`} className={label}>
-        Goal
+        {t("Goal")}
       </label>
       <input
         id={`${ids}-goal`}
@@ -317,11 +318,11 @@ function FocusSessionForm({ variant, pop }: ViewProps & { variant: "start" | "ed
         spellCheck={false}
         value={form.goal}
         onChange={(e) => set({ goal: e.target.value })}
-        placeholder="What are you focusing on?"
+        placeholder={t("What are you focusing on?")}
         className={field}
       />
       <span id={`${ids}-duration`} className={label}>
-        Duration
+        {t("Duration")}
       </span>
       <Dropdown
         size="field"
@@ -329,17 +330,17 @@ function FocusSessionForm({ variant, pop }: ViewProps & { variant: "start" | "ed
         value={form.durationMs ? String(form.durationMs) : ""}
         options={
           form.durationMs && !DURATION_OPTIONS.some((o) => o.value === String(form.durationMs))
-            ? [...DURATION_OPTIONS, { value: String(form.durationMs), label: formatTimer(form.durationMs) }]
-            : DURATION_OPTIONS
+            ? [...DURATION_OPTIONS, { value: String(form.durationMs), label: formatTimer(form.durationMs) }].map((o) => ({ ...o, label: t(o.label) }))
+            : DURATION_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))
         }
         onChange={(value) => set({ durationMs: value ? Number(value) : null })}
       />
       <span id={`${ids}-mode`} className={label}>
-        Mode
+        {t("Mode")}
       </span>
-      <Dropdown size="field" labelledBy={`${ids}-mode`} value={form.mode} options={MODE_OPTIONS} onChange={(mode) => set({ mode })} />
+      <Dropdown size="field" labelledBy={`${ids}-mode`} value={form.mode} options={MODE_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} onChange={(mode) => set({ mode })} />
       <span id={`${ids}-items`} className={label}>
-        {blocking ? "Block" : "Allow"}
+        {blocking ? t("Block") : t("Allow")}
       </span>
       <TokenField
         id={`${ids}-items-input`}
@@ -347,8 +348,8 @@ function FocusSessionForm({ variant, pop }: ViewProps & { variant: "start" | "ed
         value={form.items}
         onChange={(items) => set({ items })}
         options={options}
-        placeholder={blocking ? "What apps or websites do you want to block?" : "What apps or websites do you want to allow?"}
-        createLabel={blocking ? "Block website" : "Allow website"}
+        placeholder={blocking ? t("What apps or websites do you want to block?") : t("What apps or websites do you want to allow?")}
+        createLabel={blocking ? t("Block website") : t("Allow website")}
       />
     </FormShell>
   );
@@ -366,11 +367,11 @@ function CategoryForm({ initial, categories, onDone, onBack }: { initial?: Focus
     const extra = items.filter((i) => i.startsWith("app:") && !list.some((o) => o.value === i)).map((i) => appOption(i.slice(4), apps));
     return [...list, ...extra];
   }, [apps, items]);
-  const iconOptions = Object.entries(CATEGORY_ICONS).map(([value, Glyph]) => ({ value, label: value[0].toUpperCase() + value.slice(1), icon: <Glyph aria-hidden="true" className="size-4 text-fg-60" /> }));
+  const iconOptions = Object.entries(CATEGORY_ICONS).map(([value, Glyph]) => ({ value, label: t(value[0].toUpperCase() + value.slice(1)), icon: <Glyph aria-hidden="true" className="size-4 text-fg-60" /> }));
 
   async function save() {
     if (!title.trim()) {
-      setError("Title is required");
+      setError(t("Title is required"));
       return;
     }
     const category: FocusCategory = {
@@ -382,18 +383,18 @@ function CategoryForm({ initial, categories, onDone, onBack }: { initial?: Focus
     };
     try {
       await saveCategories(initial ? categories.map((c) => (c.id === initial.id ? category : c)) : [...categories, category]);
-      showToast({ variant: "success", title: initial ? "Updated Focus Category" : "Created Focus Category" });
+      showToast({ variant: "success", title: initial ? t("Updated Focus Category") : t("Created Focus Category") });
       onDone();
     } catch (e) {
-      fail("Could not save focus category", e);
+      fail(t("Could not save focus category"), e);
     }
   }
 
-  const heading = initial ? "Edit Focus Category" : "Create Focus Category";
+  const heading = initial ? t("Edit Focus Category") : t("Create Focus Category");
   return (
-    <FormShell title={heading} primaryTitle={initial ? "Save Category" : "Create Category"} onSave={save} onBack={onBack}>
+    <FormShell title={heading} primaryTitle={initial ? t("Save Category") : t("Create Category")} onSave={save} onBack={onBack}>
       <label htmlFor={`${ids}-title`} className={label}>
-        Title
+        {t("Title")}
       </label>
       <div className="flex flex-col gap-1.5">
         <input
@@ -402,18 +403,18 @@ function CategoryForm({ initial, categories, onDone, onBack }: { initial?: Focus
           spellCheck={false}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Category name"
+          placeholder={t("Category name")}
           aria-invalid={!!error}
           className={`${field} ${error ? "border-red" : ""}`}
         />
         {error && <p className="text-12 text-red">{error}</p>}
       </div>
       <span id={`${ids}-icon`} className={label}>
-        Icon
+        {t("Icon")}
       </span>
       <Dropdown size="field" labelledBy={`${ids}-icon`} value={icon} options={iconOptions} onChange={setIcon} />
       <span id={`${ids}-items`} className={label}>
-        Apps & Websites
+        {t("Apps & Websites")}
       </span>
       <TokenField
         id={`${ids}-items-input`}
@@ -421,15 +422,15 @@ function CategoryForm({ initial, categories, onDone, onBack }: { initial?: Focus
         value={items}
         onChange={setItems}
         options={options}
-        placeholder="Add apps or type a website"
-        createLabel="Add website"
+        placeholder={t("Add apps or type a website")}
+        createLabel={t("Add website")}
       />
     </FormShell>
   );
 }
 
 function plural(count: number, word: string) {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
+  return t(count === 1 ? "1 {word}" : "{n} {word}s", { word: t(word), n: count });
 }
 
 function SearchFocusCategories({ pop, startNew = false }: ViewProps & { startNew?: boolean }) {
@@ -441,7 +442,7 @@ function SearchFocusCategories({ pop, startNew = false }: ViewProps & { startNew
       .then(setCategories)
       .catch((e) => {
         setCategories([]);
-        fail("Could not load focus categories", e);
+        fail(t("Could not load focus categories"), e);
       });
   }, []);
   useEffect(reload, [reload]);
@@ -455,17 +456,17 @@ function SearchFocusCategories({ pop, startNew = false }: ViewProps & { startNew
         icon: categoryIcon(category),
         accessory: [category.apps.length && plural(category.apps.length, "app"), category.websites.length && plural(category.websites.length, "website")].filter(Boolean).join(", "),
         actions: [
-          [{ id: "edit", title: "Edit Category", icon: Pencil, keepOpen: true, run: () => setEditing(category) }],
-          [{ id: "create", title: "Create Focus Category", icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing("new") }],
+          [{ id: "edit", title: t("Edit Category"), icon: Pencil, keepOpen: true, run: () => setEditing(category) }],
+          [{ id: "create", title: t("Create Focus Category"), icon: Plus, shortcut: { key: "n", ctrl: true }, keepOpen: true, run: () => setEditing("new") }],
           [
             {
               id: "delete",
-              title: "Delete Category",
+              title: t("Delete Category"),
               icon: Trash2,
               destructive: true,
               keepOpen: true,
               shortcut: { key: "d", ctrl: true },
-              confirm: { title: "Delete Focus Category?", message: `“${category.title}” will be deleted. This can't be undone.`, confirmTitle: "Delete Category" },
+              confirm: { title: t("Delete Focus Category?"), message: t("“{title}” will be deleted. This can't be undone.", { title: category.title }), confirmTitle: t("Delete Category") },
               run: async () => {
                 await saveCategories((categories ?? []).filter((c) => c.id !== category.id));
                 reload();
@@ -489,13 +490,13 @@ function SearchFocusCategories({ pop, startNew = false }: ViewProps & { startNew
 
   return (
     <ListView
-      placeholder="Search focus categories…"
-      sections={[{ title: "Categories", items }]}
+      placeholder={t("Search focus categories…")}
+      sections={[{ title: t("Categories"), items }]}
       onBack={pop}
-      footerTitle="Search Focus Categories"
+      footerTitle={t("Search Focus Categories")}
       footerIcon={<GlyphTile spec={FOCUS_ICON} small />}
       isLoading={categories === null}
-      emptyText="No focus categories yet. Press Ctrl+N to create one."
+      emptyText={t("No focus categories yet. Press Ctrl+N to create one.")}
     />
   );
 }
@@ -517,7 +518,7 @@ async function importCategories() {
   for (const category of added) next.push({ ...category, id: slugify(category.title, next.map((c) => c.id)) });
   await saveCategories(next);
   const skipped = imported.length - added.length;
-  showToast({ variant: "success", title: `Imported ${added.length} ${added.length === 1 ? "category" : "categories"}`, message: skipped ? `${skipped} already existed` : undefined });
+  showToast({ variant: "success", title: t(added.length === 1 ? "Imported {n} category" : "Imported {n} categories", { n: added.length }), message: skipped ? t("{n} already existed", { n: skipped }) : undefined });
 }
 
 const getSession = () => invoke<FocusSession | null>("focus_get");
@@ -532,33 +533,33 @@ async function toggleSession() {
 }
 
 function pauseActions(): Action[] {
-  return PAUSE_CHOICES.map(([title, durationMs]) => ({ id: `pause-${title}`, title, run: () => invoke("focus_pause", { durationMs }) }));
+  return PAUSE_CHOICES.map(([title, durationMs]) => ({ id: `pause-${title}`, title: t(title), run: () => invoke("focus_pause", { durationMs }) }));
 }
 
 function sessionSubtitle(session: FocusSession) {
-  if (session.status === "paused") return "Paused";
-  if (session.durationMs === null) return "Running";
-  return `${formatTimer(remainingMs(session, Date.now()))} left`;
+  if (session.status === "paused") return t("Paused");
+  if (session.durationMs === null) return t("Running");
+  return t("{time} left", { time: formatTimer(remainingMs(session, Date.now())) });
 }
 
 function sessionCommand(session: FocusSession): Command {
   const paused = session.status === "paused";
   return {
     id: "session",
-    title: session.title.trim() || "Focus Session",
+    title: session.title.trim() || t("Focus Session"),
     subtitle: sessionSubtitle(session),
     icon: FOCUS_ICON,
     kind: "Focus Session",
-    primaryActionTitle: "Edit Session",
+    primaryActionTitle: t("Edit Session"),
     view: EditFocusSession,
     actions: [
       [
-        { id: "restart", title: "Restart Session", icon: RotateCcw, run: () => invoke("focus_restart") },
-        { id: "complete", title: "Complete Session", icon: CircleCheck, run: () => invoke("focus_complete") },
+        { id: "restart", title: t("Restart Session"), icon: RotateCcw, run: () => invoke("focus_restart") },
+        { id: "complete", title: t("Complete Session"), icon: CircleCheck, run: () => invoke("focus_complete") },
         paused
-          ? { id: "resume", title: "Resume Session", icon: Play, run: () => invoke("focus_resume") }
-          : { id: "pause", title: "Pause Session", icon: Pause, submenu: pauseActions, run: () => {} },
-        { id: "cancel", title: "Cancel Session", icon: CircleX, destructive: true, run: () => invoke("focus_cancel") },
+          ? { id: "resume", title: t("Resume Session"), icon: Play, run: () => invoke("focus_resume") }
+          : { id: "pause", title: t("Pause Session"), icon: Pause, submenu: pauseActions, run: () => {} },
+        { id: "cancel", title: t("Cancel Session"), icon: CircleX, destructive: true, run: () => invoke("focus_cancel") },
       ],
     ],
   };
@@ -577,19 +578,19 @@ export default defineExtension({
   title: "Focus",
   icon: FOCUS_ICON,
   commands: [
-    { id: "start", title: "Start Focus Session", subtitle: "Focus", keywords: ["focus", "block", "distraction"], kind: "Command", primaryActionTitle: "Open Command", view: StartFocusSession },
-    { id: "toggle", title: "Toggle Focus Session", subtitle: "Focus", keywords: ["focus"], kind: "Command", primaryActionTitle: "Run Command", run: toggleSession },
-    { id: "pause", title: "Pause Focus Session", icon: { glyph: Pause, tone: "green" }, subtitle: "Focus", kind: "Command", primaryActionTitle: "Run Command", run: () => invoke("focus_pause", { durationMs: null }) },
-    { id: "resume", title: "Resume Focus Session", icon: { glyph: Play, tone: "green" }, subtitle: "Focus", kind: "Command", primaryActionTitle: "Run Command", run: () => invoke("focus_resume") },
-    { id: "complete", title: "Complete Focus Session", icon: { glyph: CircleCheck, tone: "green" }, subtitle: "Focus", kind: "Command", primaryActionTitle: "Run Command", run: () => invoke("focus_complete") },
-    { id: "edit", title: "Edit Focus Session", icon: { glyph: Pencil, tone: "green" }, subtitle: "Focus", kind: "Command", primaryActionTitle: "Open Command", view: EditFocusSession },
-    { id: "search-categories", title: "Search Focus Categories", icon: { glyph: Search, tone: "green" }, subtitle: "Focus", kind: "Command", primaryActionTitle: "Open Command", view: SearchFocusCategories },
+    { id: "start", title: "Start Focus Session", subtitle: "Focus", keywords: ["focus", "block", "distraction", "foco", "bloquear", "distração"], kind: "Command", primaryActionTitle: "Open Command", view: StartFocusSession },
+    { id: "toggle", title: "Toggle Focus Session", subtitle: "Focus", keywords: ["focus", "foco"], kind: "Command", primaryActionTitle: "Run Command", run: toggleSession },
+    { id: "pause", title: "Pause Focus Session", icon: { glyph: Pause, tone: "green" }, subtitle: "Focus", keywords: ["foco", "pausar", "pausa"], kind: "Command", primaryActionTitle: "Run Command", run: () => invoke("focus_pause", { durationMs: null }) },
+    { id: "resume", title: "Resume Focus Session", icon: { glyph: Play, tone: "green" }, subtitle: "Focus", keywords: ["foco", "retomar"], kind: "Command", primaryActionTitle: "Run Command", run: () => invoke("focus_resume") },
+    { id: "complete", title: "Complete Focus Session", icon: { glyph: CircleCheck, tone: "green" }, subtitle: "Focus", keywords: ["foco", "concluir", "finalizar"], kind: "Command", primaryActionTitle: "Run Command", run: () => invoke("focus_complete") },
+    { id: "edit", title: "Edit Focus Session", icon: { glyph: Pencil, tone: "green" }, subtitle: "Focus", keywords: ["foco", "editar", "sessão"], kind: "Command", primaryActionTitle: "Open Command", view: EditFocusSession },
+    { id: "search-categories", title: "Search Focus Categories", icon: { glyph: Search, tone: "green" }, subtitle: "Focus", keywords: ["foco", "categorias", "buscar"], kind: "Command", primaryActionTitle: "Open Command", view: SearchFocusCategories },
     {
       id: "create-category",
       title: "Create Focus Category",
       icon: { glyph: Plus, tone: "green" },
       subtitle: "Focus",
-      keywords: ["new focus category"],
+      keywords: ["new focus category", "nova categoria de foco", "criar categoria"],
       kind: "Command",
       primaryActionTitle: "Open Command",
       view: (props: ViewProps) => <SearchFocusCategories {...props} startNew />,
@@ -599,7 +600,7 @@ export default defineExtension({
       title: "Import Focus Categories",
       icon: { glyph: FileUp, tone: "green" },
       subtitle: "Focus",
-      keywords: ["import focus categories"],
+      keywords: ["import focus categories", "importar categorias de foco"],
       kind: "Command",
       primaryActionTitle: "Run Command",
       run: importCategories,

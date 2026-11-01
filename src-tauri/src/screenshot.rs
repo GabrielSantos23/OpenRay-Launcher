@@ -39,7 +39,11 @@ struct Start {
 }
 
 fn hud(app: &AppHandle, variant: &str, title: &str, message: Option<&str>) {
-    let _ = app.emit_to(crate::hud::LABEL, "hud-show", serde_json::json!({ "variant": variant, "title": title, "message": message }));
+    hud_with(app, variant, title, message, None)
+}
+
+fn hud_with(app: &AppHandle, variant: &str, title: &str, message: Option<&str>, params: Option<serde_json::Value>) {
+    let _ = app.emit_to(crate::hud::LABEL, "hud-show", serde_json::json!({ "variant": variant, "title": title, "message": message, "params": params }));
 }
 
 fn foreground_app() -> String {
@@ -188,7 +192,7 @@ pub fn finish(app: &AppHandle, rect: Rect) -> Result<(), String> {
             let p = &frame.bgra;
             let hex = format!("#{:02X}{:02X}{:02X}", p[2], p[1], p[0]);
             crate::clipboard::write_text(&hex)?;
-            hud(app, "success", &format!("Copied {hex}"), None);
+            hud_with(app, "success", "Copied {value}", None, Some(serde_json::json!({ "value": hex })));
         }
         "ocr" => {
             let text = capture::recognize_text(&frame)?;
@@ -196,7 +200,7 @@ pub fn finish(app: &AppHandle, rect: Rect) -> Result<(), String> {
                 hud(app, "failure", "No text found", None);
             } else {
                 crate::clipboard::write_text(&text)?;
-                hud(app, "success", "Copied text to clipboard", Some(&format!("{} characters", text.chars().count())));
+                hud_with(app, "success", "Copied text to clipboard", Some("{count} characters"), Some(serde_json::json!({ "count": text.chars().count() })));
             }
         }
         "qr" => {

@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { t } from "./i18n";
 import { matchScore } from "./search";
 
 export interface DropdownOption<T extends string> {
@@ -152,8 +153,8 @@ export function Dropdown<T extends string>({
                 setQuery(e.target.value);
                 setActive(0);
               }}
-              placeholder="Search..."
-              aria-label="Search options"
+              placeholder={t("Search...")}
+              aria-label={t("Search options")}
               spellCheck={false}
               role="combobox"
               aria-expanded="true"
@@ -162,7 +163,7 @@ export function Dropdown<T extends string>({
               className={`h-10 shrink-0 bg-transparent px-4 text-fg caret-fg outline-none placeholder:text-fg-40 ${below ? "border-b" : "border-t"} border-panel-separator`}
             />
             <div ref={listRef} id="dropdown-options" role="listbox" className="max-h-[240px] overflow-y-auto p-[7px]">
-              {visible.length === 0 && <p className="flex h-8 items-center px-2 text-fg-60">No results</p>}
+              {visible.length === 0 && <p className="flex h-8 items-center px-2 text-fg-60">{t("No results")}</p>}
               {visible.map((option, i) => (
                 <div
                   key={option.value}

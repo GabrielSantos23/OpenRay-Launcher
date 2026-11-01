@@ -13,6 +13,7 @@ export default defineExtension({
       title: "Open in Browser",
       kind: "Command",
       primaryActionTitle: "Open in Browser",
+      keywords: ["url", "site", "abrir"],
       query: {
         matches: (text) => toUrl(text) !== null,
         run: (text) => invoke<void>("open_url", { url: toUrl(text), appPath: null }),

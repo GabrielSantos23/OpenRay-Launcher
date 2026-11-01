@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { matchesShortcut, shortcutLabels } from "./actions";
 import type { Action } from "./extension-api";
+import { t } from "./i18n";
 import { matchScore } from "./search";
 
 export function Keys({ labels }: { labels: string[] }) {
@@ -81,8 +82,8 @@ export function ActionPanel({ title, groups, onRun, onClose, placement = FOOTER_
         setSelected(0);
       }}
       onKeyDown={onKeyDown}
-      placeholder="Search for actions..."
-      aria-label="Search for actions"
+      placeholder={t("Search for actions...")}
+      aria-label={t("Search for actions...")}
       role="combobox"
       aria-expanded="true"
       aria-controls="actions"
@@ -97,13 +98,13 @@ export function ActionPanel({ title, groups, onRun, onClose, placement = FOOTER_
       <div className="fixed inset-0 z-10" onMouseDown={onClose} />
       <div
         role="dialog"
-        aria-label={`Actions for ${title}`}
+        aria-label={t("Actions for {title}", { title })}
         className={`z-20 flex flex-col rounded-panel border border-panel-border bg-panel shadow-panel ${placement.className}`}
       >
         {placement.searchFirst && search}
-        <div ref={listRef} id="actions" role="listbox" aria-label="Actions" className="max-h-[239px] overflow-y-auto [scrollbar-width:none] px-[7px] pt-[7px] pb-2">
+        <div ref={listRef} id="actions" role="listbox" aria-label={t("Actions")} className="max-h-[239px] overflow-y-auto [scrollbar-width:none] px-[7px] pt-[7px] pb-2">
           <div className="flex h-6 items-center px-2 text-11 font-semibold text-fg-60">{title}</div>
-          {flat.length === 0 && <p className="flex h-8 items-center px-2 text-13 text-fg-60">No matching actions</p>}
+          {flat.length === 0 && <p className="flex h-8 items-center px-2 text-13 text-fg-60">{t("No matching actions")}</p>}
           {visible.map((group, g) => (
             <Fragment key={group[0].id}>
               {g > 0 && <div role="separator" className="-mx-[7px] mt-2 mb-[7px] h-px bg-panel-separator" />}
