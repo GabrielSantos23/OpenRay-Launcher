@@ -33,13 +33,13 @@ const FORM_FACTOR: PROPERTYKEY = PROPERTYKEY { fmtid: GUID::from_u128(0x1da5d803
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SoundDevice {
-    id: String,
-    name: String,
-    state: &'static str,
-    form_factor: u32,
-    is_default: bool,
-    volume: f32,
-    is_muted: bool,
+    pub id: String,
+    pub name: String,
+    pub state: &'static str,
+    pub form_factor: u32,
+    pub is_default: bool,
+    pub volume: f32,
+    pub is_muted: bool,
 }
 
 fn message(e: windows::core::Error) -> String {

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
-import { validateManifest, type ExtensionManifest, type ManifestCommand, type PreferenceSchema } from "@flowkey-cli/native-sdk";
+import { validateManifest, type ExtensionManifest, type PreferenceSchema } from "@flowkey-cli/native-sdk";
 import { grantsOf, intersect, isEmpty, missingConsent, NO_GRANTS, type Grants } from "./gate";
 import type { InstalledExtension } from "./runtime";
 
@@ -21,10 +21,6 @@ export interface Failure {
 export const FLOWKEY_ORIGIN = "http://flowkey.localhost/";
 export const CHANGED_EVENT = "flowkey-changed";
 export const REMOVED_EVENT = "flowkey-removed";
-
-export function isNotchCommand(command: ManifestCommand): boolean {
-  return command.notch === true && command.mode !== "background" && command.ui !== "web";
-}
 
 export function manifestIssues(manifest: unknown, folder?: string): string | null {
   const { errors } = validateManifest(manifest);

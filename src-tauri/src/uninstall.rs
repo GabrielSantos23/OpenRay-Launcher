@@ -128,7 +128,7 @@ pub fn resolve(name: &str, path: &str) -> Result<Target, String> {
         }
         return Ok(Target::Package(family.to_string()));
     }
-    let target = crate::focus::shortcut_target(path).or_else(|| path.to_lowercase().ends_with(".exe").then(|| path.to_string()));
+    let target = crate::apps::shortcut_target(path).or_else(|| path.to_lowercase().ends_with(".exe").then(|| path.to_string()));
     Ok(pick(&entries(), name, target.as_deref()).cloned().map_or(Target::Settings, Target::Program))
 }
 
@@ -192,7 +192,7 @@ mod tests {
         let list = entries();
         for root in crate::apps::start_menu_roots() {
             for app in crate::apps::scan(&[root], Vec::new()).into_iter().take(40) {
-                let target = crate::focus::shortcut_target(&app.path);
+                let target = crate::apps::shortcut_target(&app.path);
                 println!("{} -> {:?}", app.name, pick(&list, &app.name, target.as_deref()).map(|e| (&e.name, &e.command)));
             }
         }

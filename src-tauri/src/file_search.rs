@@ -3,7 +3,6 @@ use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter};
 
 const REFRESH_AFTER: Duration = Duration::from_secs(60);
 const LIMIT: usize = 100;
@@ -47,29 +46,29 @@ static PROGRESS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize
 
 #[derive(Serialize)]
 pub struct FileHit {
-    path: String,
-    name: String,
-    dir: bool,
+    pub path: String,
+    pub name: String,
+    pub dir: bool,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Results {
-    home: String,
-    first_index: bool,
-    building: bool,
-    files: Vec<FileHit>,
+    pub home: String,
+    pub first_index: bool,
+    pub building: bool,
+    pub files: Vec<FileHit>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileInfo {
-    type_name: String,
-    dir: bool,
-    size: Option<u64>,
-    created: Option<u64>,
-    modified: Option<u64>,
-    accessed: Option<u64>,
+    pub type_name: String,
+    pub dir: bool,
+    pub size: Option<u64>,
+    pub created: Option<u64>,
+    pub modified: Option<u64>,
+    pub accessed: Option<u64>,
 }
 
 fn home() -> PathBuf {
@@ -113,13 +112,12 @@ fn build(root: &Path) -> Vec<Entry> {
     entries
 }
 
-fn refresh(app: &AppHandle, force: bool) -> (Arc<Vec<Entry>>, bool, bool) {
+fn refresh(on_update: impl Fn() + Send + 'static, force: bool) -> (Arc<Vec<Entry>>, bool, bool) {
     let mut index = INDEX.lock().unwrap();
     let stale = index.built.is_none_or(|built| built.elapsed() > REFRESH_AFTER);
     if (force || stale) && !index.building {
         index.building = true;
         PROGRESS.store(0, std::sync::atomic::Ordering::Relaxed);
-        let app = app.clone();
         std::thread::spawn(move || {
             let entries = build(&home());
             let mut index = INDEX.lock().unwrap();
@@ -127,7 +125,7 @@ fn refresh(app: &AppHandle, force: bool) -> (Arc<Vec<Entry>>, bool, bool) {
             index.built = Some(Instant::now());
             index.building = false;
             drop(index);
-            let _ = app.emit("file-index-updated", ());
+            on_update();
         });
     }
     (index.entries.clone(), index.built.is_none(), index.building)
@@ -137,8 +135,8 @@ pub fn status() -> Option<usize> {
     INDEX.lock().unwrap().building.then(|| PROGRESS.load(std::sync::atomic::Ordering::Relaxed))
 }
 
-pub fn reindex(app: &AppHandle) {
-    refresh(app, true);
+pub fn reindex(on_update: impl Fn() + Send + 'static) {
+    refresh(on_update, true);
 }
 
 fn kind_of(name: &str) -> Option<&'static str> {
@@ -187,7 +185,7 @@ fn recent() -> Vec<FileHit> {
     links.sort_by(|a, b| b.0.cmp(&a.0));
     let mut hits: Vec<FileHit> = Vec::new();
     for (_, link) in links.into_iter().take(RECENT_LIMIT * 2) {
-        let Some(target) = crate::focus::shortcut_target(&link.to_string_lossy()) else { continue };
+        let Some(target) = crate::apps::shortcut_target(&link.to_string_lossy()) else { continue };
         let Ok(meta) = std::fs::metadata(&target) else { continue };
         if hits.iter().any(|hit| hit.path.eq_ignore_ascii_case(&target)) {
             continue;
@@ -197,8 +195,8 @@ fn recent() -> Vec<FileHit> {
     hits
 }
 
-pub fn search(app: &AppHandle, query: &str, kind: &str) -> Results {
-    let (entries, first_index, building) = refresh(app, false);
+pub fn search(on_update: impl Fn() + Send + 'static, query: &str, kind: &str) -> Results {
+    let (entries, first_index, building) = refresh(on_update, false);
     let query = query.trim().to_lowercase();
     if query.is_empty() {
         let mut files: Vec<FileHit> = recent().into_iter().filter(|hit| matches_kind(kind, hit.dir, &hit.name)).take(RECENT_LIMIT).collect();
@@ -249,6 +247,24 @@ pub fn info(path: &str) -> Result<FileInfo, String> {
         modified: millis(meta.modified()),
         accessed: millis(meta.accessed()),
     })
+}
+
+pub fn recycle(path: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::UI::Shell::{SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE, SHFILEOPSTRUCTW};
+    let from: Vec<u16> = path.as_os_str().encode_wide().chain([0, 0]).collect();
+    let mut operation = SHFILEOPSTRUCTW {
+        wFunc: FO_DELETE,
+        pFrom: PCWSTR(from.as_ptr()),
+        fFlags: (FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT).0 as u16,
+        ..Default::default()
+    };
+    let result = unsafe { SHFileOperationW(&mut operation) };
+    if result != 0 || operation.fAnyOperationsAborted.as_bool() {
+        return Err(format!("could not move {} to the Recycle Bin (code {result})", path.display()));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

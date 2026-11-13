@@ -267,6 +267,64 @@ pub fn open_with(path: &str) -> Result<(), String> {
     std::process::Command::new("rundll32.exe").raw_arg(format!("shell32.dll,OpenAs_RunDLL {path}")).spawn().map(drop).map_err(|e| e.to_string())
 }
 
+
+pub fn shortcut_target(path: &str) -> Option<String> {
+    let path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| unsafe {
+                use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, STGM_READ};
+                use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
+                let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+                let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).ok()?;
+                let file: IPersistFile = windows::core::Interface::cast(&link).ok()?;
+                file.Load(windows::core::PCWSTR(path.as_ptr()), STGM_READ).ok()?;
+                let mut buffer = [0u16; 520];
+                link.GetPath(&mut buffer, std::ptr::null_mut(), 0).ok()?;
+                let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+                (len > 0).then(|| String::from_utf16_lossy(&buffer[..len]))
+            })
+            .join()
+            .ok()
+            .flatten()
+    })
+}
+
+pub fn pick_path(directory: bool, multiple: bool, extensions: &[String]) -> Result<Vec<String>, String> {
+    use windows::core::{HSTRING, PCWSTR};
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
+    use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
+    use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, FOS_ALLOWMULTISELECT, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH};
+    let run = || -> windows::core::Result<Vec<String>> { unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        let dialog: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)?;
+        let mut options = dialog.GetOptions()? | FOS_FORCEFILESYSTEM;
+        if directory {
+            options |= FOS_PICKFOLDERS;
+        }
+        if multiple {
+            options |= FOS_ALLOWMULTISELECT;
+        }
+        dialog.SetOptions(options)?;
+        let pattern = HSTRING::from(extensions.iter().map(|e| format!("*.{e}")).collect::<Vec<_>>().join(";"));
+        if !directory && !extensions.is_empty() {
+            dialog.SetFileTypes(&[COMDLG_FILTERSPEC { pszName: PCWSTR(pattern.as_ptr()), pszSpec: PCWSTR(pattern.as_ptr()) }])?;
+        }
+        if dialog.Show(None).is_err() {
+            return Ok(Vec::new());
+        }
+        let items = dialog.GetResults()?;
+        let mut paths = Vec::new();
+        for index in 0..items.GetCount()? {
+            let name = items.GetItemAt(index)?.GetDisplayName(SIGDN_FILESYSPATH)?;
+            paths.push(name.to_string().unwrap_or_default());
+            CoTaskMemFree(Some(name.0 as _));
+        }
+        Ok(paths)
+    } };
+    run().map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

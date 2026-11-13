@@ -1,38 +1,25 @@
-use crate::launcher::{self, hwnd};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use windows::core::{w, BSTR, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT, WPARAM};
-use windows::Win32::Graphics::Dwm::{DWMWA_BORDER_COLOR, DWMWA_TRANSITIONS_FORCEDISABLED, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND};
 use windows::Win32::Media::Audio::{PlaySoundW, SND_ALIAS, SND_ASYNC, SND_NODEFAULT};
 use windows::Win32::Storage::Packaging::Appx::GetPackageFamilyName;
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED, STGM_READ};
+use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED};
 use windows::Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION};
 use windows::Win32::System::Variant::VARIANT;
 use windows::Win32::UI::Accessibility::{
     CUIAutomation, IUIAutomation, IUIAutomationElement, TreeScope_Descendants, UIA_ControlTypePropertyId, UIA_EditControlTypeId, UIA_ValueValuePropertyId,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL, VK_W};
-use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreatePopupMenu, DestroyMenu, EnumChildWindows, EnumWindows, GetAncestor, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect,
-    GetWindowThreadProcessId, IsWindowVisible, PostMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, ShowWindow, TrackPopupMenu,
-    GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, MF_SEPARATOR, MF_STRING, SWP_NOACTIVATE, SWP_NOSIZE, SW_HIDE, SW_SHOWNOACTIVATE, TPM_BOTTOMALIGN,
-    TPM_LEFTALIGN, TPM_RETURNCMD, WM_CLOSE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    AppendMenuW, CreatePopupMenu, DestroyMenu, EnumWindows, GetAncestor, GetForegroundWindow, GetWindowThreadProcessId, IsWindowVisible, PostMessageW, SetForegroundWindow,
+    TrackPopupMenu, GA_ROOT, MF_SEPARATOR, MF_STRING, TPM_BOTTOMALIGN, TPM_LEFTALIGN, TPM_RETURNCMD, WM_CLOSE,
 };
 
-pub const PANEL: &str = "focus-panel";
-pub const TOAST: &str = "focus-toast";
-pub const BLOCK: &str = "focus-block";
-const PANEL_BOTTOM_MARGIN: f64 = 24.0;
-const TOAST_TOP_MARGIN: f64 = 24.0;
 const TICK: Duration = Duration::from_millis(300);
-const PANEL_SIZE: (f64, f64) = (265.0, 40.0);
-const TOAST_SIZE: (f64, f64) = (392.0, 66.0);
 const BROWSERS: [&str; 14] = [
     "chrome.exe", "msedge.exe", "brave.exe", "firefox.exe", "opera.exe", "vivaldi.exe", "arc.exe", "zen.exe", "librewolf.exe", "waterfox.exe",
     "thorium.exe", "floorp.exe", "chromium.exe", "helium.exe",
@@ -41,6 +28,18 @@ const ALWAYS_ALLOWED: [&str; 10] = [
     "explorer.exe", "openray.exe", "searchhost.exe", "startmenuexperiencehost.exe", "shellexperiencehost.exe", "lockapp.exe", "taskmgr.exe",
     "systemsettings.exe", "applicationframehost.exe", "textinputhost.exe",
 ];
+
+pub trait Host: Clone + Send + 'static {
+    fn changed(&self, session: Option<&Session>);
+    fn main(&self, work: impl FnOnce(&Self) + Send + 'static);
+    fn show_panel(&self);
+    fn hide_panel(&self);
+    fn show_toast(&self, notice: Notice);
+    fn hide_toast(&self);
+    fn show_block(&self, block: &BlockInfo, area: crate::window_layout::Rect);
+    fn hide_block(&self);
+    fn raise_block(&self);
+}
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -104,17 +103,25 @@ pub struct Rules {
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-struct BlockInfo {
-    key: String,
-    name: String,
-    website: bool,
-    snooze_ms: Option<u64>,
+pub struct BlockInfo {
+    pub key: String,
+    pub name: String,
+    pub website: bool,
+    pub snooze_ms: Option<u64>,
     #[serde(skip)]
-    target: isize,
+    pub target: isize,
     #[serde(skip)]
     pid: u32,
     #[serde(skip)]
     exe: String,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct Notice {
+    pub title: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snooze: Option<bool>,
 }
 
 #[derive(Default)]
@@ -123,14 +130,12 @@ struct State {
     snoozed: HashMap<String, u64>,
     block: Option<BlockInfo>,
     terminated: Vec<String>,
-    panel_position: Option<(i32, i32)>,
     next_id: u64,
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
 static WORKER: AtomicBool = AtomicBool::new(false);
-static MENU_OPEN: AtomicBool = AtomicBool::new(false);
-static HOVER_WATCH: AtomicBool = AtomicBool::new(false);
+pub static MENU_OPEN: AtomicBool = AtomicBool::new(false);
 
 fn with_state<T>(f: impl FnOnce(&mut State) -> T) -> T {
     let mut guard = STATE.lock().unwrap_or_else(|e| e.into_inner());
@@ -187,9 +192,9 @@ pub fn website_blocked(rules: &Rules, host: &str) -> bool {
     }
 }
 
-fn emit(app: &AppHandle) {
+fn emit<H: Host>(host: &H) {
     let session = with_state(|s| s.session.clone());
-    let _ = app.emit("focus-session-changed", session);
+    host.changed(session.as_ref());
 }
 
 fn rules_of(input: &StartInput) -> Rules {
@@ -218,7 +223,7 @@ pub fn get() -> Option<Session> {
     with_state(|s| s.session.clone())
 }
 
-pub fn start(app: &AppHandle, input: StartInput) -> Session {
+pub fn start<H: Host>(host: &H, input: StartInput) -> Session {
     let now = now_ms();
     let session = with_state(|s| {
         s.next_id += 1;
@@ -244,13 +249,13 @@ pub fn start(app: &AppHandle, input: StartInput) -> Session {
         s.terminated.clear();
         session
     });
-    ensure_worker(app);
-    show_panel(app);
-    emit(app);
+    ensure_worker(host);
+    host.show_panel();
+    emit(host);
     session
 }
 
-pub fn update(app: &AppHandle, input: StartInput) -> Result<Session, String> {
+pub fn update<H: Host>(host: &H, input: StartInput) -> Result<Session, String> {
     let now = now_ms();
     let session = with_state(|s| {
         let session = s.session.as_mut()?;
@@ -261,11 +266,11 @@ pub fn update(app: &AppHandle, input: StartInput) -> Result<Session, String> {
         Some(session.clone())
     })
     .ok_or("No focus session is running")?;
-    emit(app);
+    emit(host);
     Ok(session)
 }
 
-pub fn pause(app: &AppHandle, duration_ms: Option<u64>) -> Result<(), String> {
+pub fn pause<H: Host>(host: &H, duration_ms: Option<u64>) -> Result<(), String> {
     let now = now_ms();
     with_state(|s| {
         let session = s.session.as_mut().ok_or("No focus session is running")?;
@@ -277,12 +282,12 @@ pub fn pause(app: &AppHandle, duration_ms: Option<u64>) -> Result<(), String> {
         session.pause_ends_at = duration_ms.map(|d| now + d);
         Ok::<_, String>(())
     })?;
-    hide_block(app);
-    emit(app);
+    hide_block(host);
+    emit(host);
     Ok(())
 }
 
-pub fn resume(app: &AppHandle) -> Result<(), String> {
+pub fn resume<H: Host>(host: &H) -> Result<(), String> {
     let now = now_ms();
     with_state(|s| {
         let session = s.session.as_mut().ok_or("No focus session is running")?;
@@ -293,11 +298,11 @@ pub fn resume(app: &AppHandle) -> Result<(), String> {
         }
         Ok::<_, String>(())
     })?;
-    emit(app);
+    emit(host);
     Ok(())
 }
 
-pub fn restart(app: &AppHandle) -> Result<(), String> {
+pub fn restart<H: Host>(host: &H) -> Result<(), String> {
     let now = now_ms();
     with_state(|s| {
         let session = s.session.as_mut().ok_or("No focus session is running")?;
@@ -308,36 +313,34 @@ pub fn restart(app: &AppHandle) -> Result<(), String> {
         session.remaining_ms = session.duration_ms.unwrap_or(0);
         Ok::<_, String>(())
     })?;
-    emit(app);
+    emit(host);
     Ok(())
 }
 
-fn finish(app: &AppHandle, completed: bool) -> Result<(), String> {
+fn finish<H: Host>(host: &H, completed: bool) -> Result<(), String> {
     let (session, terminated) = with_state(|s| (s.session.take(), std::mem::take(&mut s.terminated)));
     let session = session.ok_or("No focus session is running")?;
     with_state(|s| s.snoozed.clear());
-    hide_block(app);
-    if let Some(panel) = app.get_webview_window(PANEL) {
-        let _ = panel.destroy();
-    }
+    hide_block(host);
+    host.hide_panel();
     if session.restore_apps {
         for exe in terminated {
             let _ = std::process::Command::new(exe).spawn();
         }
     }
     if completed {
-        show_toast(app, serde_json::json!({ "title": "Focus session completed", "message": "You stayed focused." }), session.play_sound);
+        show_toast(host, Notice { title: "Focus session completed".into(), message: "You stayed focused.".into(), snooze: None }, session.play_sound);
     }
-    emit(app);
+    emit(host);
     Ok(())
 }
 
-pub fn complete(app: &AppHandle) -> Result<(), String> {
-    finish(app, true)
+pub fn complete<H: Host>(host: &H) -> Result<(), String> {
+    finish(host, true)
 }
 
-pub fn cancel(app: &AppHandle) -> Result<(), String> {
-    finish(app, false)
+pub fn cancel<H: Host>(host: &H) -> Result<(), String> {
+    finish(host, false)
 }
 
 fn play_sound() {
@@ -346,188 +349,44 @@ fn play_sound() {
     }
 }
 
-fn popup_styles(window: &WebviewWindow, activatable: bool, size: (f64, f64)) {
-    let Some(hwnd) = hwnd(window) else { return };
-    let scale = window.scale_factor().unwrap_or(1.0);
-    launcher::make_popup(hwnd, (size.0 * scale).round() as i32, (size.1 * scale).round() as i32);
-    launcher::set_dwm(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND);
-    launcher::set_dwm(hwnd, DWMWA_BORDER_COLOR, 0x003B_3B3Bu32);
-    launcher::set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
-    unsafe {
-        let mut ex = (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32 & !WS_EX_APPWINDOW.0) | WS_EX_TOOLWINDOW.0 | WS_EX_TOPMOST.0;
-        if !activatable {
-            ex |= WS_EX_NOACTIVATE.0;
-        }
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex as isize);
-    }
-}
-
-fn work_area(app: &AppHandle, window: &WebviewWindow) -> Option<(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>, f64)> {
-    let monitor = app
-        .cursor_position()
-        .ok()
-        .and_then(|p| app.monitor_from_point(p.x, p.y).ok().flatten())
-        .or_else(|| window.primary_monitor().ok().flatten())?;
-    let area = monitor.work_area();
-    Some((area.position, area.size, monitor.scale_factor()))
-}
-
-fn place_panel(app: &AppHandle, window: &WebviewWindow, reset: bool) {
-    let Some(hwnd) = hwnd(window) else { return };
-    let saved = if reset { None } else { with_state(|s| s.panel_position) };
-    let (x, y) = match saved {
-        Some(position) => position,
-        None => {
-            let Some((origin, size, scale)) = work_area(app, window) else { return };
-            let Ok(outer) = window.outer_size() else { return };
-            (
-                origin.x + (size.width as i32 - outer.width as i32) / 2,
-                origin.y + size.height as i32 - outer.height as i32 - (PANEL_BOTTOM_MARGIN * scale).round() as i32,
-            )
-        }
-    };
-    with_state(|s| s.panel_position = Some((x, y)));
-    unsafe {
-        let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-    }
-}
-
-fn show_panel(app: &AppHandle) {
-    crate::open_window(app, PANEL, |app, window| {
-        popup_styles(&window, false, PANEL_SIZE);
-        place_panel(app, &window, false);
-        watch_hover(app);
-    });
-}
-
-fn watch_hover(app: &AppHandle) {
-    if HOVER_WATCH.swap(true, Ordering::SeqCst) {
-        return;
-    }
-    let app = app.clone();
-    std::thread::spawn(move || {
-        let mut last = false;
-        while let Some(window) = app.get_webview_window(PANEL) {
-            let inside = hwnd(&window).is_some_and(|panel| unsafe {
-                let mut cursor = POINT::default();
-                let mut rect = windows::Win32::Foundation::RECT::default();
-                GetCursorPos(&mut cursor).is_ok()
-                    && GetWindowRect(panel, &mut rect).is_ok()
-                    && cursor.x >= rect.left
-                    && cursor.x < rect.right
-                    && cursor.y >= rect.top
-                    && cursor.y < rect.bottom
-            });
-            let hovered = inside || MENU_OPEN.load(Ordering::SeqCst);
-            if hovered != last {
-                last = hovered;
-                let _ = app.emit_to(PANEL, "focus-panel-hover", hovered);
-            }
-            std::thread::sleep(Duration::from_millis(80));
-        }
-        HOVER_WATCH.store(false, Ordering::SeqCst);
-    });
-}
-
-pub fn reset_panel(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(PANEL) {
-        place_panel(app, &window, true);
-    }
-}
-
-pub fn panel_moved(window: &tauri::Window) {
-    if let Ok(position) = window.outer_position() {
-        with_state(|s| s.panel_position = Some((position.x, position.y)));
-    }
-}
-
-fn show_toast(app: &AppHandle, payload: serde_json::Value, sound: bool) {
+fn show_toast<H: Host>(host: &H, notice: Notice, sound: bool) {
     if sound {
         play_sound();
     }
-    crate::open_window(app, TOAST, move |app, window| {
-        popup_styles(&window, false, TOAST_SIZE);
-        if let (Some(hwnd), Some((origin, size, scale)), Ok(outer)) = (hwnd(&window), work_area(app, &window), window.outer_size()) {
-            let x = origin.x + (size.width as i32 - outer.width as i32) / 2;
-            let y = origin.y + (TOAST_TOP_MARGIN * scale).round() as i32;
-            unsafe {
-                let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-                let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-            }
-        }
-        let _ = app.emit_to(TOAST, "focus-toast", payload.clone());
-        let handle = app.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(400));
-            let _ = handle.emit_to(TOAST, "focus-toast", payload);
-        });
-    });
+    host.show_toast(notice);
 }
 
-pub fn hide_toast(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(TOAST) {
-        let _ = window.destroy();
-    }
-}
-
-fn hide_block(app: &AppHandle) {
+fn hide_block<H: Host>(host: &H) {
     let had = with_state(|s| s.block.take()).is_some();
-    if let Some(window) = app.get_webview_window(BLOCK) {
-        if let Some(hwnd) = hwnd(&window) {
-            unsafe {
-                let _ = ShowWindow(hwnd, SW_HIDE);
-            }
-        }
-    }
+    host.hide_block();
     if had {
-        hide_toast(app);
+        host.hide_toast();
     }
 }
 
-fn show_block(app: &AppHandle, info: BlockInfo) {
-    let target = HWND(info.target as _);
-    let Ok((_, visible)) = crate::window_layout::outer_and_visible(target) else { return };
+fn show_block<H: Host>(host: &H, info: BlockInfo) {
+    let Ok((_, visible)) = crate::window_layout::outer_and_visible(HWND(info.target as _)) else { return };
     with_state(|s| s.block = Some(info.clone()));
-    let snooze = info.snooze_ms.map(|ms| ms / 60_000);
-    show_toast(
-        app,
-        serde_json::json!({
-            "title": format!("{} is blocked", info.name),
-            "message": format!("Openray Focus is blocking {}", info.name),
-            "snooze": snooze.is_some(),
-        }),
-        with_state(|s| s.session.as_ref().is_some_and(|session| session.play_sound)),
-    );
-    crate::open_window(app, BLOCK, move |app, window| {
-        popup_styles(&window, true, (800.0, 600.0));
-        let Some(hwnd) = hwnd(&window) else { return };
-        unsafe {
-            let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), visible.left, visible.top, visible.right - visible.left, visible.bottom - visible.top, Default::default());
-            let _ = ShowWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::SW_SHOW);
-        }
-        launcher::force_foreground(hwnd);
-        let _ = window.set_focus();
-        let _ = app.emit_to(BLOCK, "focus-block", info.clone());
-        let handle = app.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(400));
-            let _ = handle.emit_to(BLOCK, "focus-block", info);
-        });
-    });
+    let sound = with_state(|s| s.session.as_ref().is_some_and(|session| session.play_sound));
+    show_toast(host, Notice { title: format!("{} is blocked", info.name), message: format!("Openray Focus is blocking {}", info.name), snooze: Some(info.snooze_ms.is_some()) }, sound);
+    host.show_block(&info, visible);
+}
+
+pub fn block() -> Option<BlockInfo> {
+    with_state(|s| s.block.clone())
 }
 
 pub fn current_block() -> Option<serde_json::Value> {
-    with_state(|s| s.block.clone()).and_then(|b| serde_json::to_value(b).ok())
+    block().and_then(|b| serde_json::to_value(b).ok())
 }
 
-pub fn snooze(app: &AppHandle) -> Result<(), String> {
+pub fn snooze<H: Host>(host: &H) -> Result<(), String> {
     let (block, ms) = with_state(|s| (s.block.clone(), s.session.as_ref().and_then(|session| session.snooze_ms)));
     let block = block.ok_or("Nothing is blocked")?;
     let ms = ms.ok_or("Snooze is off")?;
     with_state(|s| s.snoozed.insert(block.key.clone(), now_ms() + ms));
-    hide_block(app);
-    launcher::force_foreground(HWND(block.target as _));
+    hide_block(host);
+    crate::launcher::force_foreground(HWND(block.target as _));
     Ok(())
 }
 
@@ -540,11 +399,10 @@ fn send_close_tab() {
     unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
 }
 
-pub fn close_tab(app: &AppHandle) -> Result<(), String> {
+pub fn close_tab<H: Host>(host: &H) -> Result<(), String> {
     let block = with_state(|s| s.block.clone()).ok_or("Nothing is blocked")?;
-    hide_block(app);
-    let target = HWND(block.target as _);
-    launcher::force_foreground(target);
+    hide_block(host);
+    crate::launcher::force_foreground(HWND(block.target as _));
     std::thread::spawn(|| {
         std::thread::sleep(Duration::from_millis(150));
         send_close_tab();
@@ -569,10 +427,10 @@ fn process_windows(pid: u32) -> Vec<HWND> {
     data.1
 }
 
-pub fn block_left(app: &AppHandle) {
+pub fn block_left<H: Host>(host: &H) {
     let id = with_state(|s| s.block.as_ref().map(|b| b.key.clone()));
     let Some(key) = id else { return };
-    let app = app.clone();
+    let host = host.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(400));
         let block = with_state(|s| s.block.clone().filter(|b| b.key == key));
@@ -585,12 +443,7 @@ pub fn block_left(app: &AppHandle) {
             return;
         }
         if now_front == target || front_pid == block.pid {
-            let handle = app.clone();
-            let _ = app.run_on_main_thread(move || {
-                if let Some(overlay) = handle.get_webview_window(BLOCK).as_ref().and_then(hwnd) {
-                    launcher::force_foreground(overlay);
-                }
-            });
+            host.main(|host| host.raise_block());
             return;
         }
         if !block.website {
@@ -605,38 +458,17 @@ pub fn block_left(app: &AppHandle) {
                 }
             });
         }
-        let handle = app.clone();
-        let _ = app.run_on_main_thread(move || hide_block(&handle));
+        host.main(|host| hide_block(host));
     });
 }
 
 fn resolve_app(raw: &str) -> String {
     if raw.to_lowercase().ends_with(".lnk") {
-        if let Some(target) = shortcut_target(raw) {
+        if let Some(target) = crate::apps::shortcut_target(raw) {
             return app_id(&target);
         }
     }
     app_id(raw)
-}
-
-pub(crate) fn shortcut_target(path: &str) -> Option<String> {
-    let path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
-    std::thread::scope(|scope| {
-        scope
-            .spawn(|| unsafe {
-                let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-                let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).ok()?;
-                let file: IPersistFile = windows::core::Interface::cast(&link).ok()?;
-                file.Load(PCWSTR(path.as_ptr()), STGM_READ).ok()?;
-                let mut buffer = [0u16; 520];
-                link.GetPath(&mut buffer, std::ptr::null_mut(), 0).ok()?;
-                let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-                (len > 0).then(|| String::from_utf16_lossy(&buffer[..len]))
-            })
-            .join()
-            .ok()
-            .flatten()
-    })
 }
 
 struct Foreground {
@@ -646,7 +478,7 @@ struct Foreground {
     candidates: Vec<String>,
 }
 
-pub(crate) fn process_info(pid: u32) -> Option<(String, Option<String>)> {
+fn process_info(pid: u32) -> Option<(String, Option<String>)> {
     unsafe {
         let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
         let mut buffer = [0u16; 1024];
@@ -663,24 +495,6 @@ pub(crate) fn process_info(pid: u32) -> Option<(String, Option<String>)> {
     }
 }
 
-pub(crate) fn hosted_pid(hwnd: HWND, host_pid: u32) -> u32 {
-    unsafe extern "system" fn find(child: HWND, data: LPARAM) -> windows::core::BOOL {
-        let (host, found) = unsafe { &mut *(data.0 as *mut (u32, u32)) };
-        let mut pid = 0;
-        unsafe { GetWindowThreadProcessId(child, Some(&mut pid)) };
-        if pid != *host {
-            *found = pid;
-            return false.into();
-        }
-        true.into()
-    }
-    let mut data = (host_pid, host_pid);
-    unsafe {
-        let _ = EnumChildWindows(Some(hwnd), Some(find), LPARAM(&mut data as *mut _ as isize));
-    }
-    data.1
-}
-
 fn foreground() -> Option<Foreground> {
     let hwnd = unsafe { GetAncestor(GetForegroundWindow(), GA_ROOT) };
     if hwnd.is_invalid() {
@@ -693,7 +507,7 @@ fn foreground() -> Option<Foreground> {
     }
     let (mut exe, mut package) = process_info(pid)?;
     if app_id(&exe) == "applicationframehost.exe" {
-        let hosted = hosted_pid(hwnd, pid);
+        let hosted = crate::window_switcher::hosted_pid(hwnd, pid);
         if hosted != pid {
             pid = hosted;
             (exe, package) = process_info(pid)?;
@@ -735,7 +549,7 @@ impl UrlReader {
     }
 }
 
-fn check(app: &AppHandle, reader: &mut UrlReader) {
+fn check<H: Host>(host: &H, reader: &mut UrlReader) {
     let now = now_ms();
     let (session, blocking) = with_state(|s| {
         s.snoozed.retain(|_, until| *until > now);
@@ -744,17 +558,15 @@ fn check(app: &AppHandle, reader: &mut UrlReader) {
     let Some(session) = session else { return };
     if session.status == Status::Paused {
         if session.pause_ends_at.is_some_and(|end| end <= now) {
-            let handle = app.clone();
-            let _ = app.run_on_main_thread(move || {
-                let _ = resume(&handle);
+            host.main(|host| {
+                let _ = resume(host);
             });
         }
         return;
     }
     if session.end_at.is_some_and(|end| end <= now) {
-        let handle = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            let _ = complete(&handle);
+        host.main(|host| {
+            let _ = complete(host);
         });
         return;
     }
@@ -780,16 +592,15 @@ fn check(app: &AppHandle, reader: &mut UrlReader) {
         }
     }
     if let Some(block) = block {
-        let handle = app.clone();
-        let _ = app.run_on_main_thread(move || show_block(&handle, block));
+        host.main(move |host| show_block(host, block));
     }
 }
 
-fn ensure_worker(app: &AppHandle) {
+fn ensure_worker<H: Host>(host: &H) {
     if WORKER.swap(true, Ordering::SeqCst) {
         return;
     }
-    let app = app.clone();
+    let host = host.clone();
     std::thread::spawn(move || {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -797,25 +608,23 @@ fn ensure_worker(app: &AppHandle) {
         let mut reader = UrlReader { automation: None, cache: None };
         loop {
             std::thread::sleep(TICK);
-            check(&app, &mut reader);
+            check(&host, &mut reader);
         }
     });
 }
 
-pub fn panel_menu(app: &AppHandle, menu: &str, x: f64, y: f64) -> Result<(), String> {
-    let window = app.get_webview_window(PANEL).ok_or("No focus panel")?;
-    let hwnd = hwnd(&window).ok_or("No focus panel")?;
-    let origin = window.inner_position().map_err(|e| e.to_string())?;
-    let scale = window.scale_factor().unwrap_or(1.0);
-    let point = POINT { x: origin.x + (x * scale).round() as i32, y: origin.y + (y * scale).round() as i32 };
-    let items: Vec<(u32, &str)> = match menu {
+pub fn menu_items(menu: &str) -> Vec<(u32, &'static str)> {
+    match menu {
         "pause" => vec![(1, "1 minute"), (2, "2 minutes"), (5, "5 minutes"), (10, "10 minutes"), (0, ""), (99, "Indefinitely")],
         _ => vec![(1, "Edit"), (2, "Cancel"), (0, ""), (3, "Reset Panel Position")],
-    };
+    }
+}
+
+pub fn track_menu(hwnd: HWND, point: POINT, items: &[(u32, &str)]) -> Result<u32, String> {
     let previous = unsafe { GetForegroundWindow() };
     let choice = unsafe {
         let popup = CreatePopupMenu().map_err(|e| e.message())?;
-        for (id, title) in &items {
+        for (id, title) in items {
             if *id == 0 {
                 let _ = AppendMenuW(popup, MF_SEPARATOR, 0, PCWSTR::null());
             } else {
@@ -831,23 +640,29 @@ pub fn panel_menu(app: &AppHandle, menu: &str, x: f64, y: f64) -> Result<(), Str
         choice
     };
     if !previous.is_invalid() && previous != hwnd {
-        launcher::force_foreground(previous);
+        crate::launcher::force_foreground(previous);
     }
-    match (menu, choice) {
-        (_, 0) => Ok(()),
-        ("pause", 99) => pause(app, None),
-        ("pause", minutes) => pause(app, Some(u64::from(minutes) * 60_000)),
-        (_, 1) => {
-            launcher::show(app);
-            let _ = app.emit_to(launcher::LABEL, "run-command", "focus/edit");
-            Ok(())
-        }
-        (_, 2) => cancel(app),
-        (_, 3) => {
-            reset_panel(app);
-            Ok(())
-        }
-        _ => Ok(()),
+    Ok(choice)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn test_session(status: Status, duration_ms: Option<u64>, end_at: Option<u64>, remaining_ms: u64, pause_ends_at: Option<u64>) -> Session {
+    Session {
+        id: 1,
+        title: "Write".into(),
+        mode: Mode::Block,
+        status,
+        started_at: 0,
+        duration_ms,
+        end_at,
+        remaining_ms,
+        pause_ends_at,
+        form: serde_json::Value::Null,
+        rules: Rules::default(),
+        snooze_ms: None,
+        play_sound: false,
+        restore_apps: false,
     }
 }
 

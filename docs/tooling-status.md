@@ -31,3 +31,9 @@ Recorded 2026-10-18 during the kickoff task.
 | Tauri CLI | `INSTALLED_AND_VERIFIED` | Installed per-project as `@tauri-apps/cli` devDependency; `npx tauri --version` | Not installed globally. |
 
 Nothing was installed system-wide.
+
+## egui port (2026-11-04)
+
+- `app/` pins Rust 1.97.0 (already installed through rustup) in `app/rust-toolchain.toml`; the default `stable` is 1.91, too old for egui 0.37.
+- Inter static weights were made from `@fontsource-variable/inter` with fontTools 4.62 (`varLib.instancer`, Python 3.13).
+- Lucide SVGs are generated with `python scripts/lucide_svg.py node_modules/lucide-react/dist/esm/icons app/assets/icons <names>`.

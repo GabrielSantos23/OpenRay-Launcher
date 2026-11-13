@@ -11,8 +11,6 @@ const settings = (patch: Partial<Settings>): Settings => ({
   appearance: "system",
   language: "system",
   themeDarkId: "bundled-sky",
-  notchEnabled: true,
-  notchShowInFullscreen: false,
   themeLightId: "bundled-noon",
   commands: {},
   ...patch,

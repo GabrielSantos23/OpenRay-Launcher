@@ -1,11 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { CalendarDays, CalendarPlus, Clipboard, ExternalLink, Link, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { fail } from "../ActionHost";
 import {
   addDays,
-  CREATE_AT_EVENT,
   defaultStart,
   draftToEvent,
   DURATIONS,
@@ -35,11 +33,6 @@ import { field, FormShell, label } from "./focus";
 const ICON: IconSpec = { glyph: CalendarDays, tone: "red" };
 const ALL = "__all__";
 const HOUR_MS = 3_600_000;
-
-let pendingStart: number | null = null;
-listen<number>(CREATE_AT_EVENT, (e) => {
-  pendingStart = e.payload;
-}).catch(() => {});
 
 function Dot({ color }: { color?: string }) {
   return <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-fg-40" style={color ? { backgroundColor: color } : undefined} />;
@@ -216,8 +209,7 @@ function MySchedule({ pop }: ViewProps) {
 }
 
 function initialDraft(): EventDraft {
-  const start = (pendingStart !== null ? defaultStart(new Date(), new Date(pendingStart)) : defaultStart(new Date())).getTime();
-  pendingStart = null;
+  const start = defaultStart(new Date()).getTime();
   return { title: "", start, end: start + HOUR_MS, allDay: false, calendarId: "", location: "", notes: "" };
 }
 

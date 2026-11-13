@@ -1,7 +1,6 @@
 use serde_json::Value;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{LazyLock, Mutex, OnceLock};
-use tauri::{AppHandle, Emitter};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, GetKeyState, GetKeyboardLayout, SendInput, ToUnicodeEx, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
@@ -23,17 +22,16 @@ struct State {
 static STATE: LazyLock<Mutex<State>> = LazyLock::new(Default::default);
 static WORKER: OnceLock<Sender<(String, usize)>> = OnceLock::new();
 
-pub fn init(app: &AppHandle, data: &Value) {
+pub fn init(on_expand: impl Fn(String) + Send + 'static, data: &Value) {
     load(data);
     let (tx, rx) = channel::<(String, usize)>();
     if WORKER.set(tx).is_err() {
         return;
     }
-    let app = app.clone();
     std::thread::spawn(move || {
         for (id, typed) in rx {
             send(&vec![VK_BACK; typed].into_iter().flat_map(|vk| [key(vk, false), key(vk, true)]).collect::<Vec<_>>());
-            let _ = app.emit_to(crate::launcher::LABEL, "snippet-expand", id);
+            on_expand(id);
         }
     });
 }

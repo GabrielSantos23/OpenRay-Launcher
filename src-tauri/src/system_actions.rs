@@ -1,6 +1,5 @@
 use crate::launcher;
 use std::os::windows::process::CommandExt;
-use tauri::AppHandle;
 use windows::core::{w, BOOL, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
@@ -56,8 +55,8 @@ fn shutdown(flag: &str) -> Result<(), String> {
     std::process::Command::new("shutdown.exe").args([flag, "/t", "0"]).creation_flags(CREATE_NO_WINDOW).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
-fn after_hide(app: &AppHandle, action: impl FnOnce() + Send + 'static) {
-    launcher::hide(app, false);
+fn after_hide(hide: &dyn Fn(), action: impl FnOnce() + Send + 'static) {
+    hide();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(250));
         action();
@@ -76,10 +75,6 @@ fn default_volume(flow: EDataFlow) -> Result<IAudioEndpointVolume, String> {
         let device = enumerator()?.GetDefaultAudioEndpoint(flow, eMultimedia).map_err(|_| "No audio device found".to_string())?;
         device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None).map_err(message)
     }
-}
-
-pub(crate) fn speaker_volume() -> Result<IAudioEndpointVolume, String> {
-    default_volume(eRender)
 }
 
 fn speaker(change: impl FnOnce(&IAudioEndpointVolume) -> windows::core::Result<()>) -> Result<(), String> {
@@ -189,7 +184,7 @@ fn quit_all(keep: Option<u32>) {
     app_windows().into_iter().filter(|&hwnd| keep != Some(process_of(hwnd))).for_each(close);
 }
 
-pub fn run(app: &AppHandle, action: &str) -> Result<(), String> {
+pub fn run(hide: &dyn Fn(), action: &str) -> Result<(), String> {
     if let Some(level) = volume_preset(action) {
         return speaker(|v| unsafe {
             v.SetMute(false, std::ptr::null())?;
@@ -203,25 +198,25 @@ pub fn run(app: &AppHandle, action: &str) -> Result<(), String> {
         "shut-down" => shutdown("/s"),
         "sleep" | "hibernate" => {
             let hibernate = action == "hibernate";
-            after_hide(app, move || unsafe {
+            after_hide(hide, move || unsafe {
                 let _ = SetSuspendState(hibernate, false, false);
             });
             Ok(())
         }
         "sleep-displays" => {
-            after_hide(app, || unsafe {
+            after_hide(hide, || unsafe {
                 let _ = PostMessageW(Some(HWND_BROADCAST), WM_SYSCOMMAND, WPARAM(SC_MONITORPOWER as usize), LPARAM(2));
             });
             Ok(())
         }
         "show-screen-saver" => {
-            after_hide(app, || unsafe {
+            after_hide(hide, || unsafe {
                 let _ = PostMessageW(Some(GetDesktopWindow()), WM_SYSCOMMAND, WPARAM(SC_SCREENSAVE), LPARAM(0));
             });
             Ok(())
         }
         "show-desktop" => {
-            after_hide(app, || keys(&[VK_LWIN, VK_D]));
+            after_hide(hide, || keys(&[VK_LWIN, VK_D]));
             Ok(())
         }
         "open-recycle-bin" => crate::apps::open_url("shell:RecycleBinFolder", None),

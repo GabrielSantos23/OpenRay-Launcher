@@ -7,7 +7,7 @@ Tokens are measured from Raycast for Windows 2.8.2.0 on a 1920×1080 display at 
   - **H**: Win32 window measurement (`GetWindowRect`, `DwmGetWindowAttribute`).
   - **C**: the reference CSS (`frontend/css-C58pR_1e.css`, `main-window-38KZXJcp.css`).
   - **≈**: an approximation, not measured.
-- **Code:** tokens live in `src/styles.css` (`@theme`) as CSS variables.
+- **Code:** tokens live in `src/styles.css` (`@theme`) as CSS variables for the Tauri app, and in `app/src/theme.rs` (colors, fonts) and `app/src/extension.rs` (tile gradients, sRGB from the OKLCH values) for the egui app.
 
 ## Launcher window
 

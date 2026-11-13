@@ -28,8 +28,6 @@ export interface EventSection {
   events: CalendarEvent[];
 }
 
-export const CREATE_EVENT_KEY = "calendar/createEvent";
-export const CREATE_AT_EVENT = "calendar-create-at";
 export const SCHEDULE_DAYS = 30;
 
 export const DURATIONS = [
@@ -126,16 +124,8 @@ export function eventDetails(event: CalendarEvent, calendar?: CalendarInfo, loca
   return [event.title, whenText(event, locale), event.location, calendar && `Calendar: ${calendar.title}`, event.link, event.notes].filter(Boolean).join("\n");
 }
 
-export function eventsOn(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  const start = startOfDay(day).getTime();
-  const end = addDays(day, 1).getTime();
-  return events.filter((e) => e.start < end && e.end > start).sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start);
-}
-
-export function defaultStart(now: Date, day?: Date): Date {
-  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
-  if (!day || sameDay(day, now)) return next;
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9);
+export function defaultStart(now: Date): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
 }
 
 export function toLocalInput(ms: number, allDay: boolean): string {

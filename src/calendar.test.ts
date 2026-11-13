@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultStart, draftToEvent, eventsOn, formatDuration, fromLocalInput, sectionsFor, timeLabel, toLocalInput, whenText, type CalendarEvent } from "./calendar";
+import { defaultStart, draftToEvent, formatDuration, fromLocalInput, sectionsFor, timeLabel, toLocalInput, whenText, type CalendarEvent } from "./calendar";
 
 const at = (y: number, m: number, d: number, h = 0, min = 0) => new Date(y, m - 1, d, h, min).getTime();
 const event = (id: string, start: number, end: number, extra: Partial<CalendarEvent> = {}): CalendarEvent => ({
@@ -58,14 +58,9 @@ describe("calendar", () => {
     expect(formatDuration(45 * 60_000)).toBe("45 minutes");
   });
 
-  it("finds the events of one day, all-day first", () => {
-    const events = [event("late", at(2026, 10, 21, 18), at(2026, 10, 21, 19)), event("allday", at(2026, 10, 21), at(2026, 10, 22), { allDay: true }), event("other", at(2026, 10, 22, 9), at(2026, 10, 22, 10))];
-    expect(eventsOn(events, new Date(2026, 9, 21)).map((e) => e.id)).toEqual(["allday", "late"]);
-  });
 
-  it("starts new events at the next hour today, or at 9 on another day", () => {
+  it("starts new events at the next hour", () => {
     expect(defaultStart(now)).toEqual(new Date(2026, 9, 21, 11));
-    expect(defaultStart(now, new Date(2026, 9, 24))).toEqual(new Date(2026, 9, 24, 9));
   });
 
   it("round-trips local input values", () => {

@@ -139,6 +139,7 @@ mod hook {
     };
 
     pub const MARKER: usize = 0x4F50_524E;
+    pub static LAST_DOWN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     pub const HELPER_ARG: &str = "--keyboard-hook";
     const VK_UNASSIGNED: u16 = 0xE8;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -248,6 +249,7 @@ mod hook {
 
     unsafe extern "system" fn snippet_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         if let Some((event, true)) = event(code, wparam, lparam) {
+            LAST_DOWN.store(event.vkCode, std::sync::atomic::Ordering::SeqCst);
             crate::snippets::on_key(event.vkCode, event.scanCode);
         }
         unsafe { CallNextHookEx(None, code, wparam, lparam) }
@@ -404,7 +406,7 @@ pub fn bindings(pairs: &[(String, String)]) -> Result<Vec<(String, Hotkey)>, Str
     Ok(result)
 }
 
-pub use hook::{install, run_helper, set_bindings, suspend, HELPER_ARG, MARKER};
+pub use hook::{install, run_helper, set_bindings, suspend, HELPER_ARG, LAST_DOWN, MARKER};
 
 #[cfg(test)]
 mod tests {

@@ -22,8 +22,6 @@ export interface Settings {
   language: LanguageSetting;
   themeDarkId: string;
   themeLightId: string;
-  notchEnabled: boolean;
-  notchShowInFullscreen: boolean;
   commands: Record<string, CommandPrefs>;
 }
 

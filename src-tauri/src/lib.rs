@@ -12,14 +12,15 @@ mod screenshot;
 mod clipboard;
 mod file_search;
 mod flowkey;
+mod flowkey_core;
 mod games;
 mod focus;
+mod focus_windows;
 mod registry;
 mod run;
 pub mod hotkey;
 mod hud;
 mod launcher;
-mod notch;
 mod notes;
 mod settings_pages;
 mod snippets;
@@ -103,7 +104,7 @@ fn open_with(path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn file_search(app: AppHandle, query: String, kind: String) -> Result<file_search::Results, String> {
-    tauri::async_runtime::spawn_blocking(move || file_search::search(&app, &query, &kind)).await.map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || file_search::search(move || drop(app.emit("file-index-updated", ())), &query, &kind)).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -113,12 +114,46 @@ fn window_list() -> Vec<window_switcher::WindowEntry> {
 
 #[tauri::command]
 async fn window_action(app: AppHandle, id: isize, action: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || window_switcher::act(&app, id, &action)).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || window_switcher::act(&|restore| launcher::hide(&app, restore), id, &action)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 fn file_index_status() -> Option<usize> {
     file_search::status()
+}
+
+async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn calendar_list() -> Result<Vec<calendar::Calendar>, String> {
+    blocking(|| calendar::list().map_err(|e| e.message())).await
+}
+
+#[tauri::command]
+async fn calendar_events(start: i64, end: i64) -> Result<Vec<calendar::Event>, String> {
+    blocking(move || calendar::events(start, end).map_err(|e| e.message())).await
+}
+
+#[tauri::command]
+async fn calendar_create(event: calendar::NewEvent) -> Result<String, String> {
+    blocking(move || calendar::create(event)).await
+}
+
+#[tauri::command]
+async fn calendar_delete(calendar_id: String, id: String, instance_start: Option<i64>) -> Result<(), String> {
+    blocking(move || calendar::delete(&calendar_id, &id, instance_start)).await
+}
+
+#[tauri::command]
+fn calendar_open() -> Result<(), String> {
+    calendar::open()
+}
+
+#[tauri::command]
+async fn contacts_list() -> Result<Vec<contacts::Person>, String> {
+    blocking(|| contacts::all().map_err(|e| e.message())).await
 }
 
 #[tauri::command]
@@ -335,7 +370,7 @@ fn menu_items_invoke(app: AppHandle, id: u32) -> Result<(), String> {
 
 #[tauri::command]
 fn file_reindex(app: AppHandle) {
-    file_search::reindex(&app)
+    file_search::reindex(move || drop(app.emit("file-index-updated", ())))
 }
 
 #[tauri::command]
@@ -413,7 +448,6 @@ fn apply_settings(app: &AppHandle, settings: &Settings) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_visible(settings.show_in_tray);
     }
-    notch::apply(app, settings);
     Ok(())
 }
 
@@ -667,17 +701,17 @@ fn focus_block_info() -> Option<serde_json::Value> {
 
 #[tauri::command]
 fn focus_panel_menu(app: AppHandle, menu: String, x: f64, y: f64) -> Result<(), String> {
-    focus::panel_menu(&app, &menu, x, y)
+    focus_windows::panel_menu(&app, &menu, x, y)
 }
 
 #[tauri::command]
 fn focus_panel_reset(app: AppHandle) {
-    focus::reset_panel(&app)
+    focus_windows::reset_panel(&app)
 }
 
 #[tauri::command]
 fn focus_toast_hide(app: AppHandle) {
-    focus::hide_toast(&app)
+    focus_windows::hide_toast(&app)
 }
 
 #[tauri::command]
@@ -746,7 +780,7 @@ async fn system_toggle(action: String) -> Result<String, String> {
 
 #[tauri::command]
 fn system_action(app: AppHandle, action: String) -> Result<(), String> {
-    system_actions::run(&app, &action)
+    system_actions::run(&|| launcher::hide(&app, false), &action)
 }
 
 #[tauri::command]
@@ -883,7 +917,8 @@ pub fn run() {
             app.manage(clipboard::History::load(data_dir.join("clipboard"), store::now_ms()));
             let store = Store::load(data_dir);
             let settings = store.settings();
-            snippets::init(app.handle(), &store.data("snippets").unwrap_or_default());
+            let handle = app.handle().clone();
+            snippets::init(move |id| drop(handle.emit_to(launcher::LABEL, "snippet-expand", id)), &store.data("snippets").unwrap_or_default());
             *capture::CUSTOM_FOLDER.lock().unwrap_or_else(|e| e.into_inner()) = capture::custom_folder(&store.data("screenshots").unwrap_or_default());
             app.manage(store);
 
@@ -913,7 +948,7 @@ pub fn run() {
             if let Err(e) = registered {
                 eprintln!("openray: could not register hotkeys: {e}");
                 if let Some(tray) = app.tray_by_id("main") {
-                    let _ = tray.set_tooltip(Some(format!("Openray — hotkey {} unavailable", settings.hotkey)));
+                    let _ = tray.set_tooltip(Some(format!("Openray â€” hotkey {} unavailable", settings.hotkey)));
                 }
             }
 
@@ -924,8 +959,8 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             match (window.label(), event) {
-                (focus::BLOCK, WindowEvent::Focused(false)) => focus::block_left(window.app_handle()),
-                (focus::PANEL, WindowEvent::Moved(_)) => focus::panel_moved(window),
+                (focus_windows::BLOCK, WindowEvent::Focused(false)) => focus::block_left(window.app_handle()),
+                (focus_windows::PANEL, WindowEvent::Moved(_)) => focus_windows::panel_moved(window),
                 _ => {}
             }
             if window.label() == notes::LABEL {
@@ -995,15 +1030,12 @@ pub fn run() {
             show_hud,
             hud_present,
             hud_hide,
-            notch::notch_shape,
-            notch::notch_media,
-            notch::notch_battery,
-            calendar::calendar_list,
-            calendar::calendar_events,
-            calendar::calendar_create,
-            calendar::calendar_delete,
-            calendar::calendar_open,
-            contacts::contacts_list,
+            calendar_list,
+            calendar_events,
+            calendar_create,
+            calendar_delete,
+            calendar_open,
+            contacts_list,
             dictionary::dictionary_define,
             quit_app,
             settings_get,

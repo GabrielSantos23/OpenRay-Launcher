@@ -34,7 +34,7 @@ The reference is \*\*Raycast for Windows 2.8.2.0\*\*, which is installed on the 
 
 
 
-\- \*\*Stack:\*\* Tauri 2 (Rust core, WebView2 UI) with React + TypeScript + Tailwind CSS v4 in the web layer, Vite for bundling, Vitest and `cargo test` for tests. See ADR-001 in `docs/architecture.md`.
+\- \*\*Stack:\*\* Rust + egui (eframe, glow) with no WebView and no TypeScript in the main app; third-party extensions in TypeScript on an embedded JS engine. See ADR-002 in `docs/architecture.md`. The Tauri 2 app (ADR-001) stays in `src-tauri/` and `src/` until the port in `app/` reaches parity.
 
 \- \*\*Extension API:\*\* built-in features register through `defineExtension` in `src/extension-api.ts` (ADR-001, "Extension API").
 

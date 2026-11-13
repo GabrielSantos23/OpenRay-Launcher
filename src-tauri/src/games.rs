@@ -128,8 +128,8 @@ pub fn steam_games() -> Vec<Game> {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Launcher {
-    name: &'static str,
-    path: String,
+    pub name: &'static str,
+    pub path: String,
 }
 
 pub fn launchers() -> Vec<Launcher> {

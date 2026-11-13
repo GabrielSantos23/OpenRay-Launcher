@@ -3,21 +3,21 @@ use windows::ApplicationModel::Contacts::{Contact, ContactAddressKind, ContactEm
 
 #[derive(Debug, Serialize)]
 pub struct Labeled {
-    label: &'static str,
-    value: String,
+    pub label: &'static str,
+    pub value: String,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Person {
-    id: String,
-    name: String,
-    given_name: String,
-    family_name: String,
-    organization: String,
-    phone_numbers: Vec<Labeled>,
-    email_addresses: Vec<Labeled>,
-    postal_addresses: Vec<Labeled>,
+    pub id: String,
+    pub name: String,
+    pub given_name: String,
+    pub family_name: String,
+    pub organization: String,
+    pub phone_numbers: Vec<Labeled>,
+    pub email_addresses: Vec<Labeled>,
+    pub postal_addresses: Vec<Labeled>,
 }
 
 fn phone_label(kind: ContactPhoneKind) -> &'static str {
@@ -74,14 +74,9 @@ fn person(c: &Contact) -> windows::core::Result<Person> {
     })
 }
 
-fn all() -> windows::core::Result<Vec<Person>> {
+pub fn all() -> windows::core::Result<Vec<Person>> {
     let store = ContactManager::RequestStoreAsyncWithAccessType(ContactStoreAccessType::AllContactsReadOnly)?.get()?;
     Ok(store.FindContactsAsync()?.get()?.into_iter().filter_map(|c| person(&c).ok()).collect())
-}
-
-#[tauri::command]
-pub async fn contacts_list() -> Result<Vec<Person>, String> {
-    tauri::async_runtime::spawn_blocking(|| all().map_err(|e| e.message())).await.map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

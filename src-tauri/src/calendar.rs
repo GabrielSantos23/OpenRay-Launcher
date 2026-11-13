@@ -10,43 +10,43 @@ const EPOCH_TICKS: i64 = 116_444_736_000_000_000;
 const TICKS_PER_MS: i64 = 10_000;
 const CALENDAR_SCHEMES: [&str; 2] = ["outlookcal", "ms-outlook"];
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Calendar {
-    id: String,
-    title: String,
-    source: String,
-    color: String,
+    pub id: String,
+    pub title: String,
+    pub source: String,
+    pub color: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
-    id: String,
-    calendar_id: String,
-    title: String,
-    start: i64,
-    end: i64,
-    all_day: bool,
-    location: String,
-    notes: String,
-    link: String,
-    organizer: String,
-    attendees: u32,
-    instance_start: Option<i64>,
-    canceled: bool,
+    pub id: String,
+    pub calendar_id: String,
+    pub title: String,
+    pub start: i64,
+    pub end: i64,
+    pub all_day: bool,
+    pub location: String,
+    pub notes: String,
+    pub link: String,
+    pub organizer: String,
+    pub attendees: u32,
+    pub instance_start: Option<i64>,
+    pub canceled: bool,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewEvent {
-    title: String,
-    start: i64,
-    end: i64,
-    all_day: bool,
-    calendar_id: Option<String>,
-    location: String,
-    notes: String,
+    pub title: String,
+    pub start: i64,
+    pub end: i64,
+    pub all_day: bool,
+    pub calendar_id: Option<String>,
+    pub location: String,
+    pub notes: String,
 }
 
 fn to_ms(time: DateTime) -> i64 {
@@ -69,7 +69,7 @@ fn visible(store: &AppointmentStore) -> windows::core::Result<Vec<AppointmentCal
     Ok(store.FindAppointmentCalendarsAsync()?.get()?.into_iter().filter(|c| !c.IsHidden().unwrap_or(false)).collect())
 }
 
-fn list() -> windows::core::Result<Vec<Calendar>> {
+pub fn list() -> windows::core::Result<Vec<Calendar>> {
     visible(&store()?)?
         .into_iter()
         .map(|c| {
@@ -100,7 +100,7 @@ fn event(a: &Appointment) -> windows::core::Result<Event> {
     })
 }
 
-fn events(start: i64, end: i64) -> windows::core::Result<Vec<Event>> {
+pub fn events(start: i64, end: i64) -> windows::core::Result<Vec<Event>> {
     let store = store()?;
     let options = FindAppointmentsOptions::new()?;
     let fetch = options.FetchProperties()?;
@@ -141,7 +141,7 @@ fn target(store: &AppointmentStore, id: Option<&str>) -> Result<AppointmentCalen
     }
 }
 
-fn create(input: NewEvent) -> Result<String, String> {
+pub fn create(input: NewEvent) -> Result<String, String> {
     if input.title.trim().is_empty() {
         return Err("Title is required".into());
     }
@@ -164,7 +164,7 @@ fn create(input: NewEvent) -> Result<String, String> {
     save().map_err(|e| e.message())
 }
 
-fn delete(calendar_id: &str, id: &str, instance_start: Option<i64>) -> Result<(), String> {
+pub fn delete(calendar_id: &str, id: &str, instance_start: Option<i64>) -> Result<(), String> {
     let store = store().map_err(|e| e.to_string())?;
     let calendar = target(&store, Some(calendar_id))?;
     let id = HSTRING::from(id);
@@ -187,32 +187,7 @@ fn registered(scheme: &str) -> bool {
     found
 }
 
-async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
-    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-pub async fn calendar_list() -> Result<Vec<Calendar>, String> {
-    blocking(|| list().map_err(|e| e.message())).await
-}
-
-#[tauri::command]
-pub async fn calendar_events(start: i64, end: i64) -> Result<Vec<Event>, String> {
-    blocking(move || events(start, end).map_err(|e| e.message())).await
-}
-
-#[tauri::command]
-pub async fn calendar_create(event: NewEvent) -> Result<String, String> {
-    blocking(move || create(event)).await
-}
-
-#[tauri::command]
-pub async fn calendar_delete(calendar_id: String, id: String, instance_start: Option<i64>) -> Result<(), String> {
-    blocking(move || delete(&calendar_id, &id, instance_start)).await
-}
-
-#[tauri::command]
-pub fn calendar_open() -> Result<(), String> {
+pub fn open() -> Result<(), String> {
     let scheme = CALENDAR_SCHEMES.into_iter().find(|s| registered(s)).ok_or("No calendar app is installed")?;
     crate::apps::open_url(&format!("{scheme}:"), None)
 }

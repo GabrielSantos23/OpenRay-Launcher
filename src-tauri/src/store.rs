@@ -63,8 +63,6 @@ pub struct Settings {
     pub language: Language,
     pub theme_dark_id: String,
     pub theme_light_id: String,
-    pub notch_enabled: bool,
-    pub notch_show_in_fullscreen: bool,
     pub commands: HashMap<String, CommandPrefs>,
 }
 
@@ -91,8 +89,6 @@ impl Default for Settings {
             language: Language::default(),
             theme_dark_id: "bundled-raycast-dark".into(),
             theme_light_id: "bundled-raycast-light".into(),
-            notch_enabled: true,
-            notch_show_in_fullscreen: false,
             commands: HashMap::new(),
         }
     }

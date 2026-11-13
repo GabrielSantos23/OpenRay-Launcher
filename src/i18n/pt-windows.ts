@@ -112,7 +112,6 @@ export const ptWindows: Record<string, string> = {
   Nook: "Nook",
   Tray: "Bandeja",
   Widgets: "Widgets",
-  "Notch sections": "Seções do notch",
   "Open Openray settings": "Abrir configurações do Openray",
   "Pinned screenshot. Drag to move, scroll to zoom, Ctrl+C to copy, Esc or double-click to close.":
     "Captura fixada. Arraste para mover, role para ampliar, Ctrl+C para copiar, Esc ou clique duplo para fechar.",

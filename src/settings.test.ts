@@ -20,8 +20,6 @@ const base: Settings = {
   language: "system",
   themeDarkId: "bundled-raycast-dark",
   themeLightId: "bundled-raycast-light",
-  notchEnabled: true,
-  notchShowInFullscreen: false,
   commands: {},
 };
 

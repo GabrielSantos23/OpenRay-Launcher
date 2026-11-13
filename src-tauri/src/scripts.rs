@@ -20,7 +20,7 @@ pub struct Script {
     pub arguments: Vec<serde_json::Value>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Output {
     pub stdout: String,

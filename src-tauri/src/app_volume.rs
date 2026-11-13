@@ -12,12 +12,12 @@ const SYSTEM: &str = "system";
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AppAudio {
-    id: String,
-    name: String,
-    path: Option<String>,
-    volume: f32,
-    is_muted: bool,
-    is_playing: bool,
+    pub id: String,
+    pub name: String,
+    pub path: Option<String>,
+    pub volume: f32,
+    pub is_muted: bool,
+    pub is_playing: bool,
 }
 
 struct Session {

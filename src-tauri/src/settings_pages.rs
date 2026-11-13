@@ -150,10 +150,10 @@ pub fn parse(cache: &str) -> Vec<(InstalledApp, String)> {
 
 #[derive(serde::Serialize, Clone)]
 pub struct SystemPage {
-    name: String,
-    path: String,
-    keywords: String,
-    kind: &'static str,
+    pub name: String,
+    pub path: String,
+    pub keywords: String,
+    pub kind: &'static str,
 }
 
 pub fn system_pages() -> Vec<SystemPage> {

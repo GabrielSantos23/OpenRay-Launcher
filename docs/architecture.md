@@ -2,7 +2,7 @@
 
 ## ADR-001: Stack
 
-- **Status:** Accepted, 2026-10-18
+- **Status:** Accepted, 2026-10-18. Superseded for the UI layer by ADR-002 (2026-11-04).
 - **Decision:** **Tauri 2 (Rust core + WebView2 UI), with React + TypeScript + Tailwind CSS v4 in the web layer.**
 
 ### Context
@@ -42,6 +42,24 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 - **Global hotkey.** A WH_KEYBOARD_LL hook, matching the reference. `RegisterHotKey` was used in the first skeleton and replaced in milestone 1. The hook that swallows hotkeys runs in a helper process (`openray.exe --keyboard-hook`, stdin: bindings and suspend, stdout: fired ids), like the reference's `Raycast.UIAccess.exe`, because Windows skips an in-process low-level hook for about a second after the process takes the foreground. The main process keeps a non-swallowing hook for snippets.
 - **Third-party extension isolation is deferred.** Built-ins run in-process in the web layer.
 
+## ADR-002: Native UI with egui, no WebView
+
+- **Status:** Accepted, 2026-11-04. Supersedes ADR-001 for the UI layer. Migration in progress.
+- **Decision:** **Rust + egui (eframe, glow renderer), no WebView2 and no TypeScript in the main app.** Third-party extensions stay TypeScript and run in an embedded JS engine (QuickJS through `rquickjs`, implemented in `app/src/flowkey_js.rs`), rendering through the existing FlowKey `UiTree` protocol drawn natively by egui.
+
+### Context
+
+The owner asked for a WebView-free app. Measured on the dev machine with the launcher shown: the Tauri build uses 178 MB private memory across the app and six `msedgewebview2.exe` processes; the egui release build uses 113 MB in one process plus the 2 MB hotkey helper, with zero CPU while idle.
+
+### Consequences
+
+- The new app lives in `app/` (crate `openray-native`, binary `openray`). It reuses the Tauri-free Rust modules (`store.rs`, `hotkey.rs`, `apps.rs`) from `src-tauri/src` through `#[path]` until the Tauri app is removed.
+- `app/` pins Rust 1.97 (`app/rust-toolchain.toml`) because egui 0.37 needs 1.95+.
+- Renderer: glow. It measured 92-121 MB against 344 MB for eframe's default wgpu backend on the dev GPU (GTX 970).
+- Visual parity is now hand-tuned: tokens from `src/styles.css` are ported to `app/src/theme.rs`, Inter is embedded as static TTF weights converted from the OFL package, and Lucide glyphs are embedded as SVG (`scripts/lucide_svg.py`).
+- Notes uses an egui block editor (`app/src/notes`) instead of Tiptap and keeps `notes.json` in the same markdown format.
+- Built-ins implement the Rust `Extension` trait (`app/src/extension.rs`).
+
 ## Module boundaries
 
 | Module | Location | Owns |
@@ -57,7 +75,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Notes | `src/NotesWindow.tsx`, `src/notes.ts`, `src/Tooltip.tsx`, `src-tauri/src/notes.rs`, `src/extensions/notes.tsx` | `notes` window (Tiptap editor with the markdown extension, format bar, action panel, browse list, history), `notes.json` through `data_get`/`data_set`, right-edge placement on first show, `tooltip` window (non-activating, click-through) positioned above the hovered button in screen coordinates; launcher commands open it through `notes_show` |
 | Calculator | `src/calculator.ts`, `src/calculatorHistory.ts`, `src/extensions/calculator.ts`, `src/extensions/calculator-history.tsx` | Expression parser, currency and time-zone parsing, color parsing and formats; inline result card; history in `calculator-history.json` (upsert, retention, pins, date sections) and the Calculator History view |
 | Translator | `src/translate.ts`, `src/extensions/translate.tsx`, `src-tauri/src/translate.rs` | Language list and swap/restore logic; two-pane view; HTTP call to the Google `gtx` endpoint and response parsing in Rust (no CSP change needed) |
-| Calendar and Contacts | `src/calendar.ts`, `src/contacts.ts`, `src/extensions/calendar.tsx`, `src/extensions/contacts.tsx`, `src-tauri/src/calendar.rs`, `src-tauri/src/contacts.rs` | WinRT appointment and contact stores (`calendar_list`, `calendar_events`, `calendar_create`, `calendar_delete`, `calendar_open`, `contacts_list`); day sections, labels and search in TS. The notch week strip reads `calendar_events` and opens Create Event through the `calendar-create-at` and `run-command` events |
+| Calendar and Contacts | `src/calendar.ts`, `src/contacts.ts`, `src/extensions/calendar.tsx`, `src/extensions/contacts.tsx`, `src-tauri/src/calendar.rs`, `src-tauri/src/contacts.rs` | WinRT appointment and contact stores (`calendar_list`, `calendar_events`, `calendar_create`, `calendar_delete`, `calendar_open`, `contacts_list`); day sections, labels and search in TS.|
 | Dictionary | `src/dictionary.ts`, `src/extensions/dictionary.tsx`, `src-tauri/src/dictionary.rs` | Datamuse suggestions fetched from the web view (CSP `connect-src`), definitions from dictionaryapi.dev fetched in Rust (`dictionary_define`); Portuguese from the pt.wiktionary.org MediaWiki API in the web view (`origin=*`); recent words and the Language setting (`DictionarySettings` in `src/SettingsWindow.tsx`) in `dictionary.json` |
 | Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |
 | Command registry | `src/registry.ts` | Collects items from registered extensions |
@@ -73,8 +91,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
 | Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
 | Themes | `src/theme.ts` | Bundled theme data, `ThemeRoot` applies CSS variables in every window from settings, system appearance and accent |
-| Focus | `src/focus.ts`, `src/extensions/focus.tsx`, `src/FocusWindows.tsx`, `src-tauri/src/focus.rs` | Session state and timers, app and website rules, foreground watcher with UI Automation URL reading, block overlay, notification and panel windows, native panel menus; categories and preferences in `focus.json` |
-| Notch | `src/notch.ts`, `src/NotchWindow.tsx`, `src-tauri/src/notch.rs`, notch bridge in `src/extensions/flowkey.tsx` | `notch` window shape and placement, hover, volume and fullscreen watcher thread, media artwork and battery commands; the launcher renders FlowKey `notch: true` commands and forwards their trees to the notch, which sends actions back |
+| Focus | `src/focus.ts`, `src/extensions/focus.tsx`, `src/FocusWindows.tsx`, `src-tauri/src/focus.rs` (engine shared with `app/` through the `focus::Host` trait), `src-tauri/src/focus_windows.rs` (Tauri windows), `app/src/focus_ui.rs` and `app/src/extensions/focus.rs` (egui) | Session state and timers, app and website rules, foreground watcher with UI Automation URL reading, block overlay, notification and panel windows, native panel menus; categories and preferences in `focus.json` |
 | Snippets | `src/snippets.ts`, `src/extensions/snippets.tsx`, `src-tauri/src/snippets.rs` | Snippets in `snippets.json`; placeholder resolution in TypeScript; keyword tracking inside the low-level keyboard hook, erasing the keyword and asking the launcher (`snippet-expand`) to resolve it, then typing it with `snippet_type` |
 | System pages | `src/extensions/system-pages.ts`, `src-tauri/src/settings_pages.rs`, `apps::control_panel_items` | Settings search cache parsing, PageID → ms-settings table, All Control Panel Items enumeration |
 | Games | `src/extensions/games.tsx`, `src-tauri/src/games.rs` | Steam library and manifest parsing, cached icons, Game Launcher view and game items in root search |
@@ -87,7 +104,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Run | `src/run.ts`, `src/extensions/run.tsx`, `src-tauri/src/run.rs` | Windows Run catalog (PATH, App Paths, `.cpl`, `.msc`, environment variables), path completion, RunMRU history read/write/delete, ShellExecuteEx with `runas` or `cmd /k`; run commands in `run-commands.json` |
 | URL | `src/urls.ts`, `src/extensions/urls.ts` | Link detection; a command's `query` (`matches`, `run`) puts it first in Results while the search text matches |
 | Script Commands | `src/scriptCommands.ts`, `src/extensions/script-commands.tsx`, `src-tauri/src/scripts.rs` | `@raycast.*` metadata parsing, interpreter by extension, hidden runs with captured output; folders in `script-commands.json`; templates in TypeScript |
-| Screenshots | `src/capture.ts`, `src/screenshots.ts`, `src/CaptureOverlay.tsx`, `src/PinWindow.tsx`, `src/extensions/screenshots.tsx`, `src-tauri/src/capture.rs`, `src-tauri/src/screenshot.rs` | GDI capture of the virtual screen, window and monitor rectangles, PNG/BMP encoding, OCR (Windows.Media.Ocr), QR (`rqrr`); capture session state, the `capture` overlay window (shown with alpha 0 until the frozen frame loads, because a hidden WebView2 does not load it), `pin-*` windows built at runtime, and the `capture://` protocol (`frame`, `pin/<label>`) |
+| Screenshots | `src/capture.ts`, `src/screenshots.ts`, `src/CaptureOverlay.tsx`, `src/PinWindow.tsx`, `src/extensions/screenshots.tsx`, `src-tauri/src/capture.rs` (shared with `app/`), `app/src/capture_ui.rs`, `app/src/extensions/screenshots.rs`, `src-tauri/src/screenshot.rs` | GDI capture of the virtual screen, window and monitor rectangles, PNG/BMP encoding, OCR (Windows.Media.Ocr), QR (`rqrr`); capture session state, the `capture` overlay window (shown with alpha 0 until the frozen frame loads, because a hidden WebView2 does not load it), `pin-*` windows built at runtime, and the `capture://` protocol (`frame`, `pin/<label>`) |
 | Quick Look | `src/extensions/file-search.tsx`, `src-tauri/src/explorer.rs` | File Explorer selection through IShellWindows / IFolderView, shown with the Search Files info panel |
 | Menu Items | `src/extensions/menu-items.tsx`, `src-tauri/src/menu_items.rs` | Win32 menu bar walk of the previous foreground window, `WM_COMMAND` to run an item |
 | System Actions | `src/extensions/system-actions.ts`, `src-tauri/src/system_actions.rs` | Power, session, app quitting, Core Audio volume and microphone mute, media keys, dark mode and hidden-files registry toggles |
@@ -95,7 +112,8 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 | Launcher UI | `src/App.tsx` | Search input, list, footer, loader, keyboard |
 | Updater | `src/updater.ts`, `tauri-plugin-updater`, `.github/workflows/release.yml` | Periodic and manual checks against `latest.json` on the latest GitHub release (public key in `tauri.conf.json`), the `update-found` event between windows, install through the plugin; the workflow builds and signs releases with `tauri-action` |
 | FlowKey host (web) | `src/flowkey/*`, `src/extensions/flowkey.tsx` | Extension list and consent (`extensions.ts`), capability gate (`gate.ts`), native dispatcher (`natives.ts`), per-extension worker runtime (`runtime.ts`, `worker.ts`, `protocol.ts`), tree renderer (`FlowKeyView.tsx`, `Markdown.tsx`, `FlowKeyIcon.tsx`), web commands (`WebCommand.tsx`), dialogs, Settings panel |
-| FlowKey host (native) | `src-tauri/src/flowkey.rs` | `flowkey://` and `extimg://` protocols, package install and uninstall, per-extension data files, DPAPI secrets and OAuth tokens, HTTP with host and private-address checks, Spotify PKCE, image cache, SMTC media, scoped file operations, file pickers, rich clipboard |
+| FlowKey host (native) | `src-tauri/src/flowkey.rs` (Tauri commands and protocols), `src-tauri/src/flowkey_core.rs` (Tauri-free, shared with the egui app) | `flowkey://` and `extimg://` protocols, package install and uninstall, per-extension data files, DPAPI secrets and OAuth tokens, HTTP with host and private-address checks, Spotify PKCE, image cache, SMTC media, scoped file operations, file pickers, rich clipboard |
+| FlowKey host (egui) | `app/src/flowkey_js.rs`, `flowkey_host.rs`, `flowkey_gate.rs`, `extensions/flowkey.rs`, `app/js/*`, `app/assets/flowkey-host.js` | QuickJS thread per extension running the bundled worker host; Rust discovery, consent, preferences, gate and native dispatch on a tokio runtime; egui tree views. Launcher requests from other threads go through `extension::Async` |
 | Bundled FlowKey extensions | `extensions/spotify-player` | A FlowKey CLI project; `npm run build:extensions` runs `flowkey build`, and `dist/` is bundled as `resources/extensions/spotify-player` |
 
 The Rust core exposes Tauri commands:
