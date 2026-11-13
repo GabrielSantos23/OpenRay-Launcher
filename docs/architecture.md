@@ -2,7 +2,7 @@
 
 ## ADR-001: Stack
 
-- **Status:** Accepted, 2026-10-18. Superseded for the UI layer by ADR-002 (2026-11-04).
+- **Status:** Accepted, 2026-10-18. Superseded by ADR-002 (2026-11-04); the Tauri app was removed on 2026-11-13 (last present at commit 2925cc8).
 - **Decision:** **Tauri 2 (Rust core + WebView2 UI), with React + TypeScript + Tailwind CSS v4 in the web layer.**
 
 ### Context
@@ -44,7 +44,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 
 ## ADR-002: Native UI with egui, no WebView
 
-- **Status:** Accepted, 2026-11-04. Supersedes ADR-001 for the UI layer. Migration in progress.
+- **Status:** Accepted, 2026-11-04. Supersedes ADR-001. Implemented; the Tauri app and the web frontend were removed on 2026-11-13.
 - **Decision:** **Rust + egui (eframe, glow renderer), no WebView2 and no TypeScript in the main app.** Third-party extensions stay TypeScript and run in an embedded JS engine (QuickJS through `rquickjs`, implemented in `app/src/flowkey_js.rs`), rendering through the existing FlowKey `UiTree` protocol drawn natively by egui.
 
 ### Context
@@ -53,187 +53,39 @@ The owner asked for a WebView-free app. Measured on the dev machine with the lau
 
 ### Consequences
 
-- The new app lives in `app/` (crate `openray-native`, binary `openray`). It reuses the Tauri-free Rust modules (`store.rs`, `hotkey.rs`, `apps.rs`) from `src-tauri/src` through `#[path]` until the Tauri app is removed.
+- The new app lives in `app/` (crate `openray-native`, binary `openray`). The Windows backends that the Tauri app shared through `#[path]` now live in `app/src`.
 - `app/` pins Rust 1.97 (`app/rust-toolchain.toml`) because egui 0.37 needs 1.95+.
 - Renderer: glow. It measured 92-121 MB against 344 MB for eframe's default wgpu backend on the dev GPU (GTX 970).
-- Visual parity is now hand-tuned: tokens from `src/styles.css` are ported to `app/src/theme.rs`, Inter is embedded as static TTF weights converted from the OFL package, and Lucide glyphs are embedded as SVG (`scripts/lucide_svg.py`).
+- Visual parity is now hand-tuned: tokens from the former `src/styles.css` are ported to `app/src/theme.rs`, Inter is embedded as static TTF weights converted from the OFL package, and Lucide glyphs are embedded as SVG (`scripts/lucide_svg.py`).
 - Notes uses an egui block editor (`app/src/notes`) instead of Tiptap and keeps `notes.json` in the same markdown format.
 - Built-ins implement the Rust `Extension` trait (`app/src/extension.rs`).
+- npm remains only to rebuild FlowKey extension bundles (`npm run build:extensions`) and the QuickJS host (`npm run build:host`); both outputs are committed, so `cargo build` alone produces a complete app.
+- Gaps left by removing the Tauri app (Portuguese UI, auto-update, light theme, FlowKey web commands, installer) are tracked in `known-limitations.md`.
 
 ## Module boundaries
 
+All code is in `app/src` (crate `openray-native`, binary `openray.exe`).
+
 | Module | Location | Owns |
 |---|---|---|
-| Lifecycle | `src-tauri/src/lib.rs` | Single instance, tray, startup hidden, quit; `open_window` builds the Settings, Notes and tooltip windows from their `tauri.conf.json` entries (`"create": false`) on demand, and they are destroyed on close |
-| Launcher window | `src-tauri/src/launcher.rs`, `tauri.conf.json` | Popup HWND, transparent hide/show (alpha 0, click-through) with focus restore, placement, DWM styling, hide on blur |
-| Global hotkey | `src-tauri/src/hotkey.rs` | Parse hotkeys, bindings list (launcher + command hotkeys, duplicates rejected), helper process with the swallowing WH_KEYBOARD_LL hook (respawned if it exits), in-process snippet hook, suspend while recording |
-| Windows integration | `src-tauri/src/apps.rs`, `launcher.rs` | Start Menu scan, AppsFolder (MSIX) scan, shell icons served on `appicon://`, ShellExecute, DWM attributes |
-| Settings and persistence | `src-tauri/src/store.rs`, `src-tauri/src/registry.rs` | `settings.json` (hotkey, tray, show-on screen, Escape options, per-command alias/hotkey/disabled), `frecency.json`, `favorites.json`, and the extension data files `quicklinks.json`, `emoji.json` and `notes.json` (`data_get`/`data_set`, names allow-listed) in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login; Windows accent from `AccentPalette` |
-| Settings window | `src/SettingsWindow.tsx`, `src/settings.ts`, `src/Dropdown.tsx`, `src/HotkeyRecorder.tsx` | `settings` Tauri window: pages, hotkey recorder, commands table; `useSettings` keeps every window in sync through the `settings-changed` event |
-| Clipboard | `src-tauri/src/clipboard.rs` | `WM_CLIPBOARDUPDATE` listener thread, capture (text, files, DIB→PNG), exclusion formats, history store with retention and pinning, paste sequence (offset, timeout, reset) and a short recording pause for its own writes, write-back (text, files, DIB + PNG), Ctrl+V injection, source app lookup; images served on `clipimg://` |
-| Views | `src/ListView.tsx`, `src/ActionHost.tsx` | Pushed command views: back button, search with optional argument field and filter, list or grid, detail with Information, footer; action panel with submenus and confirmation dialogs, shared with the root |
-| Notes | `src/NotesWindow.tsx`, `src/notes.ts`, `src/Tooltip.tsx`, `src-tauri/src/notes.rs`, `src/extensions/notes.tsx` | `notes` window (Tiptap editor with the markdown extension, format bar, action panel, browse list, history), `notes.json` through `data_get`/`data_set`, right-edge placement on first show, `tooltip` window (non-activating, click-through) positioned above the hovered button in screen coordinates; launcher commands open it through `notes_show` |
-| Calculator | `src/calculator.ts`, `src/calculatorHistory.ts`, `src/extensions/calculator.ts`, `src/extensions/calculator-history.tsx` | Expression parser, currency and time-zone parsing, color parsing and formats; inline result card; history in `calculator-history.json` (upsert, retention, pins, date sections) and the Calculator History view |
-| Translator | `src/translate.ts`, `src/extensions/translate.tsx`, `src-tauri/src/translate.rs` | Language list and swap/restore logic; two-pane view; HTTP call to the Google `gtx` endpoint and response parsing in Rust (no CSP change needed) |
-| Calendar and Contacts | `src/calendar.ts`, `src/contacts.ts`, `src/extensions/calendar.tsx`, `src/extensions/contacts.tsx`, `src-tauri/src/calendar.rs`, `src-tauri/src/contacts.rs` | WinRT appointment and contact stores (`calendar_list`, `calendar_events`, `calendar_create`, `calendar_delete`, `calendar_open`, `contacts_list`); day sections, labels and search in TS.|
-| Dictionary | `src/dictionary.ts`, `src/extensions/dictionary.tsx`, `src-tauri/src/dictionary.rs` | Datamuse suggestions fetched from the web view (CSP `connect-src`), definitions from dictionaryapi.dev fetched in Rust (`dictionary_define`); Portuguese from the pt.wiktionary.org MediaWiki API in the web view (`origin=*`); recent words and the Language setting (`DictionarySettings` in `src/SettingsWindow.tsx`) in `dictionary.json` |
-| Search and ranking | `src/search.ts` | Matching, scoring, merging with frecency |
-| Command registry | `src/registry.ts` | Collects items from registered extensions |
-| Extension API | `src/extension-api.ts` | Types and `defineExtension` |
-| Icons | `src/icons.tsx` | `GlyphTile` (extension tiles from an `IconSpec`), `CommandIcon` (URL, tile or fallback), `OpenrayGlyph` |
-| Command arguments | `src/extension-api.ts`, `src/App.tsx` | A command's `argument` adds a field next to the root search text while it is selected; Tab moves between them and the primary action runs `argument.run(value)` (Set Volume); `optional: true` lets it run empty (run commands, script arguments) |
-| Empty list actions | `src/ListView.tsx` | `emptyActions` gives an empty view its actions and Ctrl+K panel (Create Run Command, Create Quicklink, Add Script Directory) |
-| Fallback views | `src/extension-api.ts`, `src/App.tsx` | A command's `fallbackView(text)` returns a view that opens from the “Use … with...” section with the typed text (Create Quicklink) |
-| Hotkeys without modifiers | `src-tauri/src/hotkey.rs`, `src-tauri/src/store.rs`, `src/settings.ts`, `src/HotkeyRecorder.tsx` | Print Screen, Pause, Scroll Lock and F13–F24 may be bound alone; the recorder also reads Print Screen on keyup because Windows does not send its keydown to the page; `add_default_hotkeys` fills in Print Screen defaults for screenshot commands that have no saved preferences and whose hotkey is free |
-| Performance | `src-tauri/src/cache.rs`, `src-tauri/src/launcher.rs`, `src/flowkey/FlowKeyIcon.tsx`, `vite.config.ts`, `tauri.conf.json` | Stale-while-revalidate caches for apps (20 s), Settings pages (10 min) and Steam games (1 min), warmed at startup; WebView2 memory target Low while the launcher is hidden; browser args `--disable-gpu --process-per-site` (also on runtime pin windows); extension icons by name load one Lucide module on demand from a lazy loader, with names from the `virtual:lucide-names` module, so the launcher no longer bundles all icons |
-| Built-in extensions | `src/extensions/*` | `applications` (first), `calculator`, `clipboard-history`, `emoji-picker`, `notes`, `quicklinks`, `translator`, `web-searches`, `windows-run`, `urls`, `script-commands`, `screenshots`, `menu-items`, `openray-core` |
-| Design system | `src/styles.css` (`@theme` tokens), `docs/design-system.md` | Measured tokens as CSS variables |
-| Actions | `src/actions.ts`, `src/ActionPanel.tsx` | Action groups per command (primary, extension, favorites, ranking), shortcut matching, Ctrl+K panel |
-| Toasts and HUD | `src/toast.ts`, `src/FooterToast.tsx`, `src/Hud.tsx`, `src-tauri/src/hud.rs` | `showToast` routes to the footer (launcher visible) or the `hud` window (hidden); HUD window styles, sizing and placement |
-| Themes | `src/theme.ts` | Bundled theme data, `ThemeRoot` applies CSS variables in every window from settings, system appearance and accent |
-| Focus | `src/focus.ts`, `src/extensions/focus.tsx`, `src/FocusWindows.tsx`, `src-tauri/src/focus.rs` (engine shared with `app/` through the `focus::Host` trait), `src-tauri/src/focus_windows.rs` (Tauri windows), `app/src/focus_ui.rs` and `app/src/extensions/focus.rs` (egui) | Session state and timers, app and website rules, foreground watcher with UI Automation URL reading, block overlay, notification and panel windows, native panel menus; categories and preferences in `focus.json` |
-| Snippets | `src/snippets.ts`, `src/extensions/snippets.tsx`, `src-tauri/src/snippets.rs` | Snippets in `snippets.json`; placeholder resolution in TypeScript; keyword tracking inside the low-level keyboard hook, erasing the keyword and asking the launcher (`snippet-expand`) to resolve it, then typing it with `snippet_type` |
-| System pages | `src/extensions/system-pages.ts`, `src-tauri/src/settings_pages.rs`, `apps::control_panel_items` | Settings search cache parsing, PageID → ms-settings table, All Control Panel Items enumeration |
-| Games | `src/extensions/games.tsx`, `src-tauri/src/games.rs` | Steam library and manifest parsing, cached icons, Game Launcher view and game items in root search |
-| Uninstall | `src-tauri/src/uninstall.rs` | Uninstall registry lookup for Start Menu apps, `Remove-AppxPackage` for Store apps, Settings fallback; actions may build their confirmation asynchronously (`Action.confirm` as a function) |
-| Toggles | `src-tauri/src/toggles.rs` | Night Light (CloudStore blob), HDR (Display Config advanced color), camera consent switch |
-| App volume | `src/extensions/app-volume.tsx`, `src-tauri/src/app_volume.rs` | Audio sessions of the default output device grouped by executable, per-app volume and mute, active-app commands |
-| Sound devices | `src/extensions/sound-devices.tsx`, `src-tauri/src/sound_devices.rs` | Core Audio endpoint list with names and form factors, default switching through `IPolicyConfig`, endpoint volume and mute |
-| Switch Windows | `src/extensions/navigation.tsx`, `src-tauri/src/window_switcher.rs` | Lists the open app windows (shared filter with Quit All Apps in `system_actions.rs`), resolving UWP frames to the hosted app, and switches, minimizes, closes, maximizes or quits them |
-| File Search | `src/fileSearch.ts`, `src/extensions/file-search.tsx`, `src-tauri/src/file_search.rs` | In-memory name index of the user folder, ranked search with type filter, Recently Used from the Windows Recent folder, file metadata; thumbnails through `appicon` with `thumb=1` |
-| Run | `src/run.ts`, `src/extensions/run.tsx`, `src-tauri/src/run.rs` | Windows Run catalog (PATH, App Paths, `.cpl`, `.msc`, environment variables), path completion, RunMRU history read/write/delete, ShellExecuteEx with `runas` or `cmd /k`; run commands in `run-commands.json` |
-| URL | `src/urls.ts`, `src/extensions/urls.ts` | Link detection; a command's `query` (`matches`, `run`) puts it first in Results while the search text matches |
-| Script Commands | `src/scriptCommands.ts`, `src/extensions/script-commands.tsx`, `src-tauri/src/scripts.rs` | `@raycast.*` metadata parsing, interpreter by extension, hidden runs with captured output; folders in `script-commands.json`; templates in TypeScript |
-| Screenshots | `src/capture.ts`, `src/screenshots.ts`, `src/CaptureOverlay.tsx`, `src/PinWindow.tsx`, `src/extensions/screenshots.tsx`, `src-tauri/src/capture.rs` (shared with `app/`), `app/src/capture_ui.rs`, `app/src/extensions/screenshots.rs`, `src-tauri/src/screenshot.rs` | GDI capture of the virtual screen, window and monitor rectangles, PNG/BMP encoding, OCR (Windows.Media.Ocr), QR (`rqrr`); capture session state, the `capture` overlay window (shown with alpha 0 until the frozen frame loads, because a hidden WebView2 does not load it), `pin-*` windows built at runtime, and the `capture://` protocol (`frame`, `pin/<label>`) |
-| Quick Look | `src/extensions/file-search.tsx`, `src-tauri/src/explorer.rs` | File Explorer selection through IShellWindows / IFolderView, shown with the Search Files info panel |
-| Menu Items | `src/extensions/menu-items.tsx`, `src-tauri/src/menu_items.rs` | Win32 menu bar walk of the previous foreground window, `WM_COMMAND` to run an item |
-| System Actions | `src/extensions/system-actions.ts`, `src-tauri/src/system_actions.rs` | Power, session, app quitting, Core Audio volume and microphone mute, media keys, dark mode and hidden-files registry toggles |
-| Window Management | `src/extensions/window-management.ts`, `src-tauri/src/window_layout.rs` | Layout commands; target window lookup, work-area fractions and relative frames (sizes, edge moves, grow/shrink), invisible-border compensation, display order and moves, Restore from an in-memory frame per window, minimize, always on top and app-window cycling (these update the launcher's previous window so focus returns to the right place) |
-| Launcher UI | `src/App.tsx` | Search input, list, footer, loader, keyboard |
-| Updater | `src/updater.ts`, `tauri-plugin-updater`, `.github/workflows/release.yml` | Periodic and manual checks against `latest.json` on the latest GitHub release (public key in `tauri.conf.json`), the `update-found` event between windows, install through the plugin; the workflow builds and signs releases with `tauri-action` |
-| FlowKey host (web) | `src/flowkey/*`, `src/extensions/flowkey.tsx` | Extension list and consent (`extensions.ts`), capability gate (`gate.ts`), native dispatcher (`natives.ts`), per-extension worker runtime (`runtime.ts`, `worker.ts`, `protocol.ts`), tree renderer (`FlowKeyView.tsx`, `Markdown.tsx`, `FlowKeyIcon.tsx`), web commands (`WebCommand.tsx`), dialogs, Settings panel |
-| FlowKey host (native) | `src-tauri/src/flowkey.rs` (Tauri commands and protocols), `src-tauri/src/flowkey_core.rs` (Tauri-free, shared with the egui app) | `flowkey://` and `extimg://` protocols, package install and uninstall, per-extension data files, DPAPI secrets and OAuth tokens, HTTP with host and private-address checks, Spotify PKCE, image cache, SMTC media, scoped file operations, file pickers, rich clipboard |
-| FlowKey host (egui) | `app/src/flowkey_js.rs`, `flowkey_host.rs`, `flowkey_gate.rs`, `extensions/flowkey.rs`, `app/js/*`, `app/assets/flowkey-host.js` | QuickJS thread per extension running the bundled worker host; Rust discovery, consent, preferences, gate and native dispatch on a tokio runtime; egui tree views. Launcher requests from other threads go through `extension::Async` |
-| Bundled FlowKey extensions | `extensions/spotify-player` | A FlowKey CLI project; `npm run build:extensions` runs `flowkey build`, and `dist/` is bundled as `resources/extensions/spotify-player` |
-
-The Rust core exposes Tauri commands:
-
-- `list_apps`
-- `launch_app` (optionally as administrator)
-- `show_in_explorer`
-- `frecency_visit`
-- `frecency_all`
-- `frecency_reset`
-- `favorites_get`
-- `favorites_set`
-- `hide_launcher`
-- `show_hud`, `hud_present`, `hud_hide`
-- `quit_app`
-- `settings_get`, `settings_set` (validates hotkeys, saves, re-registers, emits `settings-changed`)
-- `notes_show` (hides the launcher, creates or shows and focuses the notes window, emits `notes-open` to an existing window or keeps the request for `notes_pending` when it creates one), `notes_pending`, `tooltip_show`, `tooltip_present`, `tooltip_hide`
-- `translate` (text, source, target → translated text and detected source language)
-- Focus: `focus_get`, `focus_start`, `focus_update`, `focus_pause`, `focus_resume`, `focus_restart`, `focus_complete`, `focus_cancel`, `focus_snooze`, `focus_close_tab`, `focus_block_info`, `focus_panel_menu`, `focus_panel_reset`, `focus_toast_hide`, `read_json_file`
-- Snippets: `snippet_type` (text, cursor offset → types it into the foreground app); `data_set` with `snippets` also reloads the expansion keywords
-- Clipboard History: `clipboard_paste_next` (→ false when nothing is left to paste), `clipboard_reset_sequence`
-- System pages: `list_system_pages` (→ Settings pages and Control Panel items with name, path, keywords, kind)
-- Games: `list_games` (→ Steam games with install dir, icon, launch and uninstall links, plus launchers); `list_apps` hides Steam `.url` shortcuts for detected games
-- Uninstall: `app_uninstaller` (name, path → registered uninstaller name, "" for a Store package, or null), `app_uninstall` (→ removed | requested | settings)
-- Toggles: `system_toggle` (toggle-night-light | toggle-hdr | toggle-camera-mute → HUD text)
-- App volume: `app_volumes` (→ id, name, exe path, volume, mute, playing), `app_volume_set` (id + volume/muted), `app_volume_active` (mute | up | down → HUD text)
-- Sound devices: `sound_devices` (output | input → id, name, state, form factor, default, volume, mute), `sound_device_set` (id + default/volume/muted)
-- Switch Windows: `window_list` (→ id, title, app name, exe path, minimized, maximized, in Z-order), `window_action` (id, `switch` | `minimize` | `close` | `toggle-maximize` | `quit` | `force-quit`)
-- File Search: `file_search` (query, type → ranked hits or Recently Used, index state), `file_reindex`, `file_info` (path → shell type name, size and dates); emits `file-index-updated` when an index build finishes
-- File Search: `file_index_status` (→ files counted so far while an index build runs, else null); Quick Look: `explorer_selection` (→ selected paths of the front File Explorer window)
-- Run: `run_catalog`, `run_complete` (text → path entries), `run_history`, `run_forget`, `run_split`, `run_execute` (command, arguments, admin, shell; hides the launcher)
-- Script Commands: `scripts_list` (directories → scripts), `script_run` (path, arguments → stdout, stderr, exit code); `open_with` (Windows “Open with” dialog)
-- Screenshots: `screenshots_set_folder` (absolute path or null → saved in `screenshots.json`, kept in `capture::CUSTOM_FOLDER`); the `capture://` origin is listed in the CSP `img-src` (release builds enforce the CSP, dev builds do not); the overlay window is created at startup and shown/hidden through Tauri so its WebView keeps painting; `capture_start` (region | color | ocr | qr | pin | ruler), `capture_pending`, `capture_ready`, `capture_pixel` (x, y → hex), `capture_finish` (rect), `capture_cancel`, `capture_direct` (fullscreen | window | monitor | last-region), `pin_file`, `pin_shown`, `pin_copy`, `pin_close`, `screenshots_list`, `screenshots_folder`, `screenshot_paste_latest`, `image_copy`, `image_paste`, `image_edit`, `image_text` (PNG path → OCR text); events `capture-start`, `screenshot-saved`
-- Menu Items: `menu_items_list` (→ app name and items with id, path, shortcut, checked), `menu_items_invoke` (id)
-- Data files `run-commands` and `script-commands` added to `data_get`/`data_set`
-- `system_action` (action id → runs one system action)
-- `window_layout` (layout id → moves, resizes, minimizes, pins or cycles the target window; `minimize-on-display` uses the launcher's monitor)
-- `hotkeys_suspend`, `login_item_get`, `login_item_set`, `open_settings`, `system_accent_color`
-
-- FlowKey host: `flowkey_list`, `flowkey_extensions_dir`, `flowkey_package_manifest`, `flowkey_install`, `flowkey_uninstall`, `flowkey_data_get`, `flowkey_data_set`, `flowkey_secret`, `flowkey_http`, `flowkey_oauth`, `flowkey_image`, `flowkey_media_current`, `flowkey_media_control`, `flowkey_fs`, `flowkey_default_app`, `flowkey_pick_path`, `flowkey_selected_text`, `flowkey_edit_clipboard_entry`, `copy_rich`, `read_clipboard_rich`
-
-The hook dispatcher toggles the launcher for the `launcher` binding and emits `run-command` (the command key) to the launcher window for command hotkeys.
-
-## Extension API (internal, v0)
-
-```ts
-interface Extension {
-  id: string;
-  title: string;
-  commands?: Command[];
-  items?: () => Promise<Command[]>;
-}
-
-interface Command {
-  id: string;
-  title: string;
-  subtitle?: string;
-  icon?: string;
-  keywords?: string[];
-  kind: string;
-  primaryActionTitle: string;
-  actions?: Action[][];
-  view?: ComponentType<{ pop: () => void }>;
-  fallback?: (text: string) => Promise<void> | void;
-  run?: () => Promise<void> | void;
-}
-
-interface Extension {
-  icon?: IconSpec;
-  inline?: (query: string) => Promise<InlineResult | null>;
-}
-
-interface IconSpec {
-  glyph: ComponentType<{ className?: string; strokeWidth?: number }>;
-  tone: "blue" | "orange" | "red" | "yellow" | "purple" | "green" | "slate";
-}
-
-interface Action {
-  id: string;
-  title: string;
-  icon?: ComponentType<{ className?: string }>;
-  shortcut?: { key: string; ctrl?: boolean; alt?: boolean; shift?: boolean };
-  destructive?: boolean;
-  keepOpen?: boolean;
-  accessory?: string;
-  confirm?: { title: string; message: string; confirmTitle: string };
-  submenu?: () => Action[] | Promise<Action[]>;
-  run: () => Promise<void> | void;
-}
-```
-
-- A command with `view` replaces the root with its component (built from `ListView`); `pop` returns to the root. Command hotkeys for view commands show the launcher first.
-- `fallback` commands appear under “Use “text” with...” and receive the root text.
-- `inline` results (the calculator) render as a card above the root results; their actions drive the footer.
-- An action with `submenu` opens its items in the action panel; `confirm` asks first, with Cancel focused.
-
-- `actions` are groups shown in the Ctrl+K panel. The first group follows the primary action. The launcher adds the favorites group after it and Reset Ranking at the end.
-- An action hides the launcher after it runs, unless `keepOpen` is set.
-- Actions report results with `showToast({ variant, title, message?, icon? })` from `src/toast.ts`. Failures thrown by `run` become failure toasts.
-
-- Static `commands` declare fixed commands. `items()` supplies dynamic ones, such as one per installed app.
-- The registry namespaces ids as `<extensionId>/<commandId>`. That key is what frecency stores.
-- Built-ins are registered through `defineExtension` in `src/extensions/index.ts`, and nothing else is special-cased.
-- Planned additions, when real features need them: preferences.
-
-## i18n
-
-Openray is localized in English and Brazilian Portuguese through a small custom module, `src/i18n.ts` (no runtime dependency).
-
-- **Keys are the English strings themselves.** `t("Copy Answer")` returns the pt-BR translation from `src/i18n/pt.ts` when the language is `pt`, and the key itself otherwise. English stays byte-identical and missing translations degrade to English silently.
-- **Dictionaries are split by area** (`src/i18n/pt-core.ts`, `pt-settings.ts`, `pt-windows.ts`, `pt-extensions-a.ts`, `pt-extensions-b.ts`, `pt-flowkey.ts`) and merged in `src/i18n/pt.ts`. `{name}` placeholders are filled by `t(key, { name })`.
-- **Settings.** `language` (`system` | `en` | `pt`) lives in settings.json next to appearance; `system` follows `navigator.language`. `main.tsx` applies the setting in every window (`useApplyLanguage`) and re-renders the window when it changes.
-- **Boundaries.** Extension/command data keeps English titles, subtitles and confirmations; they are localized where they are displayed (`localizeCommand` in `App.tsx`, the Settings tables, the confirm dialog, the HUD). Search matches the localized titles, and extensions additionally carry Portuguese keywords.
+| Lifecycle | `main.rs` | Single instance (named mutex plus show event), tray menu (Open, Settings, Quit), `--show` and `--keyboard-hook` arguments, module list |
+| Launcher | `root.rs`, `search.rs`, `launcher.rs` | Root search, sections, favorites, frecency, pushed views (list, grid, form, page, detail), dropdowns, action panel, confirm dialog, toast and HUD; popup window show/hide (alpha 0, click-through), placement, DWM styling, hide on blur; `extension::Async` requests from other threads |
+| Settings window | `settings_ui.rs` | Second viewport: General, Launcher, Shortcuts, Keyboard, Extensions, per-extension pages with the commands table, hotkey recorder and conflicts, FlowKey install, uninstall, preferences and permissions |
+| Extension API | `extension.rs`, `extensions/mod.rs` | `Extension`, `Command`, `View`, `Action`, `Host`, `Request`, `Async`; built-ins listed in `built_in()`, FlowKey extensions appended on every reload |
+| Built-in features | `extensions/*.rs`, `notes/`, `focus_ui.rs`, `capture_ui.rs` | One file per extension; Notes editor and window; Focus panel, toast and block windows; screenshot overlay and pins |
+| Global hotkey | `hotkey.rs` | Hotkey parsing, helper process with the swallowing WH_KEYBOARD_LL hook, in-process snippet hook, suspend while recording |
+| Persistence | `store.rs`, `registry.rs` | `settings.json`, `frecency.json`, `favorites.json` and extension data files in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login |
+| Windows backends | `apps.rs`, `clipboard.rs`, `file_search.rs`, `explorer.rs`, `window_layout.rs`, `window_switcher.rs`, `menu_items.rs`, `system_actions.rs`, `toggles.rs`, `app_volume.rs`, `sound_devices.rs`, `settings_pages.rs`, `games.rs`, `capture.rs`, `focus.rs`, `run.rs`, `scripts.rs`, `snippets.rs`, `contacts.rs`, `calendar.rs`, `uninstall.rs` | App index and icons, clipboard listener and history, file index, window placement and switching, menu items, power/audio/media/toggles, Settings pages, Steam games, capture and OCR, Focus engine, Run, Script Commands, snippet expansion, Contacts and Calendar (WinRT), uninstallers |
+| Rendering helpers | `theme.rs`, `icons.rs`, `emoji_render.rs`, `http.rs`, `icu.rs` | Colors and fonts, Lucide glyphs, image loaders (`appicon://`, `clipimg://`, `emoji://`, extension images), WIC decoding, HTTPS through `ureq` |
+| FlowKey host | `flowkey_js.rs`, `flowkey_host.rs`, `flowkey_gate.rs`, `flowkey_core.rs`, `extensions/flowkey.rs`, `app/js/*`, `app/assets/flowkey-host.js` | See below |
 
 ## FlowKey extension host
 
-Openray runs extensions built with the user's FlowKey CLI unchanged. This does not reopen ADR-001: built-in features still use the internal API above, and each FlowKey extension is adapted into it as one Openray extension keyed `flowkey.<id>`.
+Openray runs extensions built with the user's FlowKey CLI unchanged. Each FlowKey extension becomes one Openray extension keyed `flowkey.<id>`.
 
-- **Isolation.** Each extension runs in its own module Web Worker. Workers cannot reach Tauri IPC (the invoke key lives only in the window), and `fetch`, XHR, WebSocket and similar globals are removed before the bundle loads. The worker starts from a blob so it inherits the window CSP, which limits script loads to the app and `flowkey://`.
-- **Native calls.** The worker posts `nativeCall`; the window checks the method against manifest ∩ stored consent (`gate.ts`) and runs it (`natives.ts`), mostly through `flowkey.rs`. Calls are attributed to the worker's own extension, never to an id inside the message.
-- **Trees.** React extensions render through `@flowkey-cli/react-ui`'s reconciler in the worker; trees are pushed at most every 16 ms and deduplicated. The window renders them with the existing ListView, footer and action panel.
-- **Web commands** run in a sandboxed iframe served from `flowkey://<source>/<id>/__host__/<entry>` with a strict CSP. A shim maps `chrome.webview` to `postMessage`, and the host recognises the frame by its window, not by message fields.
-- **Data** lives in `%APPDATA%\dev.openray.app\flowkey\<id>\`: `storage`, `cache`, `consent` and `preferences` as JSON, and DPAPI-sealed `secrets.bin` and `oauth-<provider>.bin`. OAuth tokens never reach the extension; `http.fetch` with `auth` injects them only for the provider's pinned host.
+- **Runtime.** Each extension runs in its own QuickJS engine (`rquickjs`) on its own thread (`flowkey_js.rs`): 512 MB heap, a 10 s limit per JS turn, timers and messages served by a Rust loop. The engine loads `app/assets/flowkey-host.js`, built by `npm run build:host` from `app/js/worker.ts` (the FlowKey worker protocol with React and `@flowkey-cli/react-ui`) and `app/js/shims.js` (timers, AbortController, URL, TextEncoder, crypto, console).
+- **Isolation.** The engine has no fetch, file, process or OS access. Dynamic import resolves only the extension's own entry file. Everything else is a `nativeCall` message.
+- **Native calls.** `flowkey_host.rs` checks each method against manifest ∩ stored consent (`flowkey_gate.rs`) and runs it on a small tokio runtime, mostly through `flowkey_core.rs` (HTTP with host allowlist and private-address blocking, Spotify PKCE OAuth, DPAPI secrets, scoped file operations, media, image cache, install and uninstall). Calls are attributed to the worker's own extension, never to an id inside the message.
+- **Trees.** React trees arrive as `tree` messages and are drawn by `extensions/flowkey.rs` with the launcher's list, grid, page and form views.
+- **Data** lives in `%APPDATA%\dev.openray.app\flowkey\<id>\`: `storage`, `cache`, `consent` and `preferences` as JSON, and DPAPI-sealed `secrets.bin` and `oauth-<provider>.bin`. OAuth tokens never reach the extension; `http.fetch` with `auth` injects them only for the provider's pinned host. Images are cached in `%LOCALAPPDATA%\dev.openray.app\flowkey-images`.
+- **Packages.** Installed extensions live in `%LOCALAPPDATA%\FlowKey.Shell\extensions` (or `FLOWKEY_EXTENSIONS_DIR`); bundled ones in `extensions\` next to `openray.exe` (debug builds read `extensions/*/dist` in the repo).

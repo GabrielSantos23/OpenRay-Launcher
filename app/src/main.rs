@@ -1,67 +1,49 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/apps.rs"]
 mod apps;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/clipboard.rs"]
 mod clipboard;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/system_actions.rs"]
 mod system_actions;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/window_layout.rs"]
 mod window_layout;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/toggles.rs"]
 mod toggles;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/app_volume.rs"]
 mod app_volume;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/sound_devices.rs"]
 mod sound_devices;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/window_switcher.rs"]
 mod window_switcher;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/settings_pages.rs"]
 mod settings_pages;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/games.rs"]
 mod games;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/file_search.rs"]
 #[allow(dead_code, unused_imports)]
 mod file_search;
-#[path = "../../src-tauri/src/explorer.rs"]
 #[allow(dead_code, unused_imports)]
 mod explorer;
-#[path = "../../src-tauri/src/menu_items.rs"]
 mod menu_items;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/capture.rs"]
 mod capture;
 mod capture_ui;
 mod emoji_render;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/flowkey_core.rs"]
 mod flowkey_core;
 mod flowkey_js;
 mod flowkey_gate;
 mod flowkey_host;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/registry.rs"]
 mod registry;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/focus.rs"]
 mod focus;
 mod focus_ui;
 mod extension;
 mod http;
 mod extensions;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/hotkey.rs"]
 mod hotkey;
 mod icons;
 mod icu;
@@ -70,29 +52,22 @@ mod root;
 mod notes;
 mod search;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/store.rs"]
 mod store;
 mod theme;
 
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/run.rs"]
 mod run;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/uninstall.rs"]
 mod uninstall;
 
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/contacts.rs"]
 mod contacts;
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/calendar.rs"]
 mod calendar;
 
 #[allow(dead_code, unused_imports)]
-#[path = "../../src-tauri/src/scripts.rs"]
 mod scripts;
 
-#[path = "../../src-tauri/src/snippets.rs"]
 #[allow(dead_code, unused_imports)]
 mod snippets;
 
@@ -110,7 +85,7 @@ fn data_dir() -> std::path::PathBuf {
 }
 
 fn tray_icon() -> Option<tray_icon::Icon> {
-    let decoder = png::Decoder::new(std::io::Cursor::new(include_bytes!("../../src-tauri/icons/32x32.png")));
+    let decoder = png::Decoder::new(std::io::Cursor::new(include_bytes!("../assets/app-icons/32x32.png")));
     let mut reader = decoder.read_info().ok()?;
     let mut buffer = vec![0; reader.output_buffer_size()];
     let info = reader.next_frame(&mut buffer).ok()?;

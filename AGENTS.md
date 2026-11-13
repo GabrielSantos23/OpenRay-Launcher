@@ -34,9 +34,9 @@ The reference is \*\*Raycast for Windows 2.8.2.0\*\*, which is installed on the 
 
 
 
-\- \*\*Stack:\*\* Rust + egui (eframe, glow) with no WebView and no TypeScript in the main app; third-party extensions in TypeScript on an embedded JS engine. See ADR-002 in `docs/architecture.md`. The Tauri 2 app (ADR-001) stays in `src-tauri/` and `src/` until the port in `app/` reaches parity.
+\- \*\*Stack:\*\* Rust + egui (eframe, glow) with no WebView and no TypeScript in the main app; third-party extensions in TypeScript on an embedded JS engine. See ADR-002 in `docs/architecture.md`. The Tauri 2 app (ADR-001) was removed in Phase 5 (2026-11-13; last present at commit 2925cc8). What it had and the egui app lacks is listed in `docs/known-limitations.md`.
 
-\- \*\*Extension API:\*\* built-in features register through `defineExtension` in `src/extension-api.ts` (ADR-001, "Extension API").
+\- \*\*Extension API:\*\* built-in features implement the `Extension` trait in `app/src/extension.rs`; third-party FlowKey extensions run on QuickJS through `app/src/flowkey_host.rs` (ADR-002).
 
 
 

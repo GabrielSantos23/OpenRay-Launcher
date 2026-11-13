@@ -6,7 +6,7 @@ Reference: Raycast for Windows 2.8.2.0 (see version note in `reverse-engineering
 
 ## egui port (ADR-002)
 
-The native app in `app/` replaces the Tauri app feature by feature. Rows below cover what the egui build does today; everything not listed here still exists only in the Tauri app.
+The native app in `app/` is the only app since Phase 5 (2026-11-13): the Tauri app and its web frontend were removed (last present at commit 2925cc8). Rows in this section are the current implementation. The sections below were written for the Tauri app: their reference evidence still holds, but their Windows behavior, file paths and statuses describe the removed code wherever no `(egui)` row above covers the feature. Features the egui app lacks are listed in `known-limitations.md` under “Removed with the Tauri app”.
 
 | Feature | Reference evidence | Windows behavior | Status | Tests | Remaining differences |
 |---|---|---|---|---|---|

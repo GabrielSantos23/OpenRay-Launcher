@@ -2,17 +2,25 @@
 
 ## egui port (ADR-002)
 
+### Removed with the Tauri app
+
+The Tauri app was removed on 2026-11-13 (last present at commit 2925cc8). These features existed there and are not in the egui app:
+
+- **Portuguese UI.** The egui app is English only; there is no Language setting. (Portuguese search keywords and the Portuguese dictionary still work.)
+- **Light theme and appearance settings.** Dark theme only; the Windows accent color is not followed.
+- **Auto-update.** No updater or Check for Updates; releases are a zip to replace by hand.
+- **Installer.** No NSIS installer or Start Menu entry; the release is a portable zip. The executable has no embedded icon.
+- **FlowKey web commands** (`ui: "web"`): they need a WebView, so they are hidden.
+- **FlowKey interval commands** are not scheduled.
+- **Tests of the web layer** (Vitest) went away with it; the logic that was ported has Rust tests in `app/`.
+
 - The egui app in `app/` covers the launcher shell, Applications, Notes (editor plus a basic window), System Actions, Window Management, Web Searches, URL, System Settings pages, Switch Windows, Search Menu Items, Volume Mixer and sound devices, Calculator and its history, Games, Clipboard History, File Search and Quick Look, Quicklinks, Snippets, Run, Emoji & Symbols, Dictionary, Translator, Contacts, Calendar, Script Commands, Focus, Screenshots and Settings (without theme, language, update and FlowKey rows). FlowKey extensions run on QuickJS; see the FlowKey item below.
-- Shared backends: `system_actions.rs`, `window_switcher.rs`, `window_layout.rs`, `toggles.rs`, `app_volume.rs`, `sound_devices.rs`, `settings_pages.rs`, `menu_items.rs`, `clipboard.rs` and `games.rs` compile into both apps through `#[path]`. `system_actions::run` and `window_switcher::act` now take a hide callback instead of a Tauri `AppHandle`, and `hosted_pid` moved from `focus.rs` to `window_switcher.rs`. `file_search.rs` and `explorer.rs` are shared too: `file_search::search` and `reindex` take an index-updated callback, `shortcut_target` moved from `focus.rs` to `apps.rs`, and the Recycle Bin delete moved from `flowkey.rs` to `file_search::recycle`. `snippets::init` takes an expand callback, and the file picker moved from `flowkey.rs` to `apps::pick_path`. `run.rs`, `uninstall.rs`, `contacts.rs`, `calendar.rs` and `scripts.rs` are shared as well; the contacts and calendar Tauri commands moved into `lib.rs`, and `calendar_open` became `calendar::open`.
 - The egui calculator is English only: no Portuguese number words, money always formatted as en-US. Dates and currency names follow the Windows display language through ICU, like WebView2 did. Free-text target dates (“Dec 25”) are not parsed; ISO and d/m[/y] are.
 - Calculator history day groups and Clipboard History day titles use today's UTC offset for every entry, so entries near midnight can land in the neighbouring day across a DST change.
 - View dropdowns (Clipboard History, File Search) have no search field, and the Information rows clip instead of scrolling. File Search's info-panel toggle resets on restart, and there is no loading line yet.
 - The egui app draws color emoji only as icons (the emoji grid). Emoji inside titles, subtitles and notes text still render as missing glyphs, because egui's font renderer has no color-font support.
 - The egui Create Event form takes dates as typed text (`YYYY-MM-DD HH:MM`); the Tauri app used the WebView's date pickers.
-- Focus sessions live in the process that started them: a session started in the egui build is not seen by the Tauri app and the other way round.
-- **FlowKey in the egui build.** Extensions run in QuickJS (`rquickjs`) with the same consent, data folder and gate as the Tauri app. Missing there: web commands (`ui: "web"`, they need a WebView and are hidden), interval background commands, tag/file/date pickers (plain text, tags and files comma-separated), description and separator form fields, form actions other than submit, `iconSvg`, `iconColor`, accessory colors, and native call aborts (calls finish and their result is dropped). Pagination shows a Load More row. The JS host is prebuilt into `app/assets/flowkey-host.js` from `src/flowkey/worker.ts` with `node app/js/build.mjs`; `worker.ts` and `protocol.ts` must move into `app/js` before Phase 5 deletes `src/`. A script that runs one JS turn for more than 10 s is interrupted.
-- Both apps use the same data folder (`%APPDATA%\dev.openray.app`). Running the egui build next to the Tauri app starts two clipboard listeners on the same `clipboard/history.json`, and each overwrites the other's changes. Run only one of them at a time.
-- No Settings window yet: hotkey, aliases and disabled commands are read from `settings.json` at startup.
+- **FlowKey.** Extensions run in QuickJS (`rquickjs`) with the same consent, data folder and gate as the Tauri app. Missing there: web commands (`ui: "web"`, they need a WebView and are hidden), interval background commands, tag/file/date pickers (plain text, tags and files comma-separated), description and separator form fields, form actions other than submit, `iconSvg`, `iconColor`, accessory colors, and native call aborts (calls finish and their result is dropped). Pagination shows a Load More row. The JS host is prebuilt into `app/assets/flowkey-host.js` from `app/js` with `npm run build:host`. A script that runs one JS turn for more than 10 s is interrupted.
 - Notes editor: underlines sit at the bottom of the 21 px line instead of under the baseline; inline code chips fill the line height; numbered lists always start at 1; quotes and code blocks hold plain lines only.
 - The emoji font is not loaded (it costs about 29 MB), so emoji in app names render as missing glyphs.
 - eframe's default features (wgpu) used 344 MB on the dev GPU, so `app/Cargo.toml` turns them off and uses glow.

@@ -20,7 +20,7 @@ It aims to look and behave like [Raycast for Windows](https://www.raycast.com/wi
 - [Project structure](#project-structure)
 - [How it works](#how-it-works)
 - [Extensions](#extensions)
-- [Releases and auto-update](#releases-and-auto-update)
+- [Releases](#releases)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [License](#license)
@@ -38,7 +38,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 - An action panel (**Ctrl+K**) with keyboard shortcuts for every action, as in Raycast.
 - Inline results for the calculator and colors, right in the root search.
 - Opens on the screen with the mouse, the active screen or the primary screen; hides when it loses focus.
-- Dark and light themes; follows the Windows accent color.
+- A dark theme matching the reference.
 
 ### Applications
 - Indexes Start Menu shortcuts and Microsoft Store (MSIX) apps, with their real icons.
@@ -127,9 +127,9 @@ Each feature below works today. The full per-feature status, with evidence and r
 ### Emoji & Symbols
 - Searchable emoji grid by category, with frequently used emoji first.
 
-### Settings and updates
+### Settings
 - A settings window for the hotkey, launch at login, tray icon, launcher position, Escape behavior, and the alias, hotkey and on/off switch of every command.
-- Automatic updates from GitHub Releases, plus a **Check for Updates** button in Settings. When an update is ready, it appears at the top of the launcher.
+- Install, configure and uninstall FlowKey extensions, and review the permissions each one has.
 
 ---
 
@@ -148,14 +148,14 @@ Known gaps and differences in the features that do exist are listed in [`docs/kn
 ## Install
 
 1. Open the [latest release](https://github.com/GabrielSantos23/OpenRay-Launcher/releases/latest).
-2. Download `Openray_<version>_x64-setup.exe` and run it. The installer runs per user and does not need administrator rights.
-3. Press **Alt+Space** to open Openray.
+2. Download `openray-windows-x64.zip` and unzip it to a folder of your choice, for example `%LOCALAPPDATA%\Programs\Openray`. Keep the `extensions` folder next to `openray.exe`.
+3. Run `openray.exe` and press **Alt+Space**. Turn on **Open at Login** in Settings to start it with Windows.
 
-Openray then updates itself whenever a new release is published.
+To update, download the newer zip and replace the files. Your data stays in `%APPDATA%\dev.openray.app`.
 
 > If you also use Raycast, give the two apps different hotkeys (for example Raycast on Ctrl+Alt+Space). Both use a keyboard hook, so the same hotkey can't work in both at once.
 
-**Requirements:** Windows 10 or 11 (x64) with the Microsoft Edge WebView2 Runtime, which Windows 11 already includes. The installer adds it if it is missing.
+**Requirements:** Windows 10 or 11 (x64). Nothing else: no WebView2, .NET or Node.js runtime.
 
 ---
 
@@ -180,36 +180,47 @@ Some commands to try: `clipboard history`, `search files`, `create snippet`, `st
 ### Prerequisites
 
 - Windows 10 or 11
-- [Node.js](https://nodejs.org/) 22+
-- [Rust](https://rustup.rs/) (stable) with the MSVC toolchain
-- The Tauri 2 prerequisites for Windows: Microsoft C++ Build Tools and WebView2. See the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/).
+- [Rust](https://rustup.rs/) with the MSVC toolchain (`app/rust-toolchain.toml` pins the version)
+- [Node.js](https://nodejs.org/) 22+, only to rebuild a FlowKey extension or the extension host bundle
 
-### Run in development
+### Run
 
 ```bash
-npm ci
-npm --prefix extensions/spotify-player install
-npm run tauri dev
+cd app
+cargo run
 ```
 
-The development build uses the identifier `dev.openray.app` and stores its data in `%APPDATA%\dev.openray.app`.
+The app stores its data in `%APPDATA%\dev.openray.app`. Debug builds load the bundled extensions from `extensions/*/dist`.
 
 ### Test
 
 ```bash
-npm test
-cd src-tauri && cargo test
+cd app
+cargo test
 ```
 
-`npm test` runs the Vitest suites for the web layer. `cargo test` covers the Rust core, including file indexing, snippet matching, window placement and the focus rules. Tests that drive real windows or audio devices are marked `#[ignore]`; run them with `cargo test -- --ignored`.
+Tests that drive real windows or audio devices are marked `#[ignore]`; run them with `cargo test -- --ignored`.
 
-### Build an installer
+### Release build
 
 ```bash
-npm run tauri build
+cd app
+cargo build --release
 ```
 
-The NSIS installer is written to `src-tauri/target/release/bundle/nsis/`.
+Put `app/target/release/openray.exe` next to an `extensions` folder that holds each bundled extension's `dist` contents (`extensions/spotify-player/`).
+
+### Extension bundles (npm)
+
+The built bundles are committed, so Cargo alone builds a complete app. Node.js is needed only to rebuild them:
+
+```bash
+npm ci
+npm run build:extensions
+npm run build:host
+```
+
+`build:extensions` runs the FlowKey CLI for `extensions/spotify-player`. `build:host` bundles the QuickJS extension host (`app/js`) into `app/assets/flowkey-host.js`.
 
 ---
 
@@ -217,47 +228,31 @@ The NSIS installer is written to `src-tauri/target/release/bundle/nsis/`.
 
 ```
 openray/
-├── src/                     React + TypeScript UI (one entry, one view per window)
-│   ├── App.tsx              Root launcher: search, results, action panel
-│   ├── ListView.tsx         Shared list/grid view with a detail pane
-│   ├── ActionHost.tsx       Action panel, confirmations, footer
-│   ├── extension-api.ts     The built-in extension API (defineExtension)
-│   ├── extensions/          Built-in features, one file per extension
-│   ├── flowkey/             Runtime for third-party (FlowKey) extensions
-│   └── *.ts                 Pure logic with Vitest tests next to it
-├── src-tauri/               Rust core (Tauri 2)
-│   ├── src/lib.rs           App setup, Tauri commands, tray, window lifecycle
-│   ├── src/launcher.rs      Launcher window: show/hide, placement, focus
-│   ├── src/hotkey.rs        Low-level keyboard hook and hotkey matching
-│   ├── src/apps.rs          App index, icons, ShellExecute
-│   ├── src/clipboard.rs     Clipboard listener and history store
-│   ├── src/file_search.rs   File index and search
-│   ├── src/snippets.rs      Keyword tracking and text expansion
-│   ├── src/focus.rs         Focus sessions, blocking, floating windows
-│   ├── src/window_layout.rs Window placement
-│   ├── src/system_actions.rs Power, audio, media and toggles
-│   └── tauri.conf.json      Windows, permissions, updater
-├── extensions/              Bundled third-party extensions (Spotify Player)
-├── docs/                    Architecture, feature matrix, research notes
-└── .github/workflows/       Release pipeline
+â”œâ”€â”€ app/                     The app (Rust, egui)
+â”‚   â”œâ”€â”€ src/main.rs          Startup, tray, single instance, module list
+â”‚   â”œâ”€â”€ src/root.rs          Launcher: search, results, views, action panel
+â”‚   â”œâ”€â”€ src/settings_ui.rs   Settings window
+â”‚   â”œâ”€â”€ src/extension.rs     The built-in extension API (Extension, Command, View)
+â”‚   â”œâ”€â”€ src/extensions/      Built-in features, one file per extension
+â”‚   â”œâ”€â”€ src/flowkey_*.rs     QuickJS runtime, gate and host for FlowKey extensions
+â”‚   â”œâ”€â”€ src/*.rs             Windows backends: hotkey hook, apps, clipboard, files, focus, capture...
+â”‚   â”œâ”€â”€ js/                  FlowKey worker host and browser shims (bundled for QuickJS)
+â”‚   â””â”€â”€ assets/              Fonts, icons, the built extension host
+â”œâ”€â”€ extensions/              Bundled FlowKey extensions (Spotify Player), source and built dist
+â”œâ”€â”€ docs/                    Architecture, feature matrix, research notes
+â””â”€â”€ .github/workflows/       Release pipeline
 ```
 
 ---
 
 ## How it works
 
-Openray uses **Tauri 2**: a small Rust core and a web UI rendered by **WebView2**, the same Chromium engine Raycast for Windows uses for its interface. Using the same engine makes it easier to match the reference's look, and the Rust core keeps memory use low. There is no Node.js process or .NET runtime.
+Openray is a single native Rust executable. The UI is drawn with **egui** (eframe, OpenGL through glow); there is no WebView, browser engine, Node.js process or .NET runtime.
 
-- **Rust core:**
-  - Owns everything that touches Windows: the keyboard hook, window styling and focus, the app and file indexes, the clipboard, audio (Core Audio), UI Automation (to read browser URLs for Focus), and simulated keystrokes.
-  - Exposes these to the UI as Tauri commands and events.
-- **Web layer:**
-  - React 19, TypeScript and Tailwind CSS v4. Colors are CSS variables, so themes can change them.
-  - Every built-in feature is an extension registered through `defineExtension`, in the same way a third-party extension would be.
-- **Windows:**
-  - The launcher window is created once and kept alive, so it opens instantly.
-  - Settings, Notes and the Focus windows are created when needed and destroyed when closed, to save memory.
-- **Data:** stored as JSON files in `%APPDATA%\<app identifier>`. Nothing is sent anywhere, except the translation and currency-rate requests those features need.
+- **Windows integration:** the keyboard hook, window styling and focus, the app and file indexes, the clipboard, audio (Core Audio), UI Automation (to read browser URLs for Focus), OCR, and simulated keystrokes all go through the Windows APIs directly.
+- **Built-in features:** each one implements the `Extension` trait in `app/src/extension.rs` and returns commands that run immediately, open a view (list, grid, form, page or detail), or add inline results to the root search.
+- **Windows:** the launcher window is created once and kept hidden, so it opens instantly. Settings, Notes, Focus and screenshot overlays are extra egui viewports created when needed.
+- **Data:** stored as JSON files in `%APPDATA%\dev.openray.app`. Nothing is sent anywhere, except the translation, dictionary and currency-rate requests those features need.
 
 The design decisions and module boundaries are explained in [`docs/architecture.md`](docs/architecture.md).
 
@@ -265,39 +260,38 @@ The design decisions and module boundaries are explained in [`docs/architecture.
 
 ## Extensions
 
-Built-in features use the internal API in [`src/extension-api.ts`](src/extension-api.ts). An extension declares commands that either run immediately, open a view (list, grid, form or detail), or add items and inline results to the root search:
+Built-in features implement the `Extension` trait in [`app/src/extension.rs`](app/src/extension.rs):
 
-```ts
-import { defineExtension } from "../extension-api";
+```rust
+pub struct Hello;
 
-export default defineExtension({
-  id: "hello",
-  title: "Hello",
-  commands: [
-    {
-      id: "say-hello",
-      title: "Say Hello",
-      kind: "Command",
-      primaryActionTitle: "Run Command",
-      run: () => console.log("Hello from Openray"),
-    },
-  ],
-});
+impl Extension for Hello {
+    fn id(&self) -> &'static str {
+        "hello"
+    }
+
+    fn commands(&self) -> Vec<Command> {
+        vec![command(self.id(), "say-hello", "Say Hello", Icon::Glyph("rocket"), "Command", "Run Command", |host| {
+            host.hud(Ok("Hello from Openray".into()));
+            Ok(())
+        })]
+    }
+}
 ```
 
-Openray can also install third-party **FlowKey** extensions, which are sandboxed in their own frame and talk to the host through a permission-checked bridge. The bundled [Spotify Player](extensions/spotify-player) is an example.
+Third-party **FlowKey** extensions are written in TypeScript with the FlowKey CLI. Openray runs each one in its own QuickJS engine with no file, network or OS access of its own; every native call goes through a permission gate based on the extension's manifest and the consent you gave. The bundled [Spotify Player](extensions/spotify-player) is an example.
 
 ---
 
-## Releases and auto-update
+## Releases
 
 Releases are built by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)):
 
-1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
+1. Bump the version in `app/Cargo.toml`.
 2. Push a tag named `vX.Y.Z`.
-3. The workflow builds the signed NSIS installer and publishes a GitHub release with `latest.json`.
+3. The workflow runs the tests, builds the release executable, and publishes `openray-windows-x64.zip` (the executable, bundled extensions and license) as a GitHub release.
 
-Installed copies check that file for updates. Building signed updates requires the repository secret `TAURI_SIGNING_PRIVATE_KEY`, and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key has a password.
+There is no auto-update yet; see [`docs/known-limitations.md`](docs/known-limitations.md).
 
 ---
 
@@ -306,7 +300,7 @@ Installed copies check that file for updates. Building signed updates requires t
 | Document | Contents |
 |---|---|
 | [`docs/feature-matrix.md`](docs/feature-matrix.md) | Every Raycast feature, its status in Openray, tests and remaining differences |
-| [`docs/architecture.md`](docs/architecture.md) | Stack decision, module boundaries, Tauri commands and events |
+| [`docs/architecture.md`](docs/architecture.md) | Stack decision and module boundaries |
 | [`docs/known-limitations.md`](docs/known-limitations.md) | What doesn't work yet or works differently |
 | [`docs/reverse-engineering-notes.md`](docs/reverse-engineering-notes.md) | How the reference behavior was observed, with evidence |
 | [`docs/design-system.md`](docs/design-system.md) | Measured design tokens |
@@ -318,9 +312,9 @@ Installed copies check that file for updates. Building signed updates requires t
 
 Issues and pull requests are welcome. Before opening a pull request:
 
-- Run `npm test` and `cargo test`, and add tests for new logic.
+- Run `cargo test` in `app/`, and add tests for new logic.
 - Follow the conventions in [`AGENTS.md`](AGENTS.md):
-  - Tailwind utilities with colors as CSS variables;
+  - colors from `app/src/theme.rs`;
   - no inline comments;
   - only real actions, with no placeholder data.
 - Update `docs/feature-matrix.md` and `docs/known-limitations.md` in the same change.

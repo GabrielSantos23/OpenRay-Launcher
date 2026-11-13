@@ -28,7 +28,7 @@ Recorded 2026-10-18 during the kickoff task.
 | Agent Skills validator (`skills-ref` / `agentskills`) | `PARTIALLY_CONFIGURED` | `uvx --from skills-ref agentskills --help` printed usage | Not installed; runs on demand from the uv cache. No project skills exist yet. |
 | Ponytail | `INSTALLED_AND_VERIFIED` | SessionStart hook printed "PONYTAIL MODE ACTIVE — level: full"; plugin present under `~/.claude/plugins` | |
 | Better Design (MCP) | `INSTALLED_AND_VERIFIED` | Tools listed in session; used for UI principles and review | |
-| Tauri CLI | `INSTALLED_AND_VERIFIED` | Installed per-project as `@tauri-apps/cli` devDependency; `npx tauri --version` | Not installed globally. |
+| Tauri CLI | `NOT_APPLICABLE` | Removed in Phase 5 with the Tauri app | — |
 
 Nothing was installed system-wide.
 
