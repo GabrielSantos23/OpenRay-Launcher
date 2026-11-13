@@ -1,6 +1,6 @@
 use super::history::{civil_from_days, days_from_civil};
 use super::math::unaccent;
-use crate::icu::{self, Style};
+use crate::icu;
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -54,23 +54,6 @@ pub fn lookup(name: &str, index: &HashMap<String, Place>) -> Option<Place> {
     index.get(&key).cloned()
 }
 
-static TIME_IN: LazyLock<[Regex; 3]> = LazyLock::new(|| {
-    [r"^(?:time|now|date)\s+in\s+(.+)$", r"^(.+?)\s+time$", r"^(?:hora|horas|agora|data|que\s+horas)\s+(?:em|no|na|de)\s+(.+)$"].map(|p| Regex::new(p).unwrap())
-});
-
-pub fn parse_time_query(query: &str, index: &HashMap<String, Place>) -> Option<Place> {
-    let text = query.trim().to_lowercase();
-    let caps = TIME_IN.iter().find_map(|r| r.captures(&text))?;
-    let place = caps[1].trim();
-    index.get(&unaccent(place)).or_else(|| index.get(place)).cloned()
-}
-
-pub fn format_time_in(ms: f64, zone: &str, locale: &str) -> (String, String) {
-    let style = if locale.to_lowercase().starts_with("pt") { Style::Medium } else { Style::Long };
-    let text = icu::format_date(ms, locale, style, Style::Short, Some(zone));
-    let offset = icu::format_pattern(ms, locale, "O", Some(zone));
-    (text, if offset.is_empty() { zone.to_owned() } else { offset })
-}
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Clock {
@@ -78,12 +61,15 @@ pub struct Clock {
     pub minute: i64,
 }
 
-static CLOCK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm|h)$").unwrap());
+static CLOCK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm|h)?$").unwrap());
 static CLOCK_SPLIT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\s+(?:in|em|para)\s+").unwrap());
 static CLOCK_LEFT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\S+)\s+(.+)$").unwrap());
 
 pub fn parse_clock(text: &str) -> Option<Clock> {
-    let caps = CLOCK.captures(&text.to_lowercase()).map(|c| (c[1].to_owned(), c.get(2).map(|m| m.as_str().to_owned()), c[3].to_owned()))?;
+    let caps = CLOCK.captures(&text.to_lowercase()).map(|c| (c[1].to_owned(), c.get(2).map(|m| m.as_str().to_owned()), c.get(3).map_or(String::new(), |m| m.as_str().to_owned())))?;
+    if caps.1.is_none() && caps.2.is_empty() {
+        return None;
+    }
     let mut hour: i64 = caps.0.parse().ok()?;
     let minute: i64 = caps.1.map_or(Some(0), |m| m.parse().ok())?;
     if caps.2 == "pm" && hour < 12 {
@@ -193,18 +179,13 @@ mod tests {
     #[test]
     fn finds_countries_and_cities() {
         let index = build_places(&["en".into(), "pt".into()]);
-        assert_eq!(parse_time_query("time in china", &index).map(|p| p.zone).as_deref(), Some("Asia/Shanghai"));
-        assert_eq!(parse_time_query("Tokyo time", &index).map(|p| p.zone).as_deref(), Some("Asia/Tokyo"));
-        assert_eq!(parse_time_query("time in nowhere", &index), None);
-        assert_eq!(parse_time_query("hora em brasil", &index).map(|p| p.name).as_deref(), Some("Brasil"));
-        assert_eq!(parse_time_query("que horas em china", &index).map(|p| p.zone).as_deref(), Some("Asia/Shanghai"));
-        assert_eq!(parse_time_query("hora em lugar nenhum", &index), None);
+        assert_eq!(lookup("china", &index).map(|p| p.zone).as_deref(), Some("Asia/Shanghai"));
+        assert_eq!(lookup("Tokyo", &index).map(|p| p.zone).as_deref(), Some("Asia/Tokyo"));
+        assert_eq!(lookup("brasil", &index).map(|p| p.name).as_deref(), Some("Brasil"));
+        assert_eq!(lookup("nowhere", &index), None);
         assert_eq!(lookup("nyc", &index).map(|p| p.zone).as_deref(), Some("America/New_York"));
-    }
-
-    #[test]
-    fn formats_the_date_like_the_reference() {
-        assert_eq!(format_time_in(1_792_362_720_000.0, "Asia/Shanghai", "en-US"), ("October 19, 2026 at 6:32 AM".into(), "GMT+8".into()));
+        assert_eq!(parse_clock_query("4:00 PT in UTC"), Some((Clock { hour: 4, minute: 0 }, "PT".into(), "UTC".into())));
+        assert_eq!(parse_clock("4"), None);
     }
 
     #[test]

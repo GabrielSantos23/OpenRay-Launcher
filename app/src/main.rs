@@ -33,6 +33,7 @@ mod emoji_render;
 #[allow(dead_code, unused_imports)]
 mod flowkey_core;
 mod flowkey_js;
+mod updater;
 mod flowkey_gate;
 mod flowkey_host;
 #[allow(dead_code, unused_imports)]
@@ -166,7 +167,19 @@ fn main() -> eframe::Result {
         hotkey::run_helper();
         return Ok(());
     }
-    let _instance = unsafe { CreateMutexW(None, true, w!("Local\\dev.openray.app.instance")) };
+    let updated = std::env::args().any(|a| a == "--updated");
+    let mut _instance = unsafe { CreateMutexW(None, true, w!("Local\\dev.openray.app.instance")) };
+    // After an update the previous process is still exiting, so wait for it to release the instance.
+    for _ in 0..50 {
+        if !updated || unsafe { GetLastError() } != ERROR_ALREADY_EXISTS {
+            break;
+        }
+        if let Ok(handle) = _instance {
+            let _ = unsafe { windows::Win32::Foundation::CloseHandle(handle) };
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        _instance = unsafe { CreateMutexW(None, true, w!("Local\\dev.openray.app.instance")) };
+    }
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         if let Ok(event) = unsafe { CreateEventW(None, false, false, w!("Local\\dev.openray.app.show")) } {
             let _ = unsafe { SetEvent(event) };
@@ -206,6 +219,7 @@ fn main() -> eframe::Result {
             if std::env::args().any(|a| a == "--show") {
                 let _ = signals.send(Signal::Show);
             }
+            updater::start(&cc.egui_ctx);
             let launcher = Launcher::new(&cc.egui_ctx, data_dir(), receiver, hotkey_error);
             Ok(Box::new(App { launcher, _tray: tray, tray_visible: true }))
         }),

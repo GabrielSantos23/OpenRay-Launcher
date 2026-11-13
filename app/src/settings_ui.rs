@@ -315,7 +315,9 @@ impl Launcher {
                     "openray-core" => "Openray".to_owned(),
                     _ => commands.iter().find_map(|c| c.subtitle.clone()).unwrap_or_else(|| id.replace('-', " ")),
                 };
-                let icon = if id == "applications" { Icon::Tile("layout-grid", Tone::Blue) } else { commands.first().map(|c| c.icon.clone()).unwrap_or(Icon::Tile("puzzle", Tone::Slate)) };
+                let icon = if let Some(icon) = extension.icon() {
+                    icon
+                } else if id == "applications" { Icon::Tile("layout-grid", Tone::Blue) } else { commands.first().map(|c| c.icon.clone()).unwrap_or(Icon::Tile("puzzle", Tone::Slate)) };
                 ExtensionInfo { id, title, icon, commands: commands.into_iter().map(|c| (c.key, c.title, c.icon)).collect() }
             })
             .collect()
@@ -518,6 +520,22 @@ impl Launcher {
                 keycap_row(ui, reset.left() - 8.0 - 40.0, row.center().y, &["Win".to_owned()]);
             }
         });
+        let update_state = crate::updater::state();
+        let mut update_row = Rect::NOTHING;
+        card(ui, y, left, width, |ui, c| update_row = c.row(ui, "Updates", Some(&crate::updater::describe(&update_state)), 180.0));
+        let ready = matches!(update_state, crate::updater::State::Ready(_));
+        let busy = matches!(update_state, crate::updater::State::Checking | crate::updater::State::Downloading(_));
+        let label = if ready { "Restart to Update" } else { "Check for Updates" };
+        if text_button(ui, update_row.right() - 12.0, update_row.center().y, label, "check-updates", !busy).1 {
+            if ready {
+                match crate::updater::apply() {
+                    Ok(()) => ui.ctx().send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close),
+                    Err(e) => w.error = Some(e),
+                }
+            } else {
+                crate::updater::check_now(ui.ctx());
+            }
+        }
         if let Some(enabled) = toggled_login {
             match crate::registry::set_login_item(enabled) {
                 Ok(()) => w.login = Some(enabled),

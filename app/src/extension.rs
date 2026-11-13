@@ -229,6 +229,43 @@ pub struct Side {
     pub text: String,
     pub label: String,
     pub swatch: Option<Color32>,
+    pub dim: Option<Vec<(usize, usize)>>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Forecast {
+    pub label: String,
+    pub icon: String,
+    pub high: String,
+    pub low: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct WeatherCard {
+    pub temperature: String,
+    pub icon: String,
+    pub place: String,
+    pub condition: String,
+    pub range: String,
+    pub today: Vec<Forecast>,
+    pub week: Vec<Forecast>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct FlightCard {
+    pub from: (String, String, String),
+    pub to: (String, String, String),
+    pub status: String,
+    pub live: bool,
+    pub note: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum CardKind {
+    Pair,
+    Weather(WeatherCard),
+    Flight(FlightCard),
+    Loading,
 }
 
 #[derive(Clone)]
@@ -238,6 +275,7 @@ pub struct Inline {
     pub output: Side,
     pub note: Option<String>,
     pub actions: Vec<Vec<Action>>,
+    pub kind: CardKind,
 }
 
 #[derive(Clone)]
@@ -479,6 +517,9 @@ impl Host {
 pub trait Extension {
     fn id(&self) -> &'static str;
     fn commands(&self) -> Vec<Command>;
+    fn icon(&self) -> Option<Icon> {
+        None
+    }
     fn inline(&self, _ctx: &egui::Context, _query: &str) -> Option<Inline> {
         None
     }

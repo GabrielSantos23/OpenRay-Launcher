@@ -34,14 +34,13 @@ var manifest_default = {
   name: "Spotify Player",
   version: "1.0.0",
   description: "Search Spotify, browse your library and control playback, with the commands of Raycast's Spotify Player.",
-  icon: "\u{1F3A7}",
+  icon: "icon.png",
   commands: [
     {
       id: "search",
       title: "Search",
       subtitle: "Spotify",
       mode: "view",
-      icon: "search",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -58,7 +57,6 @@ var manifest_default = {
       title: "Your Library",
       subtitle: "Spotify",
       mode: "view",
-      icon: "library",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -71,7 +69,6 @@ var manifest_default = {
       title: "Now Playing",
       subtitle: "Spotify",
       mode: "view",
-      icon: "disc-3",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -84,7 +81,6 @@ var manifest_default = {
       title: "Toggle Play/Pause",
       subtitle: "Spotify",
       mode: "background",
-      icon: "play",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -97,7 +93,6 @@ var manifest_default = {
       title: "Add Playing Song to Playlist",
       subtitle: "Spotify",
       mode: "view",
-      icon: "list-plus",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -108,7 +103,6 @@ var manifest_default = {
       title: "Remove Playing Song from Playlist",
       subtitle: "Spotify",
       mode: "background",
-      icon: "list-minus",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -119,7 +113,6 @@ var manifest_default = {
       title: "Next",
       subtitle: "Spotify",
       mode: "background",
-      icon: "skip-forward",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -131,7 +124,6 @@ var manifest_default = {
       title: "Previous",
       subtitle: "Spotify",
       mode: "background",
-      icon: "skip-back",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -143,7 +135,6 @@ var manifest_default = {
       title: "Like",
       subtitle: "Spotify",
       mode: "background",
-      icon: "heart",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -155,7 +146,6 @@ var manifest_default = {
       title: "Dislike",
       subtitle: "Spotify",
       mode: "background",
-      icon: "heart-off",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -167,7 +157,6 @@ var manifest_default = {
       title: "Select Device",
       subtitle: "Spotify",
       mode: "view",
-      icon: "speaker",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -180,7 +169,6 @@ var manifest_default = {
       title: "Set Volume",
       subtitle: "Spotify",
       mode: "background",
-      icon: "volume-2",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -199,7 +187,6 @@ var manifest_default = {
       title: "Set Volume to 0%",
       subtitle: "Spotify",
       mode: "background",
-      icon: "volume-x",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -211,7 +198,6 @@ var manifest_default = {
       title: "Set Volume to 25%",
       subtitle: "Spotify",
       mode: "background",
-      icon: "volume-1",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -222,7 +208,6 @@ var manifest_default = {
       title: "Set Volume to 50%",
       subtitle: "Spotify",
       mode: "background",
-      icon: "volume-1",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -233,7 +218,6 @@ var manifest_default = {
       title: "Set Volume to 75%",
       subtitle: "Spotify",
       mode: "background",
-      icon: "volume-2",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -244,7 +228,6 @@ var manifest_default = {
       title: "Set Volume to 100%",
       subtitle: "Spotify",
       mode: "background",
-      icon: "volume-2",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -255,7 +238,6 @@ var manifest_default = {
       title: "Turn Volume Down",
       subtitle: "Spotify",
       mode: "background",
-      icon: "volume-1",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -266,7 +248,6 @@ var manifest_default = {
       title: "Turn Volume up",
       subtitle: "Spotify",
       mode: "background",
-      icon: "volume-2",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -277,7 +258,6 @@ var manifest_default = {
       title: "Toggle Shuffle",
       subtitle: "Spotify",
       mode: "background",
-      icon: "shuffle",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -288,7 +268,6 @@ var manifest_default = {
       title: "Cycle Repeat",
       subtitle: "Spotify",
       mode: "background",
-      icon: "repeat",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -299,7 +278,6 @@ var manifest_default = {
       title: "Replay",
       subtitle: "Spotify",
       mode: "background",
-      icon: "rotate-ccw",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -310,7 +288,6 @@ var manifest_default = {
       id: "current-track",
       title: "Current Track",
       mode: "background",
-      icon: "music",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -322,7 +299,6 @@ var manifest_default = {
       title: "Start Radio",
       subtitle: "Spotify",
       mode: "background",
-      icon: "radio",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -333,7 +309,6 @@ var manifest_default = {
       title: "Copy URL",
       subtitle: "Spotify",
       mode: "background",
-      icon: "link",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -345,7 +320,6 @@ var manifest_default = {
       title: "Copy Artist and Title",
       subtitle: "Spotify",
       mode: "background",
-      icon: "clipboard-copy",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -356,7 +330,6 @@ var manifest_default = {
       title: "Just Play",
       subtitle: "Spotify",
       mode: "background",
-      icon: "circle-play",
       iconColor: "#1DB954",
       keywords: [
         "spotify"
@@ -375,7 +348,6 @@ var manifest_default = {
       title: "Queue",
       subtitle: "Spotify",
       mode: "view",
-      icon: "list-music",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -387,7 +359,6 @@ var manifest_default = {
       title: "Copy Embed Code",
       subtitle: "Spotify",
       mode: "background",
-      icon: "code",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -399,7 +370,6 @@ var manifest_default = {
       title: "Skip 15 Seconds",
       subtitle: "Spotify",
       mode: "background",
-      icon: "fast-forward",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -411,7 +381,6 @@ var manifest_default = {
       title: "Back 15 Seconds",
       subtitle: "Spotify",
       mode: "background",
-      icon: "rewind",
       iconColor: "#1DB954",
       keywords: [
         "spotify",
@@ -423,7 +392,6 @@ var manifest_default = {
       title: "Find Lyrics",
       subtitle: "Spotify",
       mode: "view",
-      icon: "mic-vocal",
       iconColor: "#1DB954",
       keywords: [
         "spotify",

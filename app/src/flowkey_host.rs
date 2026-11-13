@@ -66,14 +66,20 @@ impl Installed {
         path.to_string_lossy().trim_start_matches(r"\\?\").replace('\\', "/")
     }
 
+    pub fn file(&self, src: &str) -> Option<PathBuf> {
+        (!src.is_empty() && !src.contains(':') && !src.contains("..") && !src.starts_with(['/', '\\'])).then(|| self.dir.join(src))
+    }
+
     pub fn image(&self, src: &str) -> Option<String> {
         let lower = src.to_ascii_lowercase();
         if src.starts_with(IMAGE_ORIGIN) || src.starts_with("appicon://") {
             return Some(src.to_owned());
         }
         let image_file = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".bmp"].iter().any(|e| lower.ends_with(e));
-        if image_file && !src.contains(':') && !src.contains("..") && !src.starts_with(['/', '\\']) {
-            return Some(format!("{FILE_ORIGIN}{}", self.dir.join(src).to_string_lossy()));
+        if image_file {
+            if let Some(path) = self.file(src) {
+                return Some(format!("{FILE_ORIGIN}{}", path.to_string_lossy()));
+            }
         }
         let url = url::Url::parse(src).ok()?;
         let hosts: Vec<String> = self.manifest["httpHosts"].as_array().map(|a| a.iter().filter_map(|h| h.as_str().map(String::from)).collect()).unwrap_or_default();

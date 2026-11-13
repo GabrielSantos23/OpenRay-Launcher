@@ -60,7 +60,7 @@ The owner asked for a WebView-free app. Measured on the dev machine with the lau
 - Notes uses an egui block editor (`app/src/notes`) instead of Tiptap and keeps `notes.json` in the same markdown format.
 - Built-ins implement the Rust `Extension` trait (`app/src/extension.rs`).
 - npm remains only to rebuild FlowKey extension bundles (`npm run build:extensions`) and the QuickJS host (`npm run build:host`); both outputs are committed, so `cargo build` alone produces a complete app.
-- Gaps left by removing the Tauri app (Portuguese UI, auto-update, light theme, FlowKey web commands, installer) are tracked in `known-limitations.md`.
+- Gaps left by removing the Tauri app (Portuguese UI, light theme, FlowKey web commands, installer) are tracked in `known-limitations.md`.
 
 ## Module boundaries
 
@@ -76,6 +76,7 @@ All code is in `app/src` (crate `openray-native`, binary `openray.exe`).
 | Global hotkey | `hotkey.rs` | Hotkey parsing, helper process with the swallowing WH_KEYBOARD_LL hook, in-process snippet hook, suspend while recording |
 | Persistence | `store.rs`, `registry.rs` | `settings.json`, `frecency.json`, `favorites.json` and extension data files in `%APPDATA%\dev.openray.app`; HKCU Run value for Open at Login |
 | Windows backends | `apps.rs`, `clipboard.rs`, `file_search.rs`, `explorer.rs`, `window_layout.rs`, `window_switcher.rs`, `menu_items.rs`, `system_actions.rs`, `toggles.rs`, `app_volume.rs`, `sound_devices.rs`, `settings_pages.rs`, `games.rs`, `capture.rs`, `focus.rs`, `run.rs`, `scripts.rs`, `snippets.rs`, `contacts.rs`, `calendar.rs`, `uninstall.rs` | App index and icons, clipboard listener and history, file index, window placement and switching, menu items, power/audio/media/toggles, Settings pages, Steam games, capture and OCR, Focus engine, Run, Script Commands, snippet expansion, Contacts and Calendar (WinRT), uninstallers |
+| Updater | `updater.rs` | GitHub `latest.json` check, minisign-verified download, staging in `.update`, exe swap and restart with `--updated` |
 | Rendering helpers | `theme.rs`, `icons.rs`, `emoji_render.rs`, `http.rs`, `icu.rs` | Colors and fonts, Lucide glyphs, image loaders (`appicon://`, `clipimg://`, `emoji://`, extension images), WIC decoding, HTTPS through `ureq` |
 | FlowKey host | `flowkey_js.rs`, `flowkey_host.rs`, `flowkey_gate.rs`, `flowkey_core.rs`, `extensions/flowkey.rs`, `app/js/*`, `app/assets/flowkey-host.js` | See below |
 

@@ -1,7 +1,7 @@
 #[path = "settings_ui.rs"]
 mod settings_ui;
 
-use crate::extension::{Accessory, Action, Async, Command, Confirmation, Extension, Host, Icon, Inline, Page, Request, Shortcut, Side, Toast, View, ViewFactory};
+use crate::extension::{Accessory, Action, Async, CardKind, Command, Confirmation, Extension, Host, Icon, Inline, Page, Request, Shortcut, Side, Toast, View, ViewFactory};
 use crate::search::{match_score, search, Frecency};
 use crate::store::{EscapeKeyBehavior, Settings, Store};
 use crate::{icons, launcher, theme};
@@ -136,6 +136,7 @@ pub struct Launcher {
     cursor_to_end: bool,
     dropdown: Option<Open>,
     argument_for: String,
+    weather_week: bool,
 }
 
 fn text_galley(ui: &Ui, text: &str, font: FontId, color: Color32, max_width: f32) -> std::sync::Arc<egui::Galley> {
@@ -247,10 +248,17 @@ fn card_side(ui: &Ui, rect: Rect, side: &Side, input: bool) {
     let mut job = LayoutJob::default();
     let mut last = 0;
     if input {
-        for m in CONNECTOR.find_iter(&side.text) {
-            job.append(&side.text[last..m.start()], 0.0, format(theme::FG));
-            job.append(m.as_str(), 0.0, format(theme::FG_40));
-            last = m.end();
+        let ranges: Vec<(usize, usize)> = match &side.dim {
+            Some(ranges) => ranges.iter().copied().filter(|(a, b)| a < b && *b <= side.text.len() && side.text.is_char_boundary(*a) && side.text.is_char_boundary(*b)).collect(),
+            None => CONNECTOR.find_iter(&side.text).map(|m| (m.start(), m.end())).collect(),
+        };
+        for (start, end) in ranges {
+            if start < last {
+                continue;
+            }
+            job.append(&side.text[last..start], 0.0, format(theme::FG));
+            job.append(&side.text[start..end], 0.0, format(theme::FG_40));
+            last = end;
         }
     }
     job.append(&side.text[last..], 0.0, format(theme::FG));
@@ -259,8 +267,104 @@ fn card_side(ui: &Ui, rect: Rect, side: &Side, input: bool) {
     ui.painter().galley(area.center() - galley.size() / 2.0, galley, theme::FG);
 }
 
-fn paint_card(ui: &Ui, rect: Rect, card: &Inline, selected: bool) {
+fn emoji(ui: &Ui, text: &str, center: Pos2, size: f32) {
+    let px = (size * ui.ctx().pixels_per_point()).round() as u32;
+    egui::Image::new(format!("emoji://{px}/{text}")).paint_at(ui, Rect::from_center_size(center, vec2(size, size)));
+}
+
+fn paint_weather(ui: &Ui, rect: Rect, card: &crate::extension::WeatherCard, week: bool) {
+    let left = Rect::from_min_size(rect.min, vec2(rect.width() * 0.255, rect.height()));
+    let x = left.left() + 24.0;
+    let temperature = paint_text(ui, pos2(x, left.top() + 22.0), Align2::LEFT_TOP, &card.temperature, theme::weighted(24.0, theme::SEMIBOLD), theme::FG, 90.0);
+    emoji(ui, &card.icon, pos2(temperature.right() + 13.0, temperature.center().y + 1.0), 20.0);
+    let width = left.right() - x - 4.0;
+    let place = paint_text(ui, pos2(x, temperature.bottom() + 6.0), Align2::LEFT_TOP, &card.place, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, width);
+    let condition = paint_text(ui, pos2(x, place.bottom() + 3.0), Align2::LEFT_TOP, &card.condition, theme::font(11.0), theme::FG_60, width);
+    paint_text(ui, pos2(x, condition.bottom() + 3.0), Align2::LEFT_TOP, &card.range, theme::font(11.0), theme::FG_40, width);
+    let list = if week { &card.week } else { &card.today };
+    let columns = Rect::from_min_max(pos2(left.right() + 8.0, rect.top()), pos2(rect.right() - 8.0, rect.bottom()));
+    let step = columns.width() / list.len().max(1) as f32;
+    for (i, forecast) in list.iter().enumerate() {
+        let cx = columns.left() + step * (i as f32 + 0.5);
+        paint_text(ui, pos2(cx, rect.top() + 34.0), Align2::CENTER_CENTER, &forecast.label, theme::weighted(13.0, if i == 0 { theme::SEMIBOLD } else { theme::MEDIUM }), if i == 0 { theme::FG } else { theme::FG_60 }, step - 4.0);
+        emoji(ui, &forecast.icon, pos2(cx, rect.top() + 61.0), 20.0);
+        match &forecast.low {
+            Some(low) => {
+                let high = text_galley(ui, &forecast.high, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, step);
+                let low = text_galley(ui, low, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, step);
+                let total = high.size().x + 4.0 + low.size().x;
+                let y = rect.top() + 89.0 - high.size().y / 2.0;
+                ui.painter().galley(pos2(cx - total / 2.0, y), high.clone(), theme::FG);
+                ui.painter().galley(pos2(cx - total / 2.0 + high.size().x + 4.0, y), low, theme::FG);
+            }
+            None => {
+                paint_text(ui, pos2(cx, rect.top() + 89.0), Align2::CENTER_CENTER, &forecast.high, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, step);
+            }
+        }
+    }
+}
+
+fn chip(ui: &Ui, center: Pos2, text: &str, color: Color32, background: Color32) -> Rect {
+    let galley = text_galley(ui, text, theme::weighted(12.0, theme::MEDIUM), color, 200.0);
+    let rect = Rect::from_center_size(center, galley.size() + vec2(12.0, 4.0));
+    ui.painter().rect_filled(rect, 4.0, background);
+    ui.painter().galley(rect.center() - galley.size() / 2.0, galley, color);
+    rect
+}
+
+fn paint_flight(ui: &Ui, rect: Rect, card: &crate::extension::FlightCard) {
+    let half = rect.width() / 2.0;
+    for (i, (name, detail, code)) in [&card.from, &card.to].into_iter().enumerate() {
+        let side = Rect::from_min_size(pos2(rect.left() + half * i as f32, rect.top()), vec2(half, rect.height()));
+        let width = side.width() - 48.0;
+        paint_text(ui, pos2(side.center().x, side.top() + 41.0), Align2::CENTER_CENTER, name, theme::weighted(24.0, theme::SEMIBOLD), theme::FG, width);
+        paint_text(ui, pos2(side.center().x, side.top() + 66.0), Align2::CENTER_CENTER, detail, theme::font(11.0), theme::FG_60, width);
+        chip(ui, pos2(side.center().x, side.bottom() - 21.0), code, theme::FG, theme::CONTROL);
+    }
+    let x = rect.center().x;
+    for range in [rect.top()..=rect.center().y - 30.0, rect.center().y + 34.0..=rect.bottom()] {
+        ui.painter().vline(x, range, Stroke::new(1.0, theme::SEPARATOR));
+    }
+    let plane = Rect::from_center_size(pos2(x, rect.center().y - 15.0), vec2(22.0, 22.0));
+    egui::Image::from_bytes("bytes://flight-plane.svg", PLANE_SVG.as_bytes()).tint(theme::FG).paint_at(ui, plane);
+    let (color, background) = if card.live { (theme::GREEN, Color32::TRANSPARENT) } else { (theme::FG_60, Color32::TRANSPARENT) };
+    let status = chip(ui, pos2(x, rect.center().y + 14.0), &card.status, color, background);
+    if let Some(note) = &card.note {
+        chip(ui, pos2(status.right() + 8.0 + 30.0, status.center().y), note, Color32::from_rgb(0xFF, 0x9E, 0x4F), Color32::from_rgba_unmultiplied(0xFF, 0x9E, 0x4F, 38));
+    }
+}
+
+const PLANE_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" transform="rotate(90 12 12)"/></svg>"#;
+
+fn paint_skeleton(ui: &Ui, rect: Rect) {
+    let t = ui.input(|i| i.time) as f32;
+    let alpha = 10.0 + 8.0 * (0.5 + 0.5 * (t * std::f32::consts::TAU / 1.4).sin());
+    let fill = theme::fg(alpha.round() as u8);
+    let bar = |x: f32, y: f32, w: f32, h: f32| ui.painter().rect_filled(Rect::from_min_size(pos2(x, y), vec2(w, h)), 2.0, fill);
+    let x = rect.left() + 24.0;
+    bar(x, rect.top() + 26.0, 64.0, 16.0);
+    bar(x, rect.top() + 56.0, 120.0, 8.0);
+    bar(x, rect.top() + 75.0, 84.0, 8.0);
+    bar(x, rect.top() + 92.0, 68.0, 8.0);
+    let columns = Rect::from_min_max(pos2(rect.left() + rect.width() * 0.255 + 8.0, rect.top()), pos2(rect.right() - 8.0, rect.bottom()));
+    let step = columns.width() / 8.0;
+    for i in 0..8 {
+        let cx = columns.left() + step * (i as f32 + 0.5);
+        bar(cx - 14.0, rect.top() + 29.0, 28.0, 10.0);
+        bar(cx - 8.0, rect.top() + 53.0, 16.0, 16.0);
+        bar(cx - 12.0, rect.top() + 85.0, 24.0, 8.0);
+    }
+    ui.ctx().request_repaint();
+}
+
+fn paint_card(ui: &Ui, rect: Rect, card: &Inline, selected: bool, week: bool) {
     ui.painter().rect_filled(rect, 8.0, if selected { theme::SELECTION } else { theme::fg(5) });
+    match &card.kind {
+        CardKind::Weather(weather) => return paint_weather(ui, rect, weather, week),
+        CardKind::Flight(flight) => return paint_flight(ui, rect, flight),
+        CardKind::Loading => return paint_skeleton(ui, rect),
+        CardKind::Pair => {}
+    }
     let half = rect.width() / 2.0;
     card_side(ui, Rect::from_min_size(rect.min, vec2(half, rect.height())), &card.input, true);
     card_side(ui, Rect::from_min_size(pos2(rect.left() + half, rect.top()), vec2(half, rect.height())), &card.output, false);
@@ -536,6 +640,7 @@ impl Launcher {
             signals,
             hotkey_error,
             inline: None,
+            weather_week: false,
             cursor_to_end: false,
             dropdown: None,
             argument_for: String::new(),
@@ -1176,6 +1281,8 @@ impl Launcher {
                 let next = self.selection().saturating_sub(1);
                 *self.selection() = next;
                 self.scroll_to_selected = true;
+            } else if key == Key::Tab && !in_view && current.is_some_and(|r| r.card.as_ref().is_some_and(|c| matches!(c.kind, CardKind::Weather(_)))) {
+                self.weather_week = !self.weather_week;
             } else if key == Key::Tab && in_view && self.views.last().is_some_and(|v| v.view.tab_cycles()) && count > 0 {
                 let step = if modifiers.shift { count - 1 } else { 1 };
                 let next = (*self.selection() + step) % count;
@@ -1743,7 +1850,22 @@ impl Launcher {
                             ui.add_space(8.0);
                         } else {
                             let (head, _) = ui.allocate_exact_size(vec2(ui.available_width(), SECTION), Sense::hover());
-                            paint_text(ui, pos2(head.left() + 8.0, head.bottom() - 5.0), Align2::LEFT_BOTTOM, &row.section, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60, head.width());
+                            let title = paint_text(ui, pos2(head.left() + 8.0, head.bottom() - 5.0), Align2::LEFT_BOTTOM, &row.section, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60, head.width());
+                            if row.card.as_ref().is_some_and(|c| matches!(c.kind, CardKind::Weather(_))) {
+                                let mut x = title.right() + 16.0;
+                                for (week, label) in [(false, "Today"), (true, "This Week")] {
+                                    let color = if self.weather_week == week { theme::FG } else { theme::FG_40 };
+                                    let tab = paint_text(ui, pos2(x, title.bottom()), Align2::LEFT_BOTTOM, label, theme::weighted(11.0, theme::SEMIBOLD), color, 120.0);
+                                    let response = ui.interact(tab.expand(4.0), egui::Id::unique(("weather-tab", week)), Sense::click());
+                                    response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, self.weather_week == week, label));
+                                    if response.clicked() {
+                                        self.weather_week = week;
+                                    }
+                                    x = tab.right() + 10.0;
+                                }
+                            } else if row.section.starts_with("Use “") {
+                                icons::paint_glyph(ui, "settings", Rect::from_min_size(pos2(title.right() + 6.0, title.center().y - 6.0), vec2(12.0, 12.0)), theme::FG_40);
+                            }
                         }
                     }
                     let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), if row.card.is_some() { CARD } else { ROW }), Sense::click());
@@ -1767,7 +1889,7 @@ impl Launcher {
                         clicked = Some(index);
                     }
                     if let Some(card) = &row.card {
-                        paint_card(ui, rect, card, selected);
+                        paint_card(ui, rect, card, selected, self.weather_week);
                         continue;
                     }
                     let icon_width = if matches!(row.icon, Icon::Time(..)) { icons::TIME_WIDTH } else { 22.0 };

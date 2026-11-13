@@ -91,10 +91,37 @@ fn is_image(name: &str) -> bool {
     [".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".bmp", ".svg"].iter().any(|e| lower.ends_with(e))
 }
 
+pub fn svg_markup(svg: &str, color: Option<&str>) -> Option<String> {
+    let safe = |c: &&str| c.strip_prefix('#').map_or(c.chars().all(|ch| ch.is_ascii_alphabetic()), |hex| (3..=8).contains(&hex.len()) && hex.chars().all(|ch| ch.is_ascii_hexdigit()));
+    let tint = color.map(str::trim).filter(|c| !c.is_empty() && safe(c)).unwrap_or("#ffffff");
+    (svg.len() <= 64 * 1024 && svg.contains("<svg")).then(|| svg.replace("currentColor", tint))
+}
+
+fn svg_icon(svg: &str, color: Option<&str>) -> Option<Icon> {
+    use std::hash::{Hash, Hasher};
+    static INCLUDED: Mutex<Option<HashSet<String>>> = Mutex::new(None);
+    let markup = svg_markup(svg, color)?;
+    let ctx = host::context()?;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    markup.hash(&mut hasher);
+    let uri = format!("bytes://flowkey-{:016x}.svg", hasher.finish());
+    if INCLUDED.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashSet::new).insert(uri.clone()) {
+        ctx.include_bytes(uri.clone(), markup.into_bytes());
+    }
+    Some(Icon::Url(uri))
+}
+
 fn icon_for(ext: &Installed, fields: &Value, title: &str) -> Icon {
     let file = fields["iconUri"].as_str().or(fields["icon"].as_str().filter(|i| is_image(i)));
+    let color = fields["iconColor"].as_str();
+    if let Some(svg) = file.filter(|f| f.to_ascii_lowercase().ends_with(".svg")).and_then(|f| ext.file(f)).and_then(|path| std::fs::read_to_string(path).ok()).and_then(|svg| svg_icon(&svg, color)) {
+        return svg;
+    }
     if let Some(uri) = file.and_then(|f| ext.image(f)) {
         return Icon::Url(uri);
+    }
+    if let Some(svg) = fields["iconSvg"].as_str().and_then(|svg| svg_icon(svg, color)) {
+        return svg;
     }
     let name = fields["iconName"].as_str().or(fields["icon"].as_str());
     if let Some(glyph) = name.and_then(glyph) {
@@ -753,6 +780,10 @@ impl Extension for FlowKey {
         self.id
     }
 
+    fn icon(&self) -> Option<Icon> {
+        Some(icon_for(&self.ext, &json!({ "icon": self.ext.manifest["icon"] }), self.ext.name()))
+    }
+
     fn commands(&self) -> Vec<Command> {
         self.ext
             .commands()
@@ -829,6 +860,16 @@ mod tests {
         assert_eq!(shortcut_of(&json!({ "key": "return" })).unwrap().key, Some(Key::Enter));
         let actions = ordered(&json!([{ "id": "a" }, { "id": "b", "primary": true }, { "id": "c" }]));
         assert_eq!(actions.iter().map(|a| a["id"].as_str().unwrap()).collect::<Vec<_>>(), ["b", "a", "c"]);
+    }
+
+    #[test]
+    fn tints_svg_icons_with_safe_colors_only() {
+        let svg = r#"<svg viewBox="0 0 24 24"><path stroke="currentColor"/></svg>"#;
+        assert!(svg_markup(svg, Some("#1DB954")).unwrap().contains("#1DB954"));
+        assert!(svg_markup(svg, Some("red")).unwrap().contains("\"red\""));
+        assert!(svg_markup(svg, Some("\"/><script>")).unwrap().contains("#ffffff"));
+        assert!(svg_markup(svg, None).unwrap().contains("#ffffff"));
+        assert_eq!(svg_markup("not svg", None), None);
     }
 
     #[test]

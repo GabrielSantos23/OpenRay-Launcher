@@ -26,7 +26,9 @@ rqrr = { version = "0.11", default-features = false }
 windows = { version = "0.61", features = [
   "ApplicationModel_Appointments",
   "ApplicationModel_Contacts",
+  "Devices_Geolocation",
   "Foundation",
+  "Globalization",
   "Graphics_Imaging",
   "Media_Ocr",
   "Security_Cryptography",
@@ -77,6 +79,8 @@ url = "2"
 sha2 = "0.10"
 base64 = "0.22"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+minisign-verify = "0.2"
 
 [dev-dependencies]
+minisign = "0.7"
 tempfile = "3"

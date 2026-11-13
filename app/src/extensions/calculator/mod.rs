@@ -1,11 +1,13 @@
 pub mod color;
+pub mod extra;
+pub mod places;
 pub mod history;
 pub mod math;
 pub mod time;
 pub mod units;
 
 use super::command;
-use crate::extension::{frontmost_app, paste_title, Accessory, Action, Command, Empty, Extension, Host, Icon, Inline, Item, Request, Section, Shortcut, Side, Tone, View};
+use crate::extension::{frontmost_app, paste_title, Accessory, Action, CardKind, Command, Empty, Extension, FlightCard, Forecast, Host, Icon, Inline, Item, Request, Section, Shortcut, Side, Tone, View, WeatherCard};
 use crate::icu::{self, Style};
 use egui::Key;
 use history::{Calculation, Kind};
@@ -124,14 +126,32 @@ pub struct Answer {
     pub plain: String,
     pub label: String,
     pub note: Option<String>,
+    pub dim: Option<Vec<(usize, usize)>>,
 }
 
 enum Computed {
     Color(color::ParsedColor),
     Answer(Answer),
+    Weather { card: WeatherCard, open: String, copy: String },
+    Flight { card: FlightCard, open: String, copy: String },
+    Loading { section: &'static str, open_title: &'static str, open: String, fallback: Option<String> },
 }
 
 static CURRENCY_HINT: LazyLock<[Regex; 3]> = LazyLock::new(|| [r"(?i)[a-z$€£¥₹₩₽₺₿]", r"\d", r"(?i)\s(?:in|to|as|para|em|como|pra|pro|=)\s"].map(|p| Regex::new(p).unwrap()));
+static TIME_AT: LazyLock<[Regex; 2]> = LazyLock::new(|| {
+    [r"^(?:time|now|date|hora|horas|agora|data|que\s+horas)\s+(?:in|at|em|no|na|de)\s+(.+?)(?:\s*([+-])\s*(\d+(?:\.\d+)?)\s*(?:h|hrs?|hours?|horas?)?)?$", r"^(.+?)\s+time(?:\s*([+-])\s*(\d+(?:\.\d+)?)\s*(?:h|hrs?|hours?)?)?$"].map(|p| Regex::new(p).unwrap())
+});
+static DISTANCE: LazyLock<[Regex; 2]> = LazyLock::new(|| {
+    [r"^(?:distance|distancia)\s+(?:from|between|de|entre)\s+(.+?)\s+(?:to|and|ate|e|a|para)\s+(.+?)(?:\s+in\s+(km|kilometers|kilometres|miles|mi|nautical miles|nmi))?$", r"^(?:distance|distancia)\s+(?:to|ate|para)\s+(.+?)(?:\s+in\s+(km|kilometers|kilometres|miles|mi|nautical miles|nmi))?$"].map(|p| Regex::new(p).unwrap())
+});
+static TRAVEL: LazyLock<[Regex; 3]> = LazyLock::new(|| {
+    [
+        r"^(?:travel\s+)?time\s+to\s+(.+?)\s+by\s+(car|foot|walking|bike|bicycle|cycling)$",
+        r"^(walking|driving|cycling|biking)\s+time\s+(?:between|from)\s+(.+?)\s+(?:and|to)\s+(.+)$",
+        r"^(walking|driving|cycling|biking)\s+time\s+to\s+(.+)$",
+    ]
+    .map(|p| Regex::new(p).unwrap())
+});
 
 fn money(amount: f64, code: &str) -> String {
     icu::format_money(amount, code, "en-US", if amount.abs() < 1.0 { 6 } else { 2 }).unwrap_or_else(|| format!("{} {code}", math::format_number(amount)))
@@ -139,6 +159,88 @@ fn money(amount: f64, code: &str) -> String {
 
 fn currency_name(code: &str) -> String {
     math::capitalize(&icu::currency_name(code, time::locale()))
+}
+
+fn degrees(value: f64) -> String {
+    format!("{}°", value.round())
+}
+
+fn profile_of(word: &str) -> (&'static str, &'static str) {
+    match word {
+        "foot" | "walking" => ("foot", "Walking"),
+        "bike" | "bicycle" | "cycling" | "biking" => ("bike", "By Bike"),
+        _ => ("car", "By Car"),
+    }
+}
+
+fn find_zone(name: &str) -> Option<time::Place> {
+    extra::zone_abbreviation(name).map(|(name, zone)| time::Place { name, zone: zone.to_owned() }).or_else(|| time::lookup(name, &time::PLACES))
+}
+
+fn weather_card(forecast: &serde_json::Value, geo: &places::Geo, query: &places::WeatherQuery, now_s: f64) -> Option<WeatherCard> {
+    let locale = "en-US";
+    let zone = forecast["timezone"].as_str().unwrap_or(&geo.zone).to_owned();
+    let daily = &forecast["daily"];
+    let hourly = &forecast["hourly"];
+    let day = query.days.clamp(0, 7) as usize;
+    let (temperature, code, is_day) = if day > 0 {
+        (daily["temperature_2m_max"][day].as_f64()?, daily["weather_code"][day].as_i64()?, true)
+    } else {
+        let r = places::reading_at(forecast, query.hours, now_s)?;
+        (r.temperature, r.code, r.day)
+    };
+    let target_s = if day > 0 { daily["time"][day].as_f64()? + 9.0 * 3600.0 } else { now_s + query.hours as f64 * 3600.0 };
+    let range_day = if day > 0 { day } else { daily["time"].as_array()?.iter().rposition(|t| t.as_f64().is_some_and(|t| t <= target_s)).unwrap_or(0) };
+    let (condition, icon) = places::condition(code, is_day);
+    let start = places::hourly_index(forecast, target_s)?;
+    let today = (0..8)
+        .filter_map(|i| {
+            let index = start + i;
+            let at = hourly["time"][index].as_f64()?;
+            let (_, icon) = places::condition(hourly["weather_code"][index].as_i64()?, hourly["is_day"][index].as_i64() != Some(0));
+            let label = if i == 0 && day == 0 && query.hours == 0 { "Now".to_owned() } else { icu::format_pattern(at * 1000.0, locale, "HH:mm", Some(&zone)) };
+            Some(Forecast { label, icon: icon.into(), high: degrees(hourly["temperature_2m"][index].as_f64()?), low: None })
+        })
+        .collect();
+    let week = (0..8)
+        .filter_map(|i| {
+            let at = daily["time"][i].as_f64()?;
+            let (_, icon) = places::condition(daily["weather_code"][i].as_i64()?, true);
+            let label = if i == 0 { "Today".to_owned() } else { icu::format_pattern(at * 1000.0 + 12.0 * 3_600_000.0, locale, "EEE", Some(&zone)) };
+            Some(Forecast { label, icon: icon.into(), high: degrees(daily["temperature_2m_max"][i].as_f64()?), low: Some(degrees(daily["temperature_2m_min"][i].as_f64()?)) })
+        })
+        .collect();
+    Some(WeatherCard {
+        temperature: degrees(temperature),
+        icon: icon.into(),
+        place: geo.full.clone(),
+        condition: condition.into(),
+        range: format!("H: {} L: {}", degrees(daily["temperature_2m_max"][range_day].as_f64()?), degrees(daily["temperature_2m_min"][range_day].as_f64()?)),
+        today,
+        week,
+    })
+}
+
+fn flight_card(flight: &places::Flight, now_ms: f64) -> FlightCard {
+    let locale = "en-US";
+    let eta = places::flight_eta_ms(flight, now_ms);
+    let place = |a: &places::Airport| [a.city.as_str(), a.country.as_str()].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(", ");
+    let arrival = match (eta, &flight.destination_zone) {
+        (Some(at), Some(zone)) => format!("Arrives about {} ({})", icu::format_pattern(at, locale, "EEE d MMM 'at' HH:mm", Some(zone)), icu::format_pattern(at, locale, "O", Some(zone))),
+        _ => place(&flight.destination),
+    };
+    let (status, live) = match flight.live {
+        Some((_, _, _, true)) => ("On the Ground", false),
+        Some(_) => ("In Flight", true),
+        None => ("Not in the Air", false),
+    };
+    FlightCard {
+        from: (places::short_airport(&flight.origin.name, &flight.origin.city), place(&flight.origin), flight.origin.code.clone()),
+        to: (places::short_airport(&flight.destination.name, &flight.destination.city), arrival, flight.destination.code.clone()),
+        status: status.into(),
+        live,
+        note: None,
+    }
 }
 
 fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
@@ -149,7 +251,117 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
     if let Some(parsed) = color::parse(text) {
         return Some(Computed::Color(parsed));
     }
-    let answer = |kind, display: String, plain: String, input_label: String, label: String, note: Option<String>| Some(Computed::Answer(Answer { kind, input: text.to_owned(), input_label, display, plain, label, note }));
+    let lower = text.to_lowercase();
+    let folded = math::unaccent(&lower);
+    places::begin(text);
+    let answer = |kind, display: String, plain: String, input_label: String, label: String, note: Option<String>| Some(Computed::Answer(Answer { kind, input: text.to_owned(), input_label, display, plain, label, note, dim: None }));
+    let dimmed = |kind, display: String, plain: String, label: String, note: Option<String>, dim: Vec<(usize, usize)>| Some(Computed::Answer(Answer { kind, input: text.to_owned(), input_label: "Expression".into(), display, plain, label, note, dim: Some(dim) }));
+    let now = crate::store::now_ms() as f64;
+    let locale = "en-US";
+    if let Some((airline, number)) = places::parse_flight(&lower) {
+        let Some(flight) = places::flight(ctx, &airline, &number) else {
+            let open = format!("https://www.flightradar24.com/data/flights/{}{}", airline.to_lowercase(), number);
+            return Some(Computed::Loading { section: "Flight Tracker", open_title: "Open Flight Tracker", open, fallback: None });
+        };
+        let flight = flight.ok()?;
+        let card = flight_card(&flight, now);
+        let copy = format!("{} {} → {}: {}", flight.number, flight.origin.code, flight.destination.code, card.status);
+        return Some(Computed::Flight { card, open: format!("https://www.flightradar24.com/data/flights/{}", flight.number.to_lowercase()), copy });
+    }
+    if let Some(weather) = places::parse_weather(text) {
+        let loading = || matches!(weather.kind, places::WeatherKind::Card).then(|| Computed::Loading { section: "Weather Forecast", open_title: "Open in Weather", open: "msnweather://forecast".into(), fallback: Some("https://www.msn.com/en-us/weather/forecast".into()) });
+        let Some(geo) = places::place(ctx, weather.place.as_deref()) else { return loading() };
+        let geo = geo.ok()?;
+        let Some(forecast) = places::forecast(ctx, &geo) else { return loading() };
+        let forecast = forecast.ok()?;
+        let unit = "°C";
+        let now_s = now / 1000.0;
+        match weather.kind {
+            places::WeatherKind::Card => {
+                let card = weather_card(&forecast, &geo, &weather, now_s)?;
+                let copy = format!("{} {}, {} in {}", card.temperature.trim_end_matches('°'), unit, card.condition, geo.full);
+                let open = format!("msnweather://forecast?la={:.4}&lo={:.4}", geo.lat, geo.lon);
+                return Some(Computed::Weather { card, open, copy });
+            }
+            places::WeatherKind::FeelsLike => {
+                let reading = places::reading_at(&forecast, weather.hours, now_s)?;
+                let value = format!("{}{unit}", reading.feels_like.round());
+                return dimmed(Kind::UnitConversion, value.clone(), value, format!("Feels Like in {}", geo.name), None, extra::dim_words(text, &["feels", "like", "in"]));
+            }
+            places::WeatherKind::Temperature(target) => {
+                let reading = places::reading_at(&forecast, weather.hours, now_s)?;
+                let (from, to) = (units::parse(&format!("0 {unit} in {unit}"))?.from, target.unwrap_or(unit));
+                let to = units::parse(&format!("0 {to} in {to}"))?.to;
+                let value = units::convert(reading.temperature, &from, &to)?;
+                let display = format!("{}{}", math::format_number(math::to_precision(value, 3)), if to.id == "K" { " K" } else { to.id });
+                return dimmed(Kind::UnitConversion, display.clone(), format!("{value:.1}"), format!("Temperature in {}", geo.name), None, extra::dim_words(text, &["temperature", "temp", "in"]));
+            }
+        }
+    }
+    if let Some(caps) = TRAVEL.iter().find_map(|r| r.captures(&folded)) {
+        let (word, from, to) = match caps.len() {
+            3 if caps.get(2).is_some_and(|m| ["car", "foot", "walking", "bike", "bicycle", "cycling"].contains(&m.as_str())) => (caps[2].to_owned(), None, caps[1].to_owned()),
+            4 => (caps[1].to_owned(), Some(caps[2].to_owned()), caps[3].to_owned()),
+            _ => (caps[1].to_owned(), None, caps[2].to_owned()),
+        };
+        let (profile, label) = profile_of(&word);
+        let origin = places::place(ctx, from.as_deref())?.ok()?;
+        let target = places::geocode(ctx, &to)?.ok()?;
+        let (seconds, meters) = places::route(ctx, &origin, &target, profile)?.ok()?;
+        let duration = units::format_duration((seconds / 60.0).round() * 60.0);
+        let distance = format!("{} km", math::group(meters / 1000.0, 1));
+        return dimmed(Kind::DateTime, duration.clone(), format!("{}", (seconds / 60.0).round()), label.into(), Some(distance), extra::dim_words(text, &["time", "to", "by", "between", "from", "and", "walking", "driving", "cycling", "biking", "travel"]));
+    }
+    if let Some(caps) = DISTANCE.iter().find_map(|r| r.captures(&folded)) {
+        let two = caps.get(2).is_some_and(|m| !["km", "kilometers", "kilometres", "miles", "mi", "nautical miles", "nmi"].contains(&m.as_str()));
+        let (from, to, unit) = if two { (Some(caps[1].to_owned()), caps[2].to_owned(), caps.get(3)) } else { (None, caps[1].to_owned(), caps.get(2)) };
+        let a = places::place(ctx, from.as_deref())?.ok()?;
+        let b = places::geocode(ctx, &to)?.ok()?;
+        let km = extra::haversine_km((a.lat, a.lon), (b.lat, b.lon));
+        let unit = unit.map_or("km", |m| match m.as_str() {
+            "miles" | "mi" => "mi",
+            "nautical miles" | "nmi" => "nmi",
+            _ => "km",
+        });
+        let (value, label) = match unit {
+            "mi" => (km / 1.609344, "Miles"),
+            "nmi" => (km / 1.852, "Nautical Miles"),
+            _ => (km, "Kilometers"),
+        };
+        let display = format!("{} {unit}", math::group(value, 4));
+        return dimmed(Kind::UnitConversion, display, format!("{value:.4}"), label.into(), None, extra::dim_words(text, &["distance", "distancia", "from", "between", "to", "and", "de", "entre", "ate", "para", "in"]));
+    }
+    let today = ((now + icu::local_offset_minutes(now) as f64 * 60_000.0) / extra::DAY_MS).floor() as i64;
+    let local_now = now + icu::local_offset_minutes(now) as f64 * 60_000.0;
+    let range = |a: i64, b: i64| {
+        let (ya, _, _) = extra::civil(a);
+        let (yb, _, _) = extra::civil(b);
+        let first = icu::format_skeleton(a as f64 * extra::DAY_MS, "en-US", if ya == yb { "MMMd" } else { "yMMMd" }, Some("UTC"));
+        let last = icu::format_skeleton(b as f64 * extra::DAY_MS, "en-US", "yMMMd", Some("UTC"));
+        format!("{first}–{last}")
+    };
+    let parse_day = |t: &str, today: i64| time::parse_target_day(t, today);
+    let pure = extra::week(&folded, today, &range)
+        .or_else(|| extra::time_left(&folded, local_now))
+        .or_else(|| extra::since(&folded, local_now, &parse_day))
+        .or_else(|| extra::list_function(&folded))
+        .or_else(|| extra::nearest(&folded))
+        .or_else(|| extra::as_fraction(&folded))
+        .or_else(|| extra::base(&folded))
+        .or_else(|| extra::money_query(&lower))
+        .or_else(|| extra::constant(&folded))
+        .or_else(|| extra::chemistry(text))
+        .or_else(|| extra::pace(&folded))
+        .or_else(|| extra::transfer(&folded))
+        .or_else(|| extra::note(&lower))
+        .or_else(|| extra::text_function(text));
+    if let Some(p) = pure {
+        let mut answer = Answer { kind: Kind::Math, input: text.to_owned(), input_label: "Expression".into(), display: p.display, plain: p.plain, label: p.label, note: None, dim: (!p.dim.is_empty()).then_some(p.dim) };
+        if p.unit_like {
+            answer.input = answer.input.replace('/', "÷");
+        }
+        return Some(Computed::Answer(answer));
+    }
     if let Some(unit) = units::parse(text) {
         let category = unit.from.category.label().to_owned();
         let note = (unit.from.category == units::Category::Time).then(|| units::format_duration(unit.value * unit.to.factor));
@@ -165,36 +377,41 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
             }
         }
     }
-    let now = crate::store::now_ms() as f64;
-    let locale = time::locale();
-    let index = &*time::PLACES;
     if let Some((clock, from, to)) = time::parse_clock_query(text) {
-        if let (Some(from), Some(to)) = (time::lookup(&from, index), time::lookup(&to, index)) {
+        if let (Some(from), Some(to)) = (find_zone(&from), find_zone(&to)) {
             let instant = time::instant_for(time::zoned_day(now, &from.zone), clock, &from.zone);
             let when = icu::format_date(instant, locale, Style::None, Style::Short, Some(&to.zone));
-            let day = icu::format_date(instant, locale, Style::Medium, Style::None, Some(&to.zone));
-            return answer(Kind::DateTime, when.clone(), when, from.name, to.name, Some(day));
+            let day = icu::format_skeleton(instant, locale, "EEEEMMMMd", Some(&to.zone));
+            return answer(Kind::DateTime, when.clone(), when, "Expression".into(), day, Some(format!("{} → {}", from.name, to.name)));
         }
     }
     if let Some(delta) = time::parse_relative(text) {
         let when = icu::format_date(now + delta, locale, Style::Full, Style::Short, None);
         return answer(Kind::DateTime, when.clone(), when, "Date".into(), "Date".into(), None);
     }
-    let today = ((now + icu::local_offset_minutes(now) as f64 * 60_000.0) / 86_400_000.0).floor() as i64;
     if let Some(target) = time::parse_days_until(text).and_then(|t| time::parse_target_day(&t, today)) {
         let days = target - today;
         let label = format!("{} day{}", days.abs(), if days.abs() == 1 { "" } else { "s" });
         return answer(Kind::DateTime, label, days.to_string(), "Date".into(), "Date".into(), (days < 0).then(|| "Past".into()));
     }
     if let Some((from, to)) = time::parse_time_diff(text) {
-        if let (Some(from), Some(to)) = (time::lookup(&from, index), time::lookup(&to, index)) {
+        if let (Some(from), Some(to)) = (find_zone(&from), find_zone(&to)) {
             let diff = time::format_diff(icu::offset_minutes(now, &to.zone) - icu::offset_minutes(now, &from.zone));
             return answer(Kind::DateTime, diff.clone(), diff, "Time difference".into(), format!("{} → {}", from.name, to.name), None);
         }
     }
-    if let Some(place) = time::parse_time_query(text, index) {
-        let (when, offset) = time::format_time_in(now, &place.zone, locale);
-        return answer(Kind::DateTime, when.clone(), when, place.name, offset, None);
+    if let Some(caps) = TIME_AT.iter().find_map(|r| r.captures(&folded)) {
+        let name = caps[1].trim().to_owned();
+        let zone = match find_zone(&name) {
+            Some(place) => place.zone,
+            None if caps.get(0).is_some_and(|_| name.split_whitespace().count() <= 5) => places::geocode(ctx, &name)?.ok()?.zone,
+            None => return None,
+        };
+        let shift = caps.get(3).and_then(|n| n.as_str().parse::<f64>().ok()).map_or(0.0, |h| if &caps[2] == "-" { -h } else { h });
+        let at = now + shift * 3_600_000.0;
+        let when = icu::format_date(at, locale, Style::None, Style::Short, Some(&zone));
+        let day = icu::format_skeleton(at, locale, "EEEEMMMMd", Some(&zone));
+        return answer(Kind::DateTime, when.clone(), when, "Expression".into(), day, None);
     }
     if !math::is_expression(text) {
         return None;
@@ -209,7 +426,7 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
 pub fn calculate(ctx: &egui::Context, query: &str) -> Option<Answer> {
     match compute(ctx, query)? {
         Computed::Answer(answer) => Some(answer),
-        Computed::Color(_) => None,
+        _ => None,
     }
 }
 
@@ -249,6 +466,22 @@ pub fn swatch(c: &color::Rgba) -> egui::Color32 {
     egui::Color32::from_rgba_unmultiplied(c.r.round() as u8, c.g.round() as u8, c.b.round() as u8, (c.a * 255.0).round() as u8)
 }
 
+fn open_and_copy(open_title: &str, open: String, copy_title: &str, copy: String, fallback: Option<String>) -> Vec<Action> {
+    vec![
+        Action::new("open", open_title, move |_| crate::apps::open_url(&open, None).or_else(|e| fallback.as_deref().map_or(Err(e), |url| crate::apps::open_url(url, None)))).icon("external-link"),
+        Action::new("copy", copy_title, move |host| {
+            host.copy_and_close(&copy, "Copied to Clipboard");
+            Ok(())
+        })
+        .icon("clipboard")
+        .shortcut(Shortcut::key(Key::C).ctrl().shift()),
+    ]
+}
+
+fn side(text: String, label: String) -> Side {
+    Side { text, label, swatch: None, dim: None }
+}
+
 pub struct Calculator;
 
 impl Extension for Calculator {
@@ -274,8 +507,8 @@ impl Extension for Calculator {
                 let items: Vec<(&'static str, &'static str, String)> = list.into_iter().map(|f| (f.id, f.label, f.value)).collect();
                 Some(Inline {
                     section: "Color".into(),
-                    input: Side { text: query.trim().into(), label: parsed.format.into(), swatch: None },
-                    output: Side { text: String::new(), label: color::name(&parsed.rgba).into(), swatch: Some(swatch(&parsed.rgba)) },
+                    input: side(query.trim().into(), parsed.format.into()),
+                    output: Side { swatch: Some(swatch(&parsed.rgba)), ..side(String::new(), color::name(&parsed.rgba).into()) },
                     note: None,
                     actions: vec![vec![Action::new("copy-color-as", "Copy Color as…", |_| Ok(()))
                         .icon("clipboard")
@@ -292,8 +525,36 @@ impl Extension for Calculator {
                                 })
                                 .collect()
                         })]],
+                    kind: CardKind::Pair,
                 })
             }
+            Computed::Weather { card, open, copy } => {
+                let web = format!("https://www.msn.com/en-us/weather/forecast/in-{}", card.place.replace(", ", ",").replace(' ', "-"));
+                Some(Inline {
+                    section: "Weather Forecast".into(),
+                    input: side(query.trim().into(), String::new()),
+                    output: side(card.temperature.clone(), card.condition.clone()),
+                    note: None,
+                    actions: vec![open_and_copy("Open in Weather", open, "Copy Weather", copy, Some(web))],
+                    kind: CardKind::Weather(card),
+                })
+            }
+            Computed::Loading { section, open_title, open, fallback } => Some(Inline {
+                section: section.into(),
+                input: side(query.trim().into(), String::new()),
+                output: side(String::new(), String::new()),
+                note: None,
+                actions: vec![vec![Action::new("open", open_title, move |_| crate::apps::open_url(&open, None).or_else(|e| fallback.as_deref().map_or(Err(e), |url| crate::apps::open_url(url, None)))).icon("external-link")]],
+                kind: CardKind::Loading,
+            }),
+            Computed::Flight { card, open, copy } => Some(Inline {
+                section: "Flight Tracker".into(),
+                input: side(query.trim().into(), String::new()),
+                output: side(card.status.clone(), card.to.0.clone()),
+                note: None,
+                actions: vec![open_and_copy("Open Flight Tracker", open, "Copy Flight Status", copy, None)],
+                kind: CardKind::Flight(card),
+            }),
             Computed::Answer(a) => {
                 let (input, display, kind) = (a.input.clone(), a.display.clone(), a.kind);
                 let save: Rc<dyn Fn()> = Rc::new(move || history::record(&input, &display, kind));
@@ -302,10 +563,11 @@ impl Extension for Calculator {
                 actions.push(copy_question_and_answer(&a.input, &a.display, save));
                 Some(Inline {
                     section: "Calculator".into(),
-                    input: Side { text: a.input, label: a.input_label, swatch: None },
-                    output: Side { text: a.display, label: a.label, swatch: None },
+                    input: Side { dim: a.dim, ..side(a.input, a.input_label) },
+                    output: side(a.display, a.label),
                     note: a.note,
                     actions: vec![actions],
+                    kind: CardKind::Pair,
                 })
             }
         }

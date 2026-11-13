@@ -170,7 +170,25 @@ impl Extension for Core {
         });
         quit.subtitle = Some("Openray".into());
         quit.keywords = ["exit", "close", "sair", "fechar", "encerrar"].map(String::from).to_vec();
-        vec![settings, quit]
+        let mut check = command(self.id(), "check-for-updates", "Check for Updates", Icon::Tile("download", Tone::Blue), "Command", "Check for Updates", |host| {
+            crate::updater::check_now(&host.ctx);
+            host.hud(Ok("Checking for updates…".into()));
+            Ok(())
+        });
+        check.subtitle = Some("Openray".into());
+        check.keywords = ["update", "upgrade", "version", "atualizar", "atualização", "versão"].map(String::from).to_vec();
+        let mut list = vec![settings, check, quit];
+        if let crate::updater::State::Ready(version) = crate::updater::state() {
+            let mut update = command(self.id(), "restart-to-update", &format!("Restart to Update to {version}"), Icon::Tile("download", Tone::Green), "Command", "Restart to Update", |host| {
+                crate::updater::apply()?;
+                host.requests.push(Request::Quit);
+                Ok(())
+            });
+            update.subtitle = Some("Openray".into());
+            update.keywords = ["update", "upgrade", "restart", "atualizar", "reiniciar"].map(String::from).to_vec();
+            list.insert(0, update);
+        }
+        list
     }
 }
 

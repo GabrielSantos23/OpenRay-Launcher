@@ -129,6 +129,7 @@ fn format_with(ms: f64, locale: &str, time: UDateFormatStyle, date: UDateFormatS
 pub enum Style {
     None,
     Full,
+    #[cfg_attr(not(test), allow(dead_code))]
     Long,
     Medium,
     Short,

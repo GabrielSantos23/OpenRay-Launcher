@@ -104,6 +104,8 @@ const UNITS: &[Unit] = &[
     unit!("K", Temperature, 1.0, ["k", "kelvin"]),
     unit!("m/s", Speed, 1.0, ["m/s", "mps", "metro por segundo", "metros por segundo"]),
     unit!("km/h", Speed, 1.0 / 3.6, ["km/h", "kmh", "kph", "quilometro por hora", "quilometros por hora"]),
+    unit!("km/s", Speed, 1000.0, ["km/s", "kps", "kilometer per second", "kilometers per second", "quilometro por segundo", "quilometros por segundo"]),
+    unit!("mi/s", Speed, 1609.344, ["mi/s", "mile per second", "miles per second"]),
     unit!("mph", Speed, 0.44704, ["mph", "mile per hour", "miles per hour", "milha por hora", "milhas por hora"]),
     unit!("kn", Speed, 0.5144444444444445, ["kn", "knot", "knots"]),
     unit!("ft/s", Speed, 0.3048, ["ft/s", "fps", "feet per second", "pes por segundo"]),

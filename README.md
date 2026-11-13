@@ -130,6 +130,7 @@ Each feature below works today. The full per-feature status, with evidence and r
 ### Settings
 - A settings window for the hotkey, launch at login, tray icon, launcher position, Escape behavior, and the alias, hotkey and on/off switch of every command.
 - Install, configure and uninstall FlowKey extensions, and review the permissions each one has.
+- Automatic updates from GitHub Releases, with a **Check for Updates** button.
 
 ---
 
@@ -151,7 +152,7 @@ Known gaps and differences in the features that do exist are listed in [`docs/kn
 2. Download `openray-windows-x64.zip` and unzip it to a folder of your choice, for example `%LOCALAPPDATA%\Programs\Openray`. Keep the `extensions` folder next to `openray.exe`.
 3. Run `openray.exe` and press **Alt+Space**. Turn on **Open at Login** in Settings to start it with Windows.
 
-To update, download the newer zip and replace the files. Your data stays in `%APPDATA%\dev.openray.app`.
+Openray updates itself: release builds check GitHub for a new version and offer **Restart to Update** (also in Settings › General › Updates). Your data stays in `%APPDATA%\dev.openray.app`. Keep Openray in a folder you can write to, so it can replace its own files.
 
 > If you also use Raycast, give the two apps different hotkeys (for example Raycast on Ctrl+Alt+Space). Both use a keyboard hook, so the same hotkey can't work in both at once.
 
@@ -289,9 +290,9 @@ Releases are built by GitHub Actions ([`.github/workflows/release.yml`](.github/
 
 1. Bump the version in `app/Cargo.toml`.
 2. Push a tag named `vX.Y.Z`.
-3. The workflow runs the tests, builds the release executable, and publishes `openray-windows-x64.zip` (the executable, bundled extensions and license) as a GitHub release.
+3. The workflow checks that the tag matches the version, runs the tests, builds the release executable, signs `openray-windows-x64.zip` (the executable, bundled extensions and license), and publishes it with its signature and `latest.json`.
 
-There is no auto-update yet; see [`docs/known-limitations.md`](docs/known-limitations.md).
+Installed copies read `latest.json`, download the zip and install it only if its signature matches the public key built into Openray. Signing needs the repository secret `TAURI_SIGNING_PRIVATE_KEY`, and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key has a password.
 
 ---
 
