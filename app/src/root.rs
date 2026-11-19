@@ -230,6 +230,7 @@ fn accessories(ui: &Ui, right: f32, center_y: f32, parts: &[Accessory]) -> f32 {
     for part in parts.iter().rev() {
         match part {
             Accessory::Text(text) => x = paint_text(ui, pos2(x, center_y), Align2::RIGHT_CENTER, text, theme::font(12.0), theme::FG_60(), 200.0).left(),
+            Accessory::Tinted(text, color) => x = paint_text(ui, pos2(x, center_y), Align2::RIGHT_CENTER, text, theme::font(12.0), *color, 200.0).left(),
             Accessory::Tag(text) => {
                 let galley = text_galley(ui, text, theme::weighted(11.0, theme::MEDIUM), theme::ACCENT(), 200.0);
                 let rect = Rect::from_min_size(pos2(x - galley.size().x - 12.0, center_y - 9.0), vec2(galley.size().x + 12.0, 18.0));
@@ -1100,6 +1101,7 @@ impl Launcher {
         for request in requests {
             self.handle_async(ctx, request);
         }
+        crate::flowkey_host::init(ctx);
         self.reload();
         if launcher::is_shown() && ctx.input(|i| i.viewport().focused) == Some(false) && !launcher::owns_foreground() && self.was_shown {
             self.hide(ctx, false);
@@ -1512,14 +1514,23 @@ impl Launcher {
         let full = ui.max_rect();
         ui.painter().rect_filled(full, 0.0, theme::BG());
         let (mut submit, mut back) = (false, false);
+        let actions = self.views.last_mut().map(|v| v.view.form_actions()).unwrap_or_default();
+        let has_panel = actions.iter().flatten().count() > 1;
         if self.pending.is_some() {
             self.confirm_keys(ui);
+        } else if self.panel.is_some() {
+            self.panel_keys(ui);
         } else if self.dropdown.is_some() {
             self.dropdown_keys(ui);
         } else {
             for (key, modifiers) in key_presses(ui) {
                 if key == Key::Enter && modifiers.ctrl && !modifiers.alt && !modifiers.shift {
                     submit = true;
+                } else if key == Key::K && modifiers.ctrl && !modifiers.alt && !modifiers.shift && has_panel {
+                    let title = self.views.last_mut().and_then(|v| v.view.form()).map(|f| f.title.clone()).unwrap_or_default();
+                    self.panel = Some(Panel { title, groups: actions.clone(), selected: 0, filter: String::new(), command: None });
+                } else if let Some(action) = actions.iter().flatten().skip(1).find(|a| a.shortcut.is_some_and(|s| s.matches(key, modifiers))) {
+                    self.run(&ctx, action.clone(), None, false);
                 } else if key == Key::Escape && plain(modifiers) && !token_query_open(ui) && !crate::date_picker::is_open(ui) {
                     back = true;
                 } else {
@@ -1551,6 +1562,21 @@ impl Launcher {
             let mut choices = Vec::new();
             let focus = form.focus.take();
             for (i, field) in form.fields.iter_mut().enumerate() {
+                match field.kind {
+                    crate::extension::FieldKind::Separator => {
+                        ui.painter().hline((full.left() + 24.0)..=(field_left + 360.0), y + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
+                        y += 21.0;
+                        continue;
+                    }
+                    crate::extension::FieldKind::Note => {
+                        let galley = wrapped(ui, &field.value, theme::font(13.0), theme::FG_60(), 360.0);
+                        let h = galley.size().y;
+                        ui.painter().galley(pos2(field_left, y), galley, theme::FG_60());
+                        y += h + 20.0;
+                        continue;
+                    }
+                    _ => {}
+                }
                 paint_text(ui, pos2(label_right, y + 9.0), Align2::RIGHT_TOP, field.label, theme::font(13.0), theme::FG_60(), 170.0);
                 let height = match field.kind {
                     crate::extension::FieldKind::Area(h) => h,
@@ -1605,13 +1631,41 @@ impl Launcher {
                             changed.push(i);
                         }
                     }
+                    crate::extension::FieldKind::Path { directory, multiple } => {
+                        let (directory, multiple) = (*directory, *multiple);
+                        let title = if directory { "Choose Folder…" } else { "Choose File…" };
+                        let button = Rect::from_min_size(rect.min, vec2(132.0, rect.height()));
+                        let response = ui.interact(button, id, Sense::click());
+                        response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, format!("{} {title}", field.label)));
+                        ui.painter().rect_filled(button, 8.0, if response.hovered() { theme::CONTROL_HOVER() } else { theme::CONTROL() });
+                        if response.has_focus() {
+                            ui.painter().rect_stroke(button, 8.0, Stroke::new(1.0, theme::FG_40()), egui::StrokeKind::Inside);
+                        }
+                        paint_text(ui, button.center(), Align2::CENTER_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), button.width() - 12.0);
+                        let shown = if field.value.is_empty() { "Nothing selected".to_owned() } else { field.value.lines().collect::<Vec<_>>().join(", ") };
+                        paint_text(ui, pos2(button.right() + 10.0, rect.center().y), Align2::LEFT_CENTER, &shown, theme::font(12.0), theme::FG_60(), rect.right() - button.right() - 10.0);
+                        if response.gained_focus() {
+                            response.scroll_to_me(None);
+                        }
+                        if response.clicked() || (response.has_focus() && ui.input(|i| i.key_pressed(Key::Space))) {
+                            match crate::apps::pick_path(directory, multiple, &[]) {
+                                Ok(paths) if !paths.is_empty() => {
+                                    field.value = paths.join("\n");
+                                    field.error = None;
+                                    changed.push(i);
+                                }
+                                Ok(_) => {}
+                                Err(error) => field.error = Some(error),
+                            }
+                        }
+                    }
                     kind => {
                         let focused = ui.memory(|m| m.has_focus(id));
                         let border = if field.error.is_some() { theme::RED() } else if focused { theme::FG_40() } else { theme::KEY_BORDER() };
                         ui.painter().rect(rect, 8.0, theme::fg(3), Stroke::new(1.0, border), egui::StrokeKind::Inside);
                         let font = if field.mono { FontId::monospace(13.0) } else { theme::font(13.0) };
                         let hint = egui::RichText::new(field.placeholder.as_str()).color(theme::FG_40()).font(font.clone());
-                        let inner = rect.shrink2(vec2(12.0, 8.0));
+                        let inner = Rect::from_min_max(rect.min + vec2(12.0, 8.0), rect.max - vec2(12.0, 8.0));
                         let edit = if matches!(kind, crate::extension::FieldKind::Area(_)) { egui::TextEdit::multiline(&mut field.value).desired_rows(1) } else { egui::TextEdit::singleline(&mut field.value) };
                         let response = ui.put(inner, edit.id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(font).text_color(theme::FG()).hint_text(hint).desired_width(inner.width()).password(field.secret));
                         response.widget_info(|| egui::WidgetInfo::text_edit(true, field.label, &field.value, ""));
@@ -1647,9 +1701,31 @@ impl Launcher {
         let tile = Rect::from_min_size(pos2(footer.left() + 12.0, footer.center().y - 8.0), vec2(16.0, 16.0));
         icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(tile)), &icon, &title, 16.0);
         paint_text(ui, pos2(tile.right() + 8.0, footer.center().y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG_60(), 300.0);
-        let caps_left = keycaps(ui, footer.right() - 12.0, footer.center().y, &["Ctrl".into(), "↵".into()]);
+        let mut right = footer.right() - 12.0;
+        if has_panel {
+            let center_y = footer.center().y;
+            let caps = keycaps(ui, right, center_y, &["Ctrl".into(), "K".into()]);
+            let label = paint_text(ui, pos2(caps - 8.0, center_y), Align2::RIGHT_CENTER, "Actions", theme::weighted(13.0, theme::MEDIUM), theme::FG_60(), 200.0);
+            let button = Rect::from_min_max(pos2(label.left() - 8.0, center_y - 13.0), pos2(footer.right() - 9.0, center_y + 13.0));
+            let response = ui.interact(button, egui::Id::unique("form-actions"), Sense::click());
+            response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Actions"));
+            if self.panel.is_some() {
+                ui.painter().rect_filled(button, 6.0, theme::SELECTION());
+                keycaps(ui, right, center_y, &["Ctrl".into(), "K".into()]);
+                paint_text(ui, pos2(caps - 8.0, center_y), Align2::RIGHT_CENTER, "Actions", theme::weighted(13.0, theme::MEDIUM), theme::FG_60(), 200.0);
+            }
+            ui.painter().vline(button.left() - 6.0, (center_y - 5.5)..=(center_y + 5.5), Stroke::new(1.0, theme::FOOTER_DIVIDER()));
+            if response.clicked() {
+                self.panel = match self.panel {
+                    Some(_) => None,
+                    None => Some(Panel { title: title.clone(), groups: actions.clone(), selected: 0, filter: String::new(), command: None }),
+                };
+            }
+            right = button.left() - 13.0;
+        }
+        let caps_left = keycaps(ui, right, footer.center().y, &["Ctrl".into(), "↵".into()]);
         let label = paint_text(ui, pos2(caps_left - 8.0, footer.center().y), Align2::RIGHT_CENTER, submit_title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), 300.0);
-        let button = ui.interact(Rect::from_min_max(pos2(label.left() - 8.0, footer.center().y - 13.0), pos2(footer.right() - 9.0, footer.center().y + 13.0)), egui::Id::unique("form-submit"), Sense::click());
+        let button = ui.interact(Rect::from_min_max(pos2(label.left() - 8.0, footer.center().y - 13.0), pos2(right + 3.0, footer.center().y + 13.0)), egui::Id::unique("form-submit"), Sense::click());
         button.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, submit_title));
         submit |= button.clicked();
         if let Some(form) = self.views.last_mut().and_then(|v| v.view.form()) {
@@ -1685,6 +1761,9 @@ impl Launcher {
             }
         } else if back {
             self.pop_view();
+        }
+        if self.panel.is_some() {
+            self.panel_ui(ui, footer.top());
         }
     }
 

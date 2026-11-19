@@ -1,13 +1,15 @@
-use crate::extension::{Accessory, Action, Async, Command, Dropdown, Empty, Extension, Field, FieldKind, Form, Host, Icon, Item, Page, Request, Section, Shortcut, Toast, View};
+use crate::extension::{Accessory, Action, Async, Command, Dropdown, Empty, Extension, Field, FieldKind, Form, Host, Icon, Item, Page, Request, Section, Shortcut, Toast, Tokens, View};
 use crate::flowkey_gate::Grants;
 use crate::flowkey_host::{self as host, Installed, Shared};
 use crate::theme;
 use egui::{pos2, vec2, Key, Rect, RichText, Ui, UiBuilder};
 use serde_json::{json, Map, Value};
-use std::cell::Cell;
-use std::collections::HashSet;
+use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 const ACTION_ICONS: &[(&str, &str)] = &[
     (r"^(play|resume)\b", "play"),
@@ -222,6 +224,76 @@ impl Target {
     }
 }
 
+fn accessory_of(spec: &Value) -> Option<Accessory> {
+    let text = spec["text"].as_str()?.to_owned();
+    Some(match spec["color"].as_str() {
+        Some("success") => Accessory::Tinted(text, theme::GREEN()),
+        Some("danger") => Accessory::Tinted(text, theme::RED()),
+        Some("accent") => Accessory::Tinted(text, theme::ACCENT()),
+        _ => Accessory::Text(text),
+    })
+}
+
+fn tree_field(spec: &Value) -> Field {
+    let kind = spec["kind"].as_str().unwrap_or_default();
+    let label = || intern(spec["label"].as_str().or(spec["id"].as_str()).unwrap_or_default());
+    let text = |v: &Value| v.as_str().unwrap_or_default().to_owned();
+    match kind {
+        "separator" => Field::new("", FieldKind::Separator, ""),
+        "description" => Field::new("", FieldKind::Note, text(&spec["label"])),
+        "tagpicker" => {
+            let selected: Vec<String> = spec["defaults"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(String::from)).collect();
+            let tokens = Tokens { options: options_of(&spec["options"]), create: None, describe: |value| (value.to_owned(), Icon::Glyph("check")) };
+            Field::new(label(), FieldKind::Tokens(tokens), selected.join("\n")).placeholder(text(&spec["placeholder"]))
+        }
+        "filepicker" => {
+            let directory = spec["canChooseDirectories"] == true && spec["canChooseFiles"] == false;
+            Field::new(label(), FieldKind::Path { directory, multiple: spec["allowMultipleSelection"] == true }, "")
+        }
+        "datepicker" => Field::new(label(), FieldKind::Date { time: false }, text(&spec["default"])).placeholder(spec["placeholder"].as_str().unwrap_or("YYYY-MM-DD")),
+        _ => {
+            let kind = match kind {
+                "checkbox" | "dropdown" | "password" => kind,
+                _ => "text",
+            };
+            let schema = json!({ "name": spec["id"], "title": spec["label"].as_str().or(spec["id"].as_str()), "type": kind, "default": spec["default"], "options": spec["options"], "placeholder": spec["placeholder"] });
+            let mut field = field_for(&schema, None, "title");
+            if spec["kind"] == "textarea" {
+                field.kind = FieldKind::Area(80.0);
+            }
+            field
+        }
+    }
+}
+
+fn form_values(specs: &[Value], form: &Form) -> Result<Map<String, Value>, String> {
+    let mut values = Map::new();
+    for (spec, field) in specs.iter().zip(&form.fields) {
+        let Some(id) = spec["id"].as_str().filter(|_| !matches!(field.kind, FieldKind::Note | FieldKind::Separator)) else { continue };
+        if spec["required"] == true && field.value.trim().is_empty() {
+            return Err(format!("{} is required", field.label));
+        }
+        let value = match field.kind {
+            FieldKind::Toggle => Value::Bool(field.value == "true"),
+            FieldKind::Tokens(_) | FieldKind::Path { .. } => json!(field.value.lines().filter(|s| !s.is_empty()).collect::<Vec<_>>()),
+            FieldKind::Date { .. } if !field.value.trim().is_empty() && crate::extension::parse_date(&field.value).is_none() => return Err(format!("{} must be a date like 2026-01-31", field.label)),
+            FieldKind::Date { .. } => Value::String(field.value.trim().to_owned()),
+            _ => Value::String(field.value.clone()),
+        };
+        values.insert(id.to_owned(), value);
+    }
+    Ok(values)
+}
+
+fn form_action_specs(tree: &Value) -> Vec<Value> {
+    let mut list = ordered(&tree["actions"]);
+    if let Some(id) = tree["submitActionId"].as_str() {
+        let submit = list.iter().position(|a| a["id"] == id).map(|i| list.remove(i)).unwrap_or_else(|| json!({ "id": id, "title": "Submit" }));
+        list.insert(0, submit);
+    }
+    list
+}
+
 enum Stage {
     Consent(Grants, Rc<Cell<bool>>),
     Setup(Form, Vec<Value>),
@@ -238,7 +310,8 @@ pub struct TreeView {
     query: String,
     filter: Option<String>,
     arguments: Option<Value>,
-    form: Option<(String, Form)>,
+    form: Option<(Value, Form)>,
+    chosen: Rc<RefCell<Option<Value>>>,
 }
 
 fn preference_form(ext: &Installed) -> (Form, Vec<Value>) {
@@ -299,7 +372,7 @@ impl TreeView {
         let spec = ext.command(&command).unwrap_or(Value::Null);
         let title = spec["title"].as_str().unwrap_or(&command).to_owned();
         let icon = icon_for(&ext, &json!({ "icon": spec["icon"].as_str().or(ext.manifest["icon"].as_str()) }), &title);
-        let mut view = Self { ext, command, title, icon, stage: Stage::Consent(Grants::default(), Rc::default()), query: initial.unwrap_or_default(), filter: None, arguments: None, form: None };
+        let mut view = Self { ext, command, title, icon, stage: Stage::Consent(Grants::default(), Rc::default()), query: initial.unwrap_or_default(), filter: None, arguments: None, form: None, chosen: Rc::default() };
         view.advance();
         view
     }
@@ -350,6 +423,13 @@ impl TreeView {
             return vec![json!({ "title": "", "items": tree["items"] })];
         }
         tree["sections"].as_array().cloned().unwrap_or_default()
+    }
+
+    fn run_form(&self, action: &Value) -> Result<(), String> {
+        let (Some(target), Some((specs, form))) = (self.target(), &self.form) else { return Ok(()) };
+        let values = form_values(specs.as_array().map_or(&[][..], Vec::as_slice), form)?;
+        target.run(action, None, Some(Value::Object(values)));
+        Ok(())
     }
 
     fn find_item(&self, id: &str) -> Option<Value> {
@@ -608,34 +688,29 @@ impl View for TreeView {
             self.form = None;
             return None;
         };
-        let key = tree["fields"].to_string();
-        if self.form.as_ref().is_none_or(|(k, _)| *k != key) {
-            let previous: Vec<(String, String)> = self.form.take().map(|(_, f)| f.fields.into_iter().map(|f| (f.label.to_owned(), f.value)).collect()).unwrap_or_default();
-            let fields = tree["fields"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter(|f| !matches!(f["kind"].as_str(), Some("separator" | "description")))
-                .map(|f| {
-                    let kind = match f["kind"].as_str() {
-                        Some("checkbox") => "checkbox",
-                        Some("dropdown") => "dropdown",
-                        Some("password") => "password",
-                        _ => "text",
-                    };
-                    let spec = json!({ "name": f["id"], "title": f["label"].as_str().or(f["id"].as_str()), "type": kind, "default": f["default"], "options": f["options"], "placeholder": f["placeholder"] });
-                    let mut field = field_for(&spec, None, "title");
-                    if f["kind"] == "textarea" {
-                        field.kind = FieldKind::Area(80.0);
-                    }
-                    if let Some((_, value)) = previous.iter().find(|(label, _)| label == field.label) {
+        if self.form.as_ref().is_none_or(|(k, _)| *k != tree["fields"]) {
+            let previous: Vec<(String, String)> = self.form.take().map(|(specs, f)| specs.as_array().into_iter().flatten().zip(f.fields).filter_map(|(s, f)| Some((s["id"].as_str()?.to_owned(), f.value))).collect()).unwrap_or_default();
+            let specs: Vec<Value> = tree["fields"].as_array().cloned().unwrap_or_default();
+            let fields: Vec<Field> = specs
+                .iter()
+                .map(|spec| {
+                    let mut field = tree_field(spec);
+                    if let Some((_, value)) = previous.iter().find(|(id, _)| spec["id"].as_str() == Some(id)) {
                         field.value = value.clone();
                     }
                     field
                 })
                 .collect();
-            let submit = tree["actions"].as_array().and_then(|a| a.iter().find(|a| a["primary"] == true).or(a.first())).and_then(|a| a["title"].as_str()).unwrap_or("Submit");
-            self.form = Some((key, Form { title: tree["title"].as_str().unwrap_or(&self.title).to_owned(), submit: intern(submit), icon: self.icon.clone(), fields, focus: Some(0) }));
+            let submit = form_action_specs(&tree).first().and_then(|a| a["title"].as_str().map(intern)).unwrap_or("Submit");
+            let focus = fields.iter().position(|f| !matches!(f.kind, FieldKind::Note | FieldKind::Separator));
+            self.form = Some((tree["fields"].clone(), Form { title: tree["title"].as_str().unwrap_or(&self.title).to_owned(), submit, icon: self.icon.clone(), fields, focus }));
+        }
+        if let Some(action) = self.chosen.take() {
+            if let Err(error) = self.run_form(&action) {
+                if let Some(ctx) = host::context() {
+                    crate::extension::post(&ctx, Async::Toast(Toast::Failure(format!("{} failed", action["title"].as_str().unwrap_or("Action")), error)));
+                }
+            }
         }
         self.form.as_mut().map(|(_, form)| form)
     }
@@ -670,36 +745,36 @@ impl View for TreeView {
                 Ok(false)
             }
             Stage::Consent(..) => Ok(false),
-            Stage::Running(target) => {
-                let target = target.clone();
-                let Some(tree) = self.tree() else { return Ok(false) };
-                let (Some((_, form)), Some(fields)) = (&self.form, tree["fields"].as_array()) else { return Ok(false) };
-                let editable: Vec<&Value> = fields.iter().filter(|f| !matches!(f["kind"].as_str(), Some("separator" | "description"))).collect();
-                let mut values = Map::new();
-                for (spec, field) in editable.iter().zip(&form.fields) {
-                    let Some(id) = spec["id"].as_str() else { continue };
-                    if spec["required"] == true && field.value.trim().is_empty() {
-                        return Err(format!("{} is required", field.label));
-                    }
-                    let value = match spec["kind"].as_str() {
-                        Some("checkbox") => Value::Bool(field.value == "true"),
-                        Some("tagpicker" | "filepicker") => json!(field.value.split(',').map(str::trim).filter(|s| !s.is_empty()).collect::<Vec<_>>()),
-                        _ => Value::String(field.value.clone()),
-                    };
-                    values.insert(id.to_owned(), value);
-                }
-                let declared = ordered(&tree["actions"]);
-                let action = match tree["submitActionId"].as_str() {
-                    Some(id) => declared.iter().find(|a| a["id"] == id).cloned().unwrap_or_else(|| json!({ "id": id, "title": "Submit" })),
-                    None => match declared.first() {
-                        Some(action) => action.clone(),
-                        None => return Ok(false),
-                    },
-                };
-                target.run(&action, None, Some(Value::Object(values)));
+            Stage::Running(_) => {
+                let Some(action) = self.tree().and_then(|tree| form_action_specs(&tree).into_iter().next()) else { return Ok(false) };
+                self.run_form(&action)?;
                 Ok(false)
             }
         }
+    }
+
+    fn form_actions(&mut self) -> Vec<Vec<Action>> {
+        let Some(tree) = self.tree().filter(|t| t["type"] == "form") else { return Vec::new() };
+        let actions: Vec<Action> = form_action_specs(&tree)
+            .into_iter()
+            .enumerate()
+            .map(|(i, spec)| {
+                let title = spec["title"].as_str().unwrap_or_default().to_owned();
+                let (chosen, picked) = (self.chosen.clone(), spec.clone());
+                let mut action = Action::new("flowkey-form-action", title.clone(), move |_| {
+                    chosen.replace(Some(picked.clone()));
+                    Ok(())
+                })
+                .keep_open();
+                action.icon = action_glyph(&title);
+                action.destructive = spec["style"] == "destructive";
+                action.shortcut = if i == 0 { Some(Shortcut::key(Key::Enter).ctrl()) } else { shortcut_of(&spec["shortcut"]) };
+                action
+            })
+            .collect();
+        let mut first = actions;
+        let rest = first.split_off(first.len().min(1));
+        [first, rest].into_iter().filter(|g| !g.is_empty()).collect()
     }
 
     fn empty(&self) -> Empty {
@@ -727,7 +802,7 @@ impl View for TreeView {
                     .flatten()
                     .map(|item| {
                         let title = item["title"].as_str().unwrap_or_default().to_owned();
-                        let accessories = if grid { Vec::new() } else { item["accessories"].as_array().into_iter().flatten().filter_map(|a| a["text"].as_str().map(|t| Accessory::Text(t.to_owned()))).collect() };
+                        let accessories = if grid { Vec::new() } else { item["accessories"].as_array().into_iter().flatten().filter_map(accessory_of).collect() };
                         Item {
                             id: format!("{s}:{}", item["id"].as_str().unwrap_or_default()),
                             icon: icon_for(&self.ext, item, &title),
@@ -762,6 +837,65 @@ fn run_background(ext: &Arc<Installed>, command: &str, arguments: Option<Value>,
     });
 }
 
+fn interval_secs(value: &Value) -> Option<u64> {
+    let secs = match value {
+        Value::Number(n) => n.as_u64()?,
+        Value::String(text) => {
+            let text = text.trim();
+            let (number, unit) = text.split_at(text.find(|c: char| !c.is_ascii_digit()).unwrap_or(text.len()));
+            let scale = match unit {
+                "" | "s" => 1,
+                "m" => 60,
+                "h" => 3_600,
+                "d" => 86_400,
+                _ => return None,
+            };
+            number.parse::<u64>().ok()?.checked_mul(scale)?
+        }
+        _ => return None,
+    };
+    (secs >= 60).then_some(secs)
+}
+
+fn intervals(extensions: &[Arc<Installed>]) -> Vec<(String, Arc<Installed>, String, u64)> {
+    let mut found = Vec::new();
+    for ext in extensions {
+        for spec in ext.commands().into_iter().filter(|c| c["mode"] == "background") {
+            let (Some(secs), Some(id)) = (interval_secs(&spec["interval"]), spec["id"].as_str()) else { continue };
+            let key = format!("{}/{id}@{}:{secs}", ext.dir.display(), ext.manifest["version"].as_str().unwrap_or_default());
+            found.push((key, ext.clone(), id.to_owned(), secs));
+        }
+    }
+    found
+}
+
+fn schedule(extensions: &[Arc<Installed>]) {
+    static SCHEDULED: Mutex<Option<HashMap<String, Sender<()>>>> = Mutex::new(None);
+    let wanted = intervals(extensions);
+    let mut guard = SCHEDULED.lock().unwrap_or_else(|e| e.into_inner());
+    let running = guard.get_or_insert_with(HashMap::new);
+    running.retain(|key, _| wanted.iter().any(|(k, ..)| k == key));
+    for (key, ext, command, secs) in wanted {
+        if running.contains_key(&key) {
+            continue;
+        }
+        let (stop, ticks) = channel::<()>();
+        let spawned = std::thread::Builder::new().name(format!("flowkey-interval:{}", ext.id())).spawn(move || {
+            while let Err(RecvTimeoutError::Timeout) = ticks.recv_timeout(Duration::from_secs(secs)) {
+                if host::pending_consent(&ext).is_some() || !host::missing_preferences(&ext).is_empty() {
+                    continue;
+                }
+                if let Some(ctx) = host::context() {
+                    run_background(&ext, &command, None, ctx);
+                }
+            }
+        });
+        if spawned.is_ok() {
+            running.insert(key, stop);
+        }
+    }
+}
+
 pub struct FlowKey {
     id: &'static str,
     ext: Arc<Installed>,
@@ -772,6 +906,7 @@ pub fn extensions() -> Vec<Box<dyn Extension>> {
     for failure in failures {
         eprintln!("openray: FlowKey extension skipped: {failure}");
     }
+    schedule(&extensions);
     extensions.into_iter().map(|ext| Box::new(FlowKey { id: intern(&format!("flowkey.{}", ext.id())), ext }) as Box<dyn Extension>).collect()
 }
 
@@ -870,6 +1005,71 @@ mod tests {
         assert!(svg_markup(svg, Some("\"/><script>")).unwrap().contains("#ffffff"));
         assert!(svg_markup(svg, None).unwrap().contains("#ffffff"));
         assert_eq!(svg_markup("not svg", None), None);
+    }
+
+    #[test]
+    fn tints_accessories_by_semantic_color() {
+        assert_eq!(accessory_of(&json!({ "text": "Live", "color": "success" })), Some(Accessory::Tinted("Live".into(), theme::GREEN())));
+        assert_eq!(accessory_of(&json!({ "text": "Down", "color": "danger" })), Some(Accessory::Tinted("Down".into(), theme::RED())));
+        assert_eq!(accessory_of(&json!({ "text": "New", "color": "accent" })), Some(Accessory::Tinted("New".into(), theme::ACCENT())));
+        assert_eq!(accessory_of(&json!({ "text": "3:12", "color": "secondary" })), Some(Accessory::Text("3:12".into())));
+        assert_eq!(accessory_of(&json!({ "color": "success" })), None);
+    }
+
+    #[test]
+    fn builds_form_fields_and_collects_typed_values() {
+        let specs: Vec<Value> = serde_json::from_value(json!([
+            { "id": "name", "kind": "textfield", "label": "Name", "required": true },
+            { "kind": "separator" },
+            { "kind": "description", "label": "Pick what to sync." },
+            { "id": "tags", "kind": "tagpicker", "label": "Tags", "options": [{ "value": "a", "title": "A" }, { "value": "b", "title": "B" }], "defaults": ["b"] },
+            { "id": "files", "kind": "filepicker", "label": "Files", "canChooseFiles": false, "canChooseDirectories": true, "allowMultipleSelection": true },
+            { "id": "due", "kind": "datepicker", "label": "Due" },
+            { "id": "done", "kind": "checkbox", "label": "Done", "default": true },
+        ]))
+        .unwrap();
+        let mut form = Form { title: String::new(), submit: "Submit", icon: Icon::Glyph("check"), fields: specs.iter().map(tree_field).collect(), focus: None };
+        assert!(matches!(form.fields[1].kind, FieldKind::Separator));
+        assert!(matches!(form.fields[2].kind, FieldKind::Note) && form.fields[2].value == "Pick what to sync.");
+        assert!(matches!(&form.fields[3].kind, FieldKind::Tokens(t) if t.options.len() == 2) && form.fields[3].value == "b");
+        assert!(matches!(form.fields[4].kind, FieldKind::Path { directory: true, multiple: true }));
+        assert!(matches!(form.fields[5].kind, FieldKind::Date { time: false }));
+        assert_eq!(form_values(&specs, &form).unwrap_err(), "Name is required");
+        form.fields[0].value = "x".into();
+        form.fields[3].value = "b\na".into();
+        form.fields[4].value = "C:\\one\nC:\\two".into();
+        form.fields[5].value = "2026-02-30".into();
+        assert!(form_values(&specs, &form).unwrap_err().contains("must be a date"));
+        form.fields[5].value = "2026-02-28".into();
+        let values = form_values(&specs, &form).unwrap();
+        assert_eq!(Value::Object(values), json!({ "name": "x", "tags": ["b", "a"], "files": [r"C:\one", r"C:\two"], "due": "2026-02-28", "done": true }));
+    }
+
+    #[test]
+    fn puts_the_submit_action_first_among_form_actions() {
+        let ids = |tree: Value| form_action_specs(&tree).iter().map(|a| a["id"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        assert_eq!(ids(json!({ "submitActionId": "s", "actions": [{ "id": "a" }, { "id": "s" }] })), ["s", "a"]);
+        assert_eq!(ids(json!({ "submitActionId": "s", "actions": [{ "id": "a" }] })), ["s", "a"]);
+        assert_eq!(ids(json!({ "actions": [{ "id": "a" }, { "id": "b", "primary": true }] })), ["b", "a"]);
+    }
+
+    #[test]
+    fn schedules_background_commands_with_intervals() {
+        assert_eq!(interval_secs(&json!(600)), Some(600));
+        assert_eq!(interval_secs(&json!("10m")), Some(600));
+        assert_eq!(interval_secs(&json!("2h")), Some(7_200));
+        assert_eq!(interval_secs(&json!(30)), None);
+        assert_eq!(interval_secs(&json!("10x")), None);
+        assert_eq!(interval_secs(&json!(-60)), None);
+        let manifest = json!({ "id": "demo", "version": "1.2.0", "commands": [
+            { "id": "sync", "mode": "background", "interval": 900 },
+            { "id": "view", "interval": 900 },
+            { "id": "once", "mode": "background" },
+        ] });
+        let ext = Arc::new(Installed { manifest, source: "installed", dir: std::path::PathBuf::from("ext") });
+        let found = intervals(&[ext]);
+        assert_eq!(found.len(), 1);
+        assert_eq!((found[0].0.as_str(), found[0].2.as_str(), found[0].3), ("ext/sync@1.2.0:900", "sync", 900));
     }
 
     #[test]
