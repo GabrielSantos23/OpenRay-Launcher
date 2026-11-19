@@ -8,6 +8,8 @@ use std::sync::Arc;
 const BODY: f32 = 14.0;
 const BLOCK_GAP: f32 = 8.0;
 const CODE_PAD: f32 = 8.0;
+const UNDERLINE_OFFSET: f32 = 2.0;
+const CHIP_RADIUS: f32 = 4.0;
 const UNDO_LIMIT: usize = 200;
 
 #[derive(Clone)]
@@ -103,18 +105,12 @@ fn format_for(block: Block, style: &Style) -> TextFormat {
     let mut format = TextFormat { font_id: font, line_height: Some(line_height), color, ..Default::default() };
     if style.marks & CODE != 0 && block.kind != Kind::Code {
         format.font_id = theme::mono(12.0);
-        format.background = theme::KEY_BG();
-        format.expand_bg = 1.0;
     }
     if style.link.is_some() {
         color = theme::RED();
         format.color = color;
-        format.underline = Stroke::new(1.0, color);
     }
     format.italics = style.marks & ITALIC != 0;
-    if style.marks & UNDERLINE != 0 {
-        format.underline = Stroke::new(1.0, color);
-    }
     if style.marks & STRIKE != 0 || block.kind == Kind::Task(true) {
         format.strikethrough = Stroke::new(1.0, color);
     }
@@ -176,6 +172,53 @@ pub fn layout(ui: &Ui, doc: &Doc, wrap_width: f32) -> Arc<Galley> {
         galley.rect.max.y += CODE_PAD;
     }
     Arc::new(galley)
+}
+
+#[derive(Debug)]
+struct Decoration {
+    rect: Rect,
+    color: Color32,
+    chip: bool,
+}
+
+fn mark_decorations(galley: &Galley, origin: egui::Pos2, doc: &Doc) -> Vec<Decoration> {
+    let mut out: Vec<Decoration> = Vec::new();
+    if galley.job.text != doc.text {
+        return out;
+    }
+    let (mut index, mut line) = (0, 0);
+    for placed in &galley.rows {
+        let Some(&block) = doc.blocks.get(line) else { break };
+        let row = origin + placed.pos.to_vec2();
+        let first = out.len();
+        for glyph in &placed.row.glyphs {
+            let Some(style) = doc.styles.get(index) else { break };
+            index += 1;
+            let left = row.x + glyph.pos.x;
+            let right = left + glyph.advance_width;
+            let wanted = if style.marks & CODE != 0 && block.kind != Kind::Code {
+                let top = row.y + glyph.pos.y - glyph.font_ascent;
+                Some(Decoration { rect: Rect::from_min_max(pos2(left, top), pos2(right, top + glyph.font_height)).expand(1.0), color: theme::KEY_BG(), chip: true })
+            } else if style.link.is_some() || style.marks & UNDERLINE != 0 {
+                let y = (row.y + glyph.pos.y + UNDERLINE_OFFSET).round();
+                let color = if style.link.is_some() { theme::RED() } else { base_format(block).2 };
+                Some(Decoration { rect: Rect::from_min_max(pos2(left, y), pos2(right, y + 1.0)), color, chip: false })
+            } else {
+                None
+            };
+            let Some(next) = wanted else { continue };
+            let same_row = out.len() > first;
+            match out.last_mut().filter(|_| same_row) {
+                Some(last) if last.chip == next.chip && last.color == next.color && (last.rect.right() - next.rect.left()).abs() < 2.5 => last.rect = last.rect.union(next.rect),
+                _ => out.push(next),
+            }
+        }
+        if placed.ends_with_newline {
+            index += 1;
+            line += 1;
+        }
+    }
+    out
 }
 
 fn line_geometry(galley: &Galley, origin: egui::Pos2, lines: usize) -> Vec<LineGeometry> {
@@ -301,9 +344,22 @@ impl NoteEditor {
         if outdent || consume(KeyboardShortcut::new(Modifiers::NONE, Key::Tab)) {
             let (start, end) = self.selection(&ctx);
             let before = self.doc.clone();
-            if self.doc.indent(self.doc.line_of(start)..=self.doc.line_of(end), if outdent { -1 } else { 1 }) {
+            if !outdent && self.doc.blocks[self.doc.line_of(start)].kind == Kind::Code {
+                self.push_undo(start);
+                self.doc.replace(start, end, "	", None);
+                self.set_cursor(&ctx, start + 1, start + 1);
+            } else if self.doc.indent(self.doc.line_of(start)..=self.doc.line_of(end), if outdent { -1 } else { 1 }) {
                 self.undo.push(Snapshot { doc: before, cursor: start });
                 self.redo.clear();
+            }
+        }
+        let (start, end) = self.selection(&ctx);
+        let line = self.doc.line_of(start);
+        let at_end = start == end && start == self.doc.styles.len();
+        if self.doc.blocks[line].kind == Kind::Code && (consume(command(Key::Enter)) || at_end && consume(KeyboardShortcut::new(Modifiers::NONE, Key::ArrowDown))) {
+            self.push_undo(start);
+            if let Some(at) = self.doc.exit_code(line) {
+                self.set_cursor(&ctx, at, at);
             }
         }
         if consume(KeyboardShortcut::new(Modifiers::SHIFT, Key::Enter)) {
@@ -312,7 +368,7 @@ impl NoteEditor {
             self.doc.replace(start, end, "\n", None);
             let line = self.doc.line_of(start) + 1;
             let above = self.doc.blocks[line - 1];
-            self.doc.blocks[line] = Block { kind: if above.kind == Kind::Task(true) { above.kind } else { self.doc.blocks[line].kind }, indent: above.indent, joined: above.kind != Kind::Code };
+            self.doc.blocks[line] = Block { kind: if above.kind == Kind::Task(true) { above.kind } else { self.doc.blocks[line].kind }, indent: above.indent, joined: above.kind != Kind::Code, start: None };
             self.set_cursor(&ctx, start + 1, start + 1);
         }
         ui.input(|i| {
@@ -410,7 +466,7 @@ impl NoteEditor {
         let left = origin.x;
         let right = ui.max_rect().right();
         let mut shapes = Vec::new();
-        let mut counters: Vec<u32> = Vec::new();
+        let numbers = self.doc.numbers();
         let mut prev: Option<Block> = None;
         let pointer = ui.input(|i| i.pointer.interact_pos());
         let clicked = ui.input(|i| i.pointer.primary_clicked());
@@ -419,9 +475,6 @@ impl NoteEditor {
             let Some(&block) = self.doc.blocks.get(line) else { break };
             let x = left + indent_x(block);
             let center_y = geometry.first_row.center().y;
-            if !block.kind.is_list() {
-                counters.clear();
-            }
             match block.kind {
                 _ if block.joined => {}
                 Kind::Bullet => {
@@ -429,12 +482,7 @@ impl NoteEditor {
                     painter.text(pos2(x - 12.0, center_y), egui::Align2::CENTER_CENTER, glyph, theme::font(BODY), theme::FG());
                 }
                 Kind::Ordered => {
-                    let level = block.indent as usize;
-                    counters.resize(level + 1, 0);
-                    let continues = prev.is_some_and(|p| p.kind.is_list() && (p.indent as usize > level || p.kind == Kind::Ordered && p.indent as usize == level));
-                    counters[level] = if continues { counters[level] + 1 } else { 1 };
-                    counters.truncate(level + 1);
-                    painter.text(pos2(x - 6.0, center_y), egui::Align2::RIGHT_CENTER, format!("{}.", counters[level]), theme::font(BODY), theme::FG());
+                    painter.text(pos2(x - 6.0, center_y), egui::Align2::RIGHT_CENTER, format!("{}.", numbers[line]), theme::font(BODY), theme::FG());
                 }
                 Kind::Task(checked) => {
                     let rect = Rect::from_center_size(pos2(x - 15.0, center_y), vec2(14.0, 14.0));
@@ -468,6 +516,7 @@ impl NoteEditor {
             }
             prev = Some(block);
         }
+        shapes.extend(mark_decorations(galley, origin, &self.doc).into_iter().map(|d| Shape::rect_filled(d.rect, if d.chip { CHIP_RADIUS } else { 0.0 }, d.color)));
         painter.set(background, Shape::Vec(shapes));
         if let Some(line) = toggle {
             let (cursor, _) = self.selection(ui.ctx());
@@ -492,5 +541,53 @@ impl NoteEditor {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn decorations(markdown: &str) -> (Vec<Decoration>, Vec<f32>, f32) {
+        let ctx = egui::Context::default();
+        theme::install(&ctx);
+        let _ = ctx.run_ui(Default::default(), |_| {});
+        let mut result = None;
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            let doc = Doc::from_markdown(markdown);
+            let galley = layout(ui, &doc, 400.0);
+            let baselines = galley.rows.iter().map(|r| r.pos.y + r.row.glyphs.first().map_or(0.0, |g| g.pos.y)).collect();
+            result = Some((mark_decorations(&galley, egui::Pos2::ZERO, &doc), baselines, galley.rows[0].rect().height()));
+        });
+        result.expect("ran one pass")
+    }
+
+    #[test]
+    fn underline_sits_just_under_the_baseline() {
+        let (marks, baselines, row_height) = decorations("a ++under++ b");
+        assert_eq!(marks.len(), 1);
+        let line = &marks[0];
+        assert!(!line.chip);
+        assert_eq!(line.rect.top(), (baselines[0] + UNDERLINE_OFFSET).round());
+        assert!(line.rect.bottom() < row_height - 1.0, "{line:?} in a {row_height} px row");
+        assert!(line.rect.width() > 20.0);
+    }
+
+    #[test]
+    fn code_chip_hugs_the_text() {
+        let (marks, baselines, row_height) = decorations("a `code` b");
+        assert_eq!(marks.len(), 1);
+        let chip = &marks[0];
+        assert!(chip.chip);
+        assert!(chip.rect.height() < row_height - 2.0, "{chip:?} in a {row_height} px row");
+        assert!(chip.rect.top() > 0.0 && chip.rect.bottom() < row_height);
+        assert!(chip.rect.top() < baselines[0] && chip.rect.bottom() > baselines[0]);
+    }
+
+    #[test]
+    fn decorations_follow_lines_and_skip_code_blocks() {
+        let (marks, _, _) = decorations("x\n\n[link](https://a.io) and `c`\n\n```\n`raw`\n```");
+        assert_eq!(marks.iter().map(|m| m.chip).collect::<Vec<_>>(), [false, true]);
+        assert!(marks[0].rect.top() > 21.0);
     }
 }

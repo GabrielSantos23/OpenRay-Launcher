@@ -39,6 +39,7 @@ pub struct Block {
     pub kind: Kind,
     pub indent: u8,
     pub joined: bool,
+    pub start: Option<u64>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
@@ -124,7 +125,7 @@ impl Doc {
         let chars = self.chars();
         let line = chars[..start].iter().filter(|&&c| c == '\n').count();
         let removed_lines = chars[start..end].iter().filter(|&&c| c == '\n').count();
-        let style = style.unwrap_or_else(|| self.inherited(start, &chars));
+        let style = if self.blocks[line].kind == Kind::Code { Style::default() } else { style.unwrap_or_else(|| self.inherited(start, &chars)) };
         let at_line_end = chars.get(end).is_none_or(|&c| c == '\n');
         let mut text: String = chars[..start].iter().collect();
         text.push_str(inserted);
@@ -135,7 +136,7 @@ impl Doc {
         let kept = self.blocks[line];
         let removed_blocks: Vec<Block> = self.blocks.drain(line + 1..=line + removed_lines).collect();
         let added = inserted.chars().filter(|&c| c == '\n').count();
-        let mut next = Block { kind: if at_line_end { kept.kind.continued() } else { kept.kind }, indent: kept.indent, joined: false };
+        let mut next = Block { kind: if at_line_end { kept.kind.continued() } else { kept.kind }, indent: kept.indent, joined: false, start: None };
         if let Kind::Task(_) = next.kind {
             next.kind = Kind::Task(false);
         }
@@ -160,9 +161,21 @@ impl Doc {
         Some(Edit { start, removed, inserted, removed_blocks })
     }
 
+    fn styled_chars(&self, start: usize, end: usize) -> Vec<usize> {
+        let mut line = 0;
+        let mut out = Vec::new();
+        for (i, c) in self.text.chars().enumerate().take(end) {
+            if c == '\n' {
+                line += 1;
+            } else if i >= start && self.blocks[line].kind != Kind::Code {
+                out.push(i);
+            }
+        }
+        out
+    }
+
     pub fn toggle_mark(&mut self, start: usize, end: usize, mark: u8) {
-        let chars = self.chars();
-        let targets: Vec<usize> = (start..end).filter(|&i| chars[i] != '\n').collect();
+        let targets = self.styled_chars(start, end);
         let on = !targets.iter().all(|&i| self.styles[i].marks & mark != 0);
         for i in targets {
             let style = &mut self.styles[i];
@@ -178,8 +191,7 @@ impl Doc {
 
     pub fn set_link(&mut self, start: usize, end: usize, url: Option<&str>) {
         let link: Option<Arc<str>> = url.map(Into::into);
-        let chars = self.chars();
-        for i in (start..end).filter(|&i| chars[i] != '\n') {
+        for i in self.styled_chars(start, end) {
             self.styles[i].link = link.clone();
         }
     }
@@ -189,8 +201,14 @@ impl Doc {
         for line in lines {
             let block = &mut self.blocks[line];
             block.kind = if all && kind != Kind::Paragraph { Kind::Paragraph } else { kind };
+            block.start = None;
             if !block.kind.is_list() {
                 block.indent = 0;
+            }
+            if block.kind == Kind::Code {
+                let begin = self.line_start(line);
+                let len = self.line_len(line);
+                self.styles[begin..begin + len].fill(Style::default());
             }
         }
     }
@@ -217,7 +235,7 @@ impl Doc {
         let line = self.line_of(edit.start);
         let block = self.blocks[line];
         let text = self.line_text(line).to_owned();
-        if text.is_empty() && (block.kind.is_list() || matches!(block.kind, Kind::Quote | Kind::Code)) {
+        if text.is_empty() && (block.kind.is_list() || block.kind == Kind::Quote) {
             self.replace(edit.start, edit.start + 1, "", None);
             let block = &mut self.blocks[line];
             if block.indent > 0 {
@@ -238,6 +256,9 @@ impl Doc {
 
     pub fn handle_backspace(&mut self, edit: &Edit, removal: Removal) -> Option<usize> {
         if edit.removed != "\n" || !edit.inserted.is_empty() || removal != Removal::Backward {
+            return None;
+        }
+        if edit.removed_blocks[0].kind == Kind::Code && self.blocks[self.line_of(edit.start)].kind == Kind::Code {
             return None;
         }
         self.replace(edit.start, edit.start, "\n", Some(Style::default()));
@@ -284,6 +305,7 @@ impl Doc {
             if let Some(kind) = kind.filter(|k| block.kind == Kind::Paragraph || matches!(k, Kind::Task(_))) {
                 self.replace(begin, edit.start + 1, "", None);
                 self.blocks[line].kind = kind;
+                self.blocks[line].start = if kind == Kind::Ordered { before[..before.len() - 2].parse().ok().filter(|&n| n >= 2) } else { None };
                 return Some((begin, 0));
             }
         }
@@ -293,11 +315,11 @@ impl Doc {
             self.blocks[line + 1] = Block::default();
             return Some((begin + 1, 0));
         }
-        if c == ' ' {
-            return self.autolink(begin, edit.start).map(|at| (at, 0));
-        }
         if block.kind == Kind::Code {
             return None;
+        }
+        if c == ' ' {
+            return self.autolink(begin, edit.start).map(|at| (at, 0));
         }
         for (delimiter, mark) in [("**", BOLD), ("~~", STRIKE), ("++", UNDERLINE), ("`", CODE), ("*", ITALIC), ("_", ITALIC)] {
             if let Some(cursor) = self.inline_rule(&before, begin, delimiter, mark) {
@@ -305,6 +327,43 @@ impl Doc {
             }
         }
         None
+    }
+
+    pub fn exit_code(&mut self, line: usize) -> Option<usize> {
+        let last = (line..self.blocks.len()).take_while(|&l| self.blocks[l].kind == Kind::Code).last()?;
+        let end = self.line_start(last) + self.line_len(last);
+        self.replace(end, end, "\n", Some(Style::default()));
+        self.blocks[last + 1] = Block::default();
+        Some(end + 1)
+    }
+
+    pub fn numbers(&self) -> Vec<u64> {
+        let mut levels: Vec<(Kind, u64)> = Vec::new();
+        let mut prev: Option<Block> = None;
+        let mut out = Vec::with_capacity(self.blocks.len());
+        for &block in &self.blocks {
+            if !block.kind.is_list() {
+                levels.clear();
+            }
+            let joined = block.joined && prev.is_some_and(|p| p.kind != Kind::Code && p.kind != Kind::Rule);
+            if !block.kind.is_list() || joined {
+                out.push(0);
+                prev = Some(block);
+                continue;
+            }
+            let level = block.indent as usize;
+            let continues = prev.is_some_and(|p| p.kind.is_list() && p.indent as usize >= level) && levels.get(level).is_some_and(|&(kind, n)| kind == block.kind && n > 0);
+            let n = match block.start {
+                Some(n) if block.kind == Kind::Ordered => n,
+                _ if continues => levels[level].1 + 1,
+                _ => 1,
+            };
+            levels.resize(level + 1, (block.kind, 0));
+            levels[level] = (block.kind, n);
+            out.push(if block.kind == Kind::Ordered { n } else { 0 });
+            prev = Some(block);
+        }
+        out
     }
 
     fn inline_rule(&mut self, before: &str, begin: usize, delimiter: &str, mark: u8) -> Option<usize> {
@@ -362,8 +421,7 @@ impl Doc {
         let styles = self.line_styles();
         let mut out = String::new();
         let mut widths: Vec<usize> = Vec::new();
-        let mut counters: Vec<u64> = Vec::new();
-        let mut kinds: Vec<Kind> = Vec::new();
+        let numbers = self.numbers();
         let mut prev: Option<Block> = None;
         let mut prev_empty_paragraph = false;
         for (i, line) in lines.iter().enumerate() {
@@ -393,8 +451,6 @@ impl Doc {
             }
             if !block.kind.is_list() {
                 widths.clear();
-                counters.clear();
-                kinds.clear();
             }
             match block.kind {
                 Kind::Paragraph if line.is_empty() => {
@@ -423,15 +479,8 @@ impl Doc {
                     let level = block.indent as usize;
                     widths.resize(level.max(widths.len()), 2);
                     widths.truncate(level);
-                    counters.resize(level + 1, 0);
-                    kinds.resize(level + 1, block.kind);
-                    let continues = prev.is_some_and(|p| p.kind.is_list() && p.indent as usize >= level) && kinds[level] == block.kind && counters[level] > 0;
-                    counters[level] = if continues { counters[level] + 1 } else { 1 };
-                    kinds[level] = block.kind;
-                    counters.truncate(level + 1);
-                    kinds.truncate(level + 1);
                     let marker = match block.kind {
-                        Kind::Ordered => format!("{}. ", counters[level]),
+                        Kind::Ordered => format!("{}. ", numbers[i]),
                         Kind::Task(true) => "- [x] ".to_string(),
                         Kind::Task(false) => "- [ ] ".to_string(),
                         _ => "- ".to_string(),
@@ -577,6 +626,7 @@ struct Builder {
     code_block: bool,
     pending_kind: Option<Kind>,
     heading: Option<u8>,
+    list_start: Option<u64>,
 }
 
 impl Builder {
@@ -594,7 +644,7 @@ impl Builder {
     fn push_block(&mut self, kind: Kind, joined: bool) {
         let indent = self.lists.len().saturating_sub(1) as u8;
         let indent = if kind.is_list() { indent } else { 0 };
-        let block = Block { kind, indent, joined };
+        let block = Block { kind, indent, joined, start: None };
         match &mut self.doc {
             None => {
                 let mut doc = Doc::default();
@@ -614,6 +664,8 @@ impl Builder {
             self.item_needs_block = false;
             let kind = self.pending_kind.take().unwrap_or_else(|| self.list_kind());
             self.push_block(kind, false);
+            let start = self.list_start.take().filter(|&n| n != 1 && kind == Kind::Ordered);
+            self.doc().blocks.last_mut().expect("a block was just pushed").start = start;
         }
     }
 
@@ -673,6 +725,7 @@ impl Builder {
             Event::Start(Tag::List(start)) => {
                 self.ensure_item_block();
                 self.lists.push(start);
+                self.list_start = start;
             }
             Event::End(TagEnd::List(_)) => {
                 self.lists.pop();
@@ -957,6 +1010,83 @@ mod tests {
         assert_eq!(doc.to_markdown(), "- a\n  - b");
         doc.set_kind(0..=1, Kind::Paragraph);
         assert_eq!(doc.to_markdown(), "a\n\nb");
+    }
+
+    fn type_text(doc: &mut Doc, text: &str) -> Option<(usize, u8)> {
+        let mut result = None;
+        for c in text.chars() {
+            let at = doc.styles.len();
+            let mut next = doc.text.clone();
+            next.push(c);
+            let edit = doc.sync(&next, at + 1, None).unwrap();
+            result = doc.handle_enter(&edit).map(|at| (at, 0)).or_else(|| doc.handle_shortcuts(&edit));
+        }
+        result
+    }
+
+    #[test]
+    fn ordered_lists_keep_their_start_number() {
+        for md in ["3. a\n4. b", "1. a\n2. b\n\n---\n\n7. c", "1. a\n   1. inner\n   2. inner\n2. b"] {
+            assert_eq!(round_trip(md), md, "{md}");
+        }
+        assert_eq!(Doc::from_markdown("5. a\n6. b").numbers(), [5, 6]);
+        assert_eq!(Doc::from_markdown("2. a\n\n- x\n\n1. b").numbers(), [2, 0, 1]);
+    }
+
+    #[test]
+    fn typed_number_starts_the_list() {
+        let mut doc = Doc::default();
+        type_text(&mut doc, "3. a\nb");
+        assert_eq!((doc.text.as_str(), doc.numbers()), ("a\nb", vec![3, 4]));
+        assert_eq!(doc.to_markdown(), "3. a\n4. b");
+        let mut doc = Doc::default();
+        type_text(&mut doc, "1. a");
+        assert_eq!(doc.blocks[0].start, None);
+        doc.set_kind(0..=0, Kind::Paragraph);
+        doc.set_kind(0..=0, Kind::Ordered);
+        assert_eq!(doc.numbers(), [1]);
+    }
+
+    #[test]
+    fn code_blocks_take_blank_lines_and_join_on_backspace() {
+        let mut doc = Doc::from_markdown("```\na\n```");
+        type_text(&mut doc, "\n\nb");
+        assert_eq!(doc.text, "a\n\nb");
+        assert!(doc.blocks.iter().all(|b| b.kind == Kind::Code));
+        assert_eq!(doc.to_markdown(), "```\na\n\nb\n```");
+        let edit = doc.sync("a\nb", 2, None).unwrap();
+        assert_eq!(doc.handle_backspace(&edit, Removal::Backward), None);
+        assert_eq!((doc.text.as_str(), doc.blocks.len()), ("a\nb", 2));
+        assert_eq!(doc.exit_code(0), Some(4));
+        assert_eq!(doc.blocks.iter().map(|b| b.kind).collect::<Vec<_>>(), [Kind::Code, Kind::Code, Kind::Paragraph]);
+        assert_eq!(doc.to_markdown(), "```\na\nb\n```\n\n");
+    }
+
+    #[test]
+    fn code_blocks_stay_plain() {
+        let mut doc = Doc::from_markdown("**bold** x");
+        doc.set_kind(0..=0, Kind::Code);
+        assert!(doc.styles.iter().all(|s| *s == Style::default()));
+        doc.toggle_mark(0, 4, BOLD);
+        assert!(doc.styles.iter().all(|s| *s == Style::default()));
+        doc.sync("bold xy", 7, Some(Style { marks: ITALIC, link: None }));
+        assert_eq!(doc.styles[6], Style::default());
+        let mut doc = Doc::from_markdown("```\nsee\n```");
+        type_text(&mut doc, " https://a.io **b** ");
+        assert!(doc.styles.iter().all(|s| *s == Style::default()));
+        assert_eq!(doc.to_markdown(), "```\nsee https://a.io **b** \n```");
+    }
+
+    #[test]
+    fn quotes_hold_inline_formatting() {
+        for md in ["> **bold** *it* `code` ++under++ [l](https://a.io)", "> one\n>\n> **two**"] {
+            assert_eq!(round_trip(md), md, "{md}");
+        }
+        let mut doc = Doc::default();
+        type_text(&mut doc, "> a **b** ~~c~~");
+        assert_eq!(doc.blocks[0].kind, Kind::Quote);
+        assert_eq!(doc.text, "a b c");
+        assert_eq!((doc.styles[2].marks, doc.styles[4].marks & STRIKE), (BOLD, STRIKE));
     }
 
     #[test]
