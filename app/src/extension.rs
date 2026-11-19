@@ -200,6 +200,7 @@ pub struct Command {
 pub enum Accessory {
     Text(String),
     Tag(String),
+    Tinted(String, Color32),
     Volume { level: f32, muted: bool, input: bool },
 }
 
@@ -293,6 +294,18 @@ pub enum FieldKind {
     Choice(Vec<(String, String, Icon)>),
     Toggle,
     Tokens(Tokens),
+    Path { directory: bool, multiple: bool },
+    Date,
+    Note,
+    Separator,
+}
+
+pub fn parse_date(text: &str) -> Option<(i64, i64, i64)> {
+    use crate::extensions::calculator::history::days_from_civil;
+    let mut parts = text.trim().splitn(3, '-').map(|p| p.parse::<i64>().ok().filter(|_| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())));
+    let (year, month, day) = (parts.next()??, parts.next()??, parts.next()??);
+    let days = days_from_civil(year, month + 1, 1) - days_from_civil(year, month, 1);
+    ((1..=12).contains(&month) && (1..=days).contains(&day)).then_some((year, month, day))
 }
 
 #[derive(Clone)]
@@ -376,6 +389,9 @@ pub trait View {
         Ok(false)
     }
     fn form_changed(&mut self, _index: usize) {}
+    fn form_actions(&mut self) -> Vec<Vec<Action>> {
+        Vec::new()
+    }
     fn empty_actions(&self) -> Vec<Vec<Action>> {
         Vec::new()
     }
@@ -536,4 +552,20 @@ pub fn frontmost_app() -> Option<String> {
 
 pub fn paste_title(app: &Option<String>) -> String {
     app.as_ref().map_or_else(|| "Paste".into(), |app| format!("Paste to {app}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_calendar_dates_only() {
+        assert_eq!(parse_date("2026-11-19"), Some((2026, 11, 19)));
+        assert_eq!(parse_date(" 2024-02-29 "), Some((2024, 2, 29)));
+        assert_eq!(parse_date("2025-02-29"), None);
+        assert_eq!(parse_date("2026-13-01"), None);
+        assert_eq!(parse_date("2026-11"), None);
+        assert_eq!(parse_date("2026-+1-01"), None);
+        assert_eq!(parse_date(""), None);
+    }
 }

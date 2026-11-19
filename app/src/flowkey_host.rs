@@ -227,6 +227,7 @@ pub struct Host {
     ready: Mutex<Readiness>,
     views: Mutex<HashMap<String, Weak<Mutex<ViewState>>>>,
     done: Mutex<HashMap<String, Done>>,
+    calls: Mutex<HashMap<String, tokio::task::AbortHandle>>,
 }
 
 static HOSTS: Mutex<Vec<Arc<Host>>> = Mutex::new(Vec::new());
@@ -278,7 +279,7 @@ fn host(ext: &Arc<Installed>) -> Arc<Host> {
                 host.receive(&text);
             }
         }, move |level, message| eprintln!("openray: [flowkey:{tag}] {level}: {message}"));
-        Host { ext: ext.clone(), worker, ready: Mutex::new(Readiness::Loading(Vec::new())), views: Mutex::default(), done: Mutex::default() }
+        Host { ext: ext.clone(), worker, ready: Mutex::new(Readiness::Loading(Vec::new())), views: Mutex::default(), done: Mutex::default(), calls: Mutex::default() }
     });
     host.worker.send(&json!({ "type": "load", "requestId": next_id("load"), "extensionId": id, "url": ext.entry(), "manifest": ext.manifest, "preferences": preferences(ext), "isDevelopment": false }));
     hosts.push(host.clone());
@@ -349,6 +350,11 @@ impl Host {
                 repaint();
             }
             "nativeCall" => native(self.clone(), message),
+            "nativeAbort" => {
+                if let Some(call) = message["requestId"].as_str().and_then(|id| lock(&self.calls).remove(id)) {
+                    call.abort();
+                }
+            }
             "windowCommand" => match message["command"].as_str() {
                 Some("closeMainWindow") => post(Async::Hide(true)),
                 Some("popToRoot") => post(Async::PopToRoot),
@@ -467,15 +473,20 @@ fn runtime() -> &'static tokio::runtime::Runtime {
 }
 
 fn native(host: Arc<Host>, message: Value) {
-    runtime().spawn(async move {
+    let id = message["requestId"].as_str().unwrap_or_default().to_owned();
+    let mut calls = lock(&host.calls);
+    let (owner, key) = (host.clone(), id.clone());
+    let task = runtime().spawn(async move {
         let method = message["method"].as_str().unwrap_or_default().to_owned();
         let params = message.get("params").filter(|p| p.is_object()).cloned().unwrap_or_else(|| json!({}));
-        let reply = match dispatch(&host.ext, &method, &params).await {
+        let reply = match dispatch(&owner.ext, &method, &params).await {
             Ok(result) => json!({ "type": "nativeResult", "requestId": message["requestId"], "ok": true, "result": result }),
             Err(error) => json!({ "type": "nativeResult", "requestId": message["requestId"], "ok": false, "error": { "code": error.code, "message": error.message } }),
         };
-        host.worker.send(&reply);
+        lock(&owner.calls).remove(&key);
+        owner.worker.send(&reply);
     });
+    calls.insert(id, task.abort_handle());
 }
 
 fn text(params: &Value, name: &str) -> Res<String> {
@@ -856,6 +867,28 @@ mod tests {
         assert_eq!(ext.image("https://evil.example/a.png"), None);
         assert!(image_file(&format!("{IMAGE_ORIGIN}{}.png", "a".repeat(64))).is_some());
         assert!(image_file(&format!("{IMAGE_ORIGIN}..\\x.png")).is_none());
+    }
+
+    fn test_host() -> Arc<Host> {
+        let ext = Arc::new(Installed { manifest: json!({ "id": "abort-test", "name": "A", "version": "1.0.0", "commands": [] }), source: "installed", dir: PathBuf::from("nowhere") });
+        let worker = flowkey_js::spawn("abort-test".into(), "C:/nowhere/main.js".into(), |_| {}, |_, _| {});
+        Arc::new(Host { ext, worker, ready: Mutex::new(Readiness::Ready), views: Mutex::default(), done: Mutex::default(), calls: Mutex::default() })
+    }
+
+    #[test]
+    fn aborts_native_calls_and_forgets_finished_ones() {
+        let host = test_host();
+        let slow = runtime().spawn(std::future::pending::<()>());
+        lock(&host.calls).insert("r1".into(), slow.abort_handle());
+        host.receive(&json!({ "type": "nativeAbort", "requestId": "r1" }).to_string());
+        assert!(lock(&host.calls).is_empty());
+        assert!(runtime().block_on(slow).unwrap_err().is_cancelled());
+        native(host.clone(), json!({ "type": "nativeCall", "requestId": "r2", "method": "nope.missing", "params": {} }));
+        let started = std::time::Instant::now();
+        while !lock(&host.calls).is_empty() {
+            assert!(started.elapsed() < Duration::from_secs(10), "finished call was not removed");
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
 
     #[test]
