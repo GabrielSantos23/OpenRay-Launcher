@@ -148,6 +148,7 @@ macro_rules! ready {
 }
 
 static CURRENCY_HINT: LazyLock<[Regex; 3]> = LazyLock::new(|| [r"(?i)[a-z$€£¥₹₩₽₺₿]", r"\d", r"(?i)\s(?:in|to|as|para|em|como|pra|pro|=)\s"].map(|p| Regex::new(p).unwrap()));
+static ISO_WORD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\b[a-z]{3}\b").unwrap());
 static TIME_AT: LazyLock<[Regex; 2]> = LazyLock::new(|| {
     [r"^(?:time|now|date|hora|horas|agora|data|que\s+horas)\s+(?:in|at|em|no|na|de)\s+(.+?)(?:\s*([+-])\s*(\d+(?:\.\d+)?)\s*(?:h|hrs?|hours?|horas?)?)?$", r"^(.+?)\s+time(?:\s*([+-])\s*(\d+(?:\.\d+)?)\s*(?:h|hrs?|hours?)?)?$"].map(|p| Regex::new(p).unwrap())
 });
@@ -254,6 +255,26 @@ fn flight_card(flight: &places::Flight, now_ms: f64) -> FlightCard {
 }
 
 fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
+    places::begin(query);
+    if let Some(found) = compute_text(ctx, query) {
+        return Some(found);
+    }
+    match compute_text(ctx, &math::spell_numbers(query.trim())?)? {
+        Computed::Answer(a) => Some(Computed::Answer(Answer { input: query.trim().to_owned(), dim: None, ..a })),
+        other => Some(other),
+    }
+}
+
+fn iso_codes(text: &str) -> HashSet<String> {
+    ISO_WORD.find_iter(text).map(|m| m.as_str().to_uppercase()).filter(|code| icu::currency_name(code, "en-US") != *code).collect()
+}
+
+fn rates_pending() -> bool {
+    let state = RATES.lock().unwrap_or_else(|e| e.into_inner());
+    state.fiat_pending || state.crypto_pending
+}
+
+fn compute_text(ctx: &egui::Context, query: &str) -> Option<Computed> {
     let text = query.trim();
     if text.is_empty() {
         return None;
@@ -263,7 +284,6 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
     }
     let lower = text.to_lowercase();
     let folded = math::unaccent(&lower);
-    places::begin(text);
     let answer = |kind, display: String, plain: String, input_label: String, label: String, note: Option<String>| Some(Computed::Answer(Answer { kind, input: text.to_owned(), input_label, display, plain, label, note, dim: None }));
     let dimmed = |kind, display: String, plain: String, label: String, note: Option<String>, dim: Vec<(usize, usize)>| Some(Computed::Answer(Answer { kind, input: text.to_owned(), input_label: "Expression".into(), display, plain, label, note, dim: Some(dim) }));
     let now = crate::store::now_ms() as f64;
@@ -378,12 +398,15 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
         return answer(Kind::UnitConversion, format!("{} {}", units::format_value(unit.value), unit.to.id), format!("{}", math::to_precision(unit.value, 12)), category.clone(), category, note);
     }
     if CURRENCY_HINT.iter().all(|r| r.is_match(text)) {
-        if let Some(table) = rates(ctx) {
-            let known: HashSet<String> = table.rates.keys().cloned().collect();
-            if let Some(parsed) = math::parse_currency(text, &known) {
-                if let Some(value) = math::convert_currency(&parsed, &table.rates) {
-                    return answer(Kind::UnitConversion, money(value, &parsed.to), format!("{value:.2}"), currency_name(&parsed.from), currency_name(&parsed.to), Some(time::updated_ago(table.updated, crate::store::now_ms())));
-                }
+        let table = rates(ctx);
+        let mut known: HashSet<String> = table.as_ref().map(|t| t.rates.keys().cloned().collect()).unwrap_or_default();
+        known.extend(iso_codes(text));
+        if let Some(parsed) = math::parse_currency(text, &known) {
+            if let Some((table, value)) = table.as_ref().and_then(|t| Some((t, math::convert_currency(&parsed, &t.rates)?))) {
+                return answer(Kind::UnitConversion, money(value, &parsed.to), format!("{value:.2}"), currency_name(&parsed.from), currency_name(&parsed.to), Some(time::updated_ago(table.updated, crate::store::now_ms())));
+            }
+            if rates_pending() {
+                return Some(Computed::PairLoading);
             }
         }
     }
@@ -415,7 +438,8 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
         let zone = match find_zone(&name) {
             Some(place) => place.zone,
             None if TIME_AT[0].is_match(&folded) && name.split_whitespace().count() <= 5 => ready!(places::geocode(ctx, &name)).zone,
-            // "X time" also matches phrases like "screen time", so it waits silently instead of flashing a skeleton
+            None if name.split_whitespace().count() <= 5 && places::likely_place(&name) => ready!(places::geocode(ctx, &name)).zone,
+            // "X time" also matches phrases like "screen time", so those wait silently instead of flashing a skeleton
             None if name.split_whitespace().count() <= 5 => places::geocode(ctx, &name)?.ok()?.zone,
             None => return None,
         };
@@ -432,7 +456,7 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
     if math::plain_number(value) == text {
         return None;
     }
-    answer(Kind::Math, math::format_number(value), math::plain_number(value), "Expression".into(), math::number_to_words(value).unwrap_or_else(|| "Result".into()), None)
+    answer(Kind::Math, math::format_number(value), math::plain_number(value), "Expression".into(), if crate::i18n::is_portuguese() { math::number_to_words_pt(value) } else { math::number_to_words(value) }.unwrap_or_else(|| "Result".into()), None)
 }
 
 pub fn calculate(ctx: &egui::Context, query: &str) -> Option<Answer> {
@@ -776,6 +800,25 @@ mod tests {
         let rates = crypto_rates_from_prices(&prices);
         assert_eq!(rates.len(), 1);
         assert_eq!(rates["BTC"], 1.0 / 50000.0);
+    }
+
+    #[test]
+    fn recognizes_currency_codes_before_rates_arrive() {
+        let parsed = math::parse_currency("100 usd in eur", &iso_codes("100 usd in eur")).unwrap();
+        assert_eq!((parsed.from.as_str(), parsed.to.as_str()), ("USD", "EUR"));
+        assert!(math::parse_currency("100 the in eur", &iso_codes("100 the in eur")).is_none());
+        assert!(iso_codes("time in tokyo").is_empty());
+    }
+
+    #[test]
+    fn computes_portuguese_number_words() {
+        let ctx = egui::Context::default();
+        let Some(Computed::Answer(a)) = compute(&ctx, "dois mais três") else { panic!("no answer") };
+        assert_eq!((a.input.as_str(), a.display.as_str()), ("dois mais três", "5"));
+        let Some(Computed::Answer(a)) = compute(&ctx, "cento e vinte dividido por dois") else { panic!("no answer") };
+        assert_eq!(a.display, "60");
+        assert!(matches!(compute(&ctx, "days until christmas"), Some(Computed::Answer(_))));
+        assert!(matches!(compute(&ctx, "dias até 25 de dezembro"), Some(Computed::Answer(_))));
     }
 }
 

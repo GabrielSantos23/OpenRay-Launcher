@@ -282,6 +282,130 @@ pub fn number_to_words(value: f64) -> Option<String> {
     Some(format!("{}{}", if value < 0.0 { "Minus " } else { "" }, parts.join(" ")))
 }
 
+const PT_ONES: [&str; 20] = ["zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+const PT_TENS: [&str; 10] = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+const PT_HUNDREDS: [&str; 10] = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+
+fn pt_below_thousand(n: u64) -> String {
+    let (hundreds, rest) = (n / 100, n % 100);
+    let mut parts = Vec::new();
+    if hundreds > 0 {
+        parts.push(if hundreds == 1 && rest == 0 { "cem".to_owned() } else { PT_HUNDREDS[hundreds as usize].to_owned() });
+    }
+    if rest >= 20 {
+        parts.push(format!("{}{}", PT_TENS[(rest / 10) as usize], if rest % 10 > 0 { format!(" e {}", PT_ONES[(rest % 10) as usize]) } else { String::new() }));
+    } else if rest > 0 || parts.is_empty() {
+        parts.push(PT_ONES[rest as usize].into());
+    }
+    parts.join(" e ")
+}
+
+fn pt_scale(n: u64, scale: usize) -> String {
+    let words = pt_below_thousand(n);
+    let plural = n > 1;
+    match scale {
+        0 => words,
+        1 if n == 1 => "mil".into(),
+        1 => format!("{words} mil"),
+        _ => format!("{} {}", if n == 1 { "um".to_owned() } else { words }, match (scale, plural) {
+            (2, false) => "milhão",
+            (2, true) => "milhões",
+            (3, false) => "bilhão",
+            (3, true) => "bilhões",
+            (_, false) => "trilhão",
+            _ => "trilhões",
+        }),
+    }
+}
+
+pub fn number_to_words_pt(value: f64) -> Option<String> {
+    if value.fract() != 0.0 || value.abs() >= 1e15 {
+        return None;
+    }
+    if value == 0.0 {
+        return Some("Zero".into());
+    }
+    let mut chunks = Vec::new();
+    let mut n = value.abs() as u64;
+    let mut scale = 0;
+    while n > 0 {
+        if n % 1000 > 0 {
+            chunks.insert(0, (n % 1000, scale));
+        }
+        n /= 1000;
+        scale += 1;
+    }
+    let words: Vec<String> = chunks
+        .iter()
+        .enumerate()
+        .map(|(i, (n, scale))| {
+            let word = pt_scale(*n, *scale);
+            let rest = &chunks[i + 1..];
+            let needs_e = rest.len() == 1 && (rest[0].0 < 100 || rest[0].0 % 100 == 0);
+            if needs_e { format!("{word} e") } else { word }
+        })
+        .collect();
+    Some(capitalize(&format!("{}{}", if value < 0.0 { "menos " } else { "" }, words.join(" "))))
+}
+
+const PT_NUMBERS: [(&str, f64); 49] = [
+    ("zero", 0.0), ("um", 1.0), ("uma", 1.0), ("dois", 2.0), ("duas", 2.0), ("tres", 3.0), ("quatro", 4.0), ("cinco", 5.0), ("seis", 6.0), ("sete", 7.0), ("oito", 8.0), ("nove", 9.0),
+    ("dez", 10.0), ("onze", 11.0), ("doze", 12.0), ("treze", 13.0), ("quatorze", 14.0), ("catorze", 14.0), ("quinze", 15.0), ("dezesseis", 16.0), ("dezessete", 17.0), ("dezoito", 18.0), ("dezenove", 19.0),
+    ("vinte", 20.0), ("trinta", 30.0), ("quarenta", 40.0), ("cinquenta", 50.0), ("sessenta", 60.0), ("setenta", 70.0), ("oitenta", 80.0), ("noventa", 90.0),
+    ("cem", 100.0), ("cento", 100.0), ("duzentos", 200.0), ("duzentas", 200.0), ("trezentos", 300.0), ("trezentas", 300.0), ("quatrocentos", 400.0), ("quatrocentas", 400.0), ("quinhentos", 500.0), ("quinhentas", 500.0),
+    ("seiscentos", 600.0), ("seiscentas", 600.0), ("setecentos", 700.0), ("setecentas", 700.0), ("oitocentos", 800.0), ("oitocentas", 800.0), ("novecentos", 900.0), ("novecentas", 900.0),
+];
+const PT_SCALES: [(&str, f64); 5] = [("mil", 1e3), ("milhao", 1e6), ("milhoes", 1e6), ("bilhao", 1e9), ("bilhoes", 1e9)];
+const PT_OPERATORS: [(&str, &str); 7] = [("multiplicado por", "*"), ("dividido por", "/"), ("elevado a", "^"), ("por cento", "%"), ("mais", "+"), ("menos", "-"), ("vezes", "*")];
+
+fn word_value(table: &[(&str, f64)], word: &str) -> Option<f64> {
+    table.iter().find(|(w, _)| *w == word).map(|(_, v)| *v)
+}
+
+pub fn spell_numbers(text: &str) -> Option<String> {
+    let words: Vec<String> = unaccent(&text.to_lowercase()).split_whitespace().map(str::to_owned).collect();
+    let is_word = |w: &str| word_value(&PT_NUMBERS, w).or_else(|| word_value(&PT_SCALES, w)).is_some();
+    let (mut out, mut changed, mut i) = (Vec::new(), false, 0);
+    while i < words.len() {
+        let operator = PT_OPERATORS.iter().find(|(phrase, _)| {
+            let n = phrase.split(' ').count();
+            words.get(i..i + n).is_some_and(|w| w.join(" ") == *phrase)
+        });
+        if let Some((phrase, op)) = operator {
+            out.push(op.to_string());
+            i += phrase.split(' ').count();
+            changed = true;
+            continue;
+        }
+        let (mut total, mut current, mut j, mut spelled) = (0.0, 0.0, i, false);
+        while let Some(w) = words.get(j) {
+            if let Some(v) = word_value(&PT_NUMBERS, w) {
+                current += v;
+                spelled = true;
+            } else if let Some(scale) = word_value(&PT_SCALES, w) {
+                total += if current == 0.0 { 1.0 } else { current } * scale;
+                current = 0.0;
+                spelled = true;
+            } else if w == "e" && spelled && words.get(j + 1).is_some_and(|n| is_word(n)) {
+            } else if j == i && words.get(j + 1).is_some_and(|n| word_value(&PT_SCALES, n).is_some()) && w.replace(',', ".").parse::<f64>().is_ok() {
+                current = w.replace(',', ".").parse().unwrap_or(0.0);
+            } else {
+                break;
+            }
+            j += 1;
+        }
+        if spelled {
+            out.push(format!("{}", total + current));
+            changed = true;
+            i = j;
+        } else {
+            out.push(words[i].clone());
+            i += 1;
+        }
+    }
+    changed.then(|| out.join(" "))
+}
+
 pub fn unaccent(text: &str) -> String {
     text.chars()
         .map(|c| match c {
@@ -445,6 +569,26 @@ mod tests {
         assert_eq!(number_to_words(1214.0).as_deref(), Some("One Thousand Two Hundred Fourteen"));
         assert_eq!(number_to_words(-40.0).as_deref(), Some("Minus Forty"));
         assert_eq!(number_to_words(2.5), None);
+        assert_eq!(number_to_words_pt(1214.0).as_deref(), Some("Mil duzentos e quatorze"));
+        assert_eq!(number_to_words_pt(2300.0).as_deref(), Some("Dois mil e trezentos"));
+        assert_eq!(number_to_words_pt(100.0).as_deref(), Some("Cem"));
+        assert_eq!(number_to_words_pt(1_000_001.0).as_deref(), Some("Um milhão e um"));
+        assert_eq!(number_to_words_pt(-21.0).as_deref(), Some("Menos vinte e um"));
+    }
+
+    #[test]
+    fn reads_portuguese_number_words() {
+        assert_eq!(spell_numbers("dois mais três").as_deref(), Some("2 + 3"));
+        assert_eq!(spell_numbers("cem reais em dólares").as_deref(), Some("100 reais em dolares"));
+        assert_eq!(spell_numbers("cento e vinte e cinco dividido por cinco").as_deref(), Some("125 / 5"));
+        assert_eq!(spell_numbers("dois mil e trezentos vezes 2").as_deref(), Some("2300 * 2"));
+        assert_eq!(spell_numbers("um milhão e duzentos mil").as_deref(), Some("1200000"));
+        assert_eq!(spell_numbers("10 mil reais em usd").as_deref(), Some("10000 reais em usd"));
+        assert_eq!(spell_numbers("mil e um").as_deref(), Some("1001"));
+        assert_eq!(spell_numbers("dez por cento").as_deref(), Some("10 %"));
+        assert_eq!(spell_numbers("rock e roll"), None);
+        assert_eq!(spell_numbers("100 usd in eur"), None);
+        assert_eq!(evaluate(&spell_numbers("dois elevado a dez").unwrap()), Some(1024.0));
     }
 
     fn known() -> HashSet<String> {

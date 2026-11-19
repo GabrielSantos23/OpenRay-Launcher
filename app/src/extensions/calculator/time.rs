@@ -129,14 +129,36 @@ static ISO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\d{4})-(\d{1,2})-(
 static DMY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{4}))?$").unwrap());
 static UNTIL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(?:days? (?:until|to)|dias ate|dias até)\s+(.+)$").unwrap());
 
+static DAY_MONTH: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\d{1,2})(?:st|nd|rd|th|º)?\s+(?:de\s+|of\s+)?([a-z]+)\.?(?:,?\s+(?:de\s+)?(\d{4}))?$").unwrap());
+static MONTH_DAY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?$").unwrap());
+static ARTICLE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?:the|o|a)\s+").unwrap());
+const HOLIDAYS: [(&str, i64, i64); 7] = [("christmas", 12, 25), ("christmas day", 12, 25), ("natal", 12, 25), ("halloween", 10, 31), ("new year", 1, 1), ("new years", 1, 1), ("ano novo", 1, 1)];
+
+fn civil_day(year: i64, month: i64, day: i64) -> Option<i64> {
+    let first = days_from_civil(year, month, 1);
+    ((1..=12).contains(&month) && day >= 1 && day <= days_from_civil(year, month + 1, 1) - first).then(|| first + day - 1)
+}
+
 pub fn parse_target_day(text: &str, today: i64) -> Option<i64> {
-    let trimmed = text.trim();
+    let lower = unaccent(&text.trim().to_lowercase()).replace('\'', "");
+    let trimmed = ARTICLE.replace(&lower, "");
+    let trimmed = trimmed.as_ref();
     let num = |s: &str| s.parse::<i64>().ok();
+    let this_year = civil_from_days(today).0;
     if let Some(c) = ISO.captures(trimmed) {
         return Some(days_from_civil(num(&c[1])?, num(&c[2])?, num(&c[3])?));
     }
+    if let Some((_, month, day)) = HOLIDAYS.iter().find(|(name, _, _)| *name == trimmed) {
+        let this = civil_day(this_year, *month, *day)?;
+        return if this < today { civil_day(this_year + 1, *month, *day) } else { Some(this) };
+    }
+    let named = DAY_MONTH.captures(trimmed).map(|c| (c[1].to_owned(), c[2].to_owned(), c.get(3))).or_else(|| MONTH_DAY.captures(trimmed).map(|c| (c[2].to_owned(), c[1].to_owned(), c.get(3))));
+    if let Some((day, month, year)) = named {
+        let year = year.map_or(Some(this_year), |y| num(y.as_str()))?;
+        return civil_day(year, super::extra::month_of(&month)?, num(&day)?);
+    }
     let c = DMY.captures(trimmed)?;
-    let year = c.get(3).map_or(Some(civil_from_days(today).0), |y| num(y.as_str()))?;
+    let year = c.get(3).map_or(Some(this_year), |y| num(y.as_str()))?;
     Some(days_from_civil(year, num(&c[2])?, num(&c[1])?))
 }
 
@@ -201,6 +223,14 @@ mod tests {
         assert_eq!(parse_target_day("25/12", today).map(|d| d - today), Some(51));
         assert_eq!(parse_target_day("2027-01-01", today).map(|d| d - today), Some(58));
         assert_eq!(parse_days_until("days until 25/12").as_deref(), Some("25/12"));
+        for text in ["Dec 25", "december 25th", "25 dec", "25 de dezembro", "25 de Dezembro de 2026", "dez 25", "the 25th of december", "christmas", "Natal", "o natal", "December 25, 2026"] {
+            assert_eq!(parse_target_day(text, today).map(|d| d - today), Some(51), "{text}");
+        }
+        assert_eq!(parse_target_day("new year's", today).map(|d| d - today), Some(58));
+        assert_eq!(parse_target_day("halloween", today), Some(days_from_civil(2027, 10, 31)));
+        assert_eq!(parse_target_day("1 março", today).map(|d| d - today), Some(days_from_civil(2026, 3, 1) - today));
+        assert_eq!(parse_target_day("31 fev", today), None);
+        assert_eq!(parse_target_day("25 blah", today), None);
         assert_eq!(parse_time_diff("time difference between london and tokyo"), Some(("london".into(), "tokyo".into())));
         assert_eq!(format_diff(330), "+5 h 30 min");
         assert_eq!(format_diff(-180), "-3 h");
