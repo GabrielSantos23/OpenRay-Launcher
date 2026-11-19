@@ -84,13 +84,13 @@ fn gap_before(prev: Option<Block>, block: Block) -> f32 {
 
 fn base_format(block: Block) -> (egui::FontId, f32, Color32) {
     match block.kind {
-        Kind::Heading(1) => (theme::weighted(24.0, theme::BOLD), 30.0, theme::FG),
-        Kind::Heading(2) => (theme::weighted(18.0, theme::SEMIBOLD), 24.0, theme::FG),
-        Kind::Heading(_) => (theme::weighted(15.0, theme::SEMIBOLD), 21.0, theme::FG),
-        Kind::Code => (theme::mono(12.0), 18.0, theme::FG),
-        Kind::Quote => (theme::font(BODY), 21.0, theme::FG_60),
-        Kind::Task(true) => (theme::font(BODY), 21.0, theme::FG_40),
-        _ => (theme::font(BODY), 21.0, theme::FG),
+        Kind::Heading(1) => (theme::weighted(24.0, theme::BOLD), 30.0, theme::FG()),
+        Kind::Heading(2) => (theme::weighted(18.0, theme::SEMIBOLD), 24.0, theme::FG()),
+        Kind::Heading(_) => (theme::weighted(15.0, theme::SEMIBOLD), 21.0, theme::FG()),
+        Kind::Code => (theme::mono(12.0), 18.0, theme::FG()),
+        Kind::Quote => (theme::font(BODY), 21.0, theme::FG_60()),
+        Kind::Task(true) => (theme::font(BODY), 21.0, theme::FG_40()),
+        _ => (theme::font(BODY), 21.0, theme::FG()),
     }
 }
 
@@ -103,11 +103,11 @@ fn format_for(block: Block, style: &Style) -> TextFormat {
     let mut format = TextFormat { font_id: font, line_height: Some(line_height), color, ..Default::default() };
     if style.marks & CODE != 0 && block.kind != Kind::Code {
         format.font_id = theme::mono(12.0);
-        format.background = theme::KEY_BG;
+        format.background = theme::KEY_BG();
         format.expand_bg = 1.0;
     }
     if style.link.is_some() {
-        color = theme::RED;
+        color = theme::RED();
         format.color = color;
         format.underline = Stroke::new(1.0, color);
     }
@@ -426,7 +426,7 @@ impl NoteEditor {
                 _ if block.joined => {}
                 Kind::Bullet => {
                     let glyph = if block.indent % 3 == 1 { "◦" } else if block.indent % 3 == 2 { "▪" } else { "•" };
-                    painter.text(pos2(x - 12.0, center_y), egui::Align2::CENTER_CENTER, glyph, theme::font(BODY), theme::FG);
+                    painter.text(pos2(x - 12.0, center_y), egui::Align2::CENTER_CENTER, glyph, theme::font(BODY), theme::FG());
                 }
                 Kind::Ordered => {
                     let level = block.indent as usize;
@@ -434,15 +434,15 @@ impl NoteEditor {
                     let continues = prev.is_some_and(|p| p.kind.is_list() && (p.indent as usize > level || p.kind == Kind::Ordered && p.indent as usize == level));
                     counters[level] = if continues { counters[level] + 1 } else { 1 };
                     counters.truncate(level + 1);
-                    painter.text(pos2(x - 6.0, center_y), egui::Align2::RIGHT_CENTER, format!("{}.", counters[level]), theme::font(BODY), theme::FG);
+                    painter.text(pos2(x - 6.0, center_y), egui::Align2::RIGHT_CENTER, format!("{}.", counters[level]), theme::font(BODY), theme::FG());
                 }
                 Kind::Task(checked) => {
                     let rect = Rect::from_center_size(pos2(x - 15.0, center_y), vec2(14.0, 14.0));
                     if checked {
-                        painter.rect_filled(rect, 3.0, theme::ACCENT);
+                        painter.rect_filled(rect, 3.0, theme::ACCENT());
                         painter.add(Shape::line(vec![pos2(rect.left() + 3.0, rect.center().y), pos2(rect.left() + 6.0, rect.bottom() - 4.0), pos2(rect.right() - 3.0, rect.top() + 4.0)], Stroke::new(1.6, Color32::WHITE)));
                     } else {
-                        painter.rect_stroke(rect, 3.0, Stroke::new(1.0, theme::FG_60), egui::StrokeKind::Inside);
+                        painter.rect_stroke(rect, 3.0, Stroke::new(1.0, theme::FG_60()), egui::StrokeKind::Inside);
                     }
                     if clicked && pointer.is_some_and(|p| rect.expand(3.0).contains(p)) {
                         toggle = Some(line);
@@ -450,7 +450,7 @@ impl NoteEditor {
                 }
                 Kind::Quote => {
                     let rect = Rect::from_min_max(pos2(left, geometry.rows.top()), pos2(left + 2.0, geometry.rows.bottom()));
-                    shapes.push(Shape::rect_filled(rect, 0.0, theme::FOOTER_DIVIDER));
+                    shapes.push(Shape::rect_filled(rect, 0.0, theme::FOOTER_DIVIDER()));
                 }
                 Kind::Code => {
                     let top = if prev.is_some_and(|p| p.kind == Kind::Code) { geometry.rows.top() } else { geometry.rows.top() - CODE_PAD };
@@ -458,11 +458,11 @@ impl NoteEditor {
                     let bottom = if last { geometry.rows.bottom() + CODE_PAD } else { geometry.rows.bottom() };
                     let rect = Rect::from_min_max(pos2(left, top), pos2(right, bottom));
                     let rounding = egui::CornerRadius { nw: if top < geometry.rows.top() { 6 } else { 0 }, ne: if top < geometry.rows.top() { 6 } else { 0 }, sw: if last { 6 } else { 0 }, se: if last { 6 } else { 0 } };
-                    shapes.push(Shape::rect_filled(rect, rounding, theme::KEY_BG));
+                    shapes.push(Shape::rect_filled(rect, rounding, theme::KEY_BG()));
                 }
                 Kind::Rule => {
                     let rect = Rect::from_min_max(pos2(left, center_y - 1.0), pos2(right, center_y + 1.0));
-                    shapes.push(Shape::rect_filled(rect, 0.0, theme::SEPARATOR));
+                    shapes.push(Shape::rect_filled(rect, 0.0, theme::SEPARATOR()));
                 }
                 _ => {}
             }

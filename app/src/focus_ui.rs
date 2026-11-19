@@ -149,7 +149,7 @@ pub fn own_window(title: &str) -> Option<HWND> {
 
 fn popup_styles(hwnd: HWND, activatable: bool) {
     launcher::set_dwm(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND);
-    launcher::set_dwm(hwnd, DWMWA_BORDER_COLOR, theme::WINDOW_BORDER);
+    launcher::set_dwm(hwnd, DWMWA_BORDER_COLOR, theme::WINDOW_BORDER());
     launcher::set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
     unsafe {
         let mut ex = (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32 & !WS_EX_APPWINDOW.0) | WS_EX_TOOLWINDOW.0;
@@ -173,7 +173,7 @@ pub fn popup(title: &str, size: egui::Vec2, position: Pos2, active: bool) -> egu
 }
 
 pub fn paint_text(ui: &Ui, anchor: Pos2, align: Align2, text: &str, font: egui::FontId, color: Color32, max_width: f32) -> Rect {
-    let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
+    let mut job = egui::text::LayoutJob::simple_singleline(crate::i18n::tr(text).into_owned(), font, color);
     job.wrap = egui::text::TextWrapping::truncate_at_width(max_width);
     let galley = ui.fonts_mut(|f| f.layout_job(job));
     let rect = align.anchor_size(anchor, galley.size());
@@ -183,20 +183,20 @@ pub fn paint_text(ui: &Ui, anchor: Pos2, align: Align2, text: &str, font: egui::
 
 fn button(ui: &mut Ui, rect: Rect, id: &str, text: &str, glyph: Option<&str>, font_size: f32) -> egui::Response {
     let response = ui.interact(rect, egui::Id::unique(("focus-button", id)), Sense::click());
-    let fill = if response.hovered() || response.is_pointer_button_down_on() { theme::CONTROL_HOVER } else { theme::CONTROL };
+    let fill = if response.hovered() || response.is_pointer_button_down_on() { theme::CONTROL_HOVER() } else { theme::CONTROL() };
     ui.painter().rect_filled(rect, 6.0, fill);
     if response.has_focus() {
-        ui.painter().rect_stroke(rect.expand(2.0), 8.0, Stroke::new(1.0, theme::FG_40), egui::StrokeKind::Outside);
+        ui.painter().rect_stroke(rect.expand(2.0), 8.0, Stroke::new(1.0, theme::FG_40()), egui::StrokeKind::Outside);
     }
     let font = theme::weighted(font_size, theme::MEDIUM);
     match glyph {
-        Some(name) if text.is_empty() => icons::paint_glyph(ui, name, Rect::from_center_size(rect.center(), vec2(14.0, 14.0)), theme::FG),
+        Some(name) if text.is_empty() => icons::paint_glyph(ui, name, Rect::from_center_size(rect.center(), vec2(14.0, 14.0)), theme::FG()),
         Some(name) => {
-            let label = paint_text(ui, pos2(rect.left() + 8.0, rect.center().y), Align2::LEFT_CENTER, text, font, theme::FG, rect.width());
-            icons::paint_glyph(ui, name, Rect::from_center_size(pos2(label.right() + 6.0 + 7.0, rect.center().y), vec2(14.0, 14.0)), theme::FG);
+            let label = paint_text(ui, pos2(rect.left() + 8.0, rect.center().y), Align2::LEFT_CENTER, text, font, theme::FG(), rect.width());
+            icons::paint_glyph(ui, name, Rect::from_center_size(pos2(label.right() + 6.0 + 7.0, rect.center().y), vec2(14.0, 14.0)), theme::FG());
         }
         None => {
-            paint_text(ui, rect.center(), Align2::CENTER_CENTER, text, font, theme::FG, rect.width());
+            paint_text(ui, rect.center(), Align2::CENTER_CENTER, text, font, theme::FG(), rect.width());
         }
     }
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, if text.is_empty() { id } else { text }));
@@ -204,7 +204,7 @@ fn button(ui: &mut Ui, rect: Rect, id: &str, text: &str, glyph: Option<&str>, fo
 }
 
 fn button_width(ui: &Ui, text: &str, glyph: bool, font_size: f32) -> f32 {
-    let width = ui.fonts_mut(|f| f.layout_no_wrap(text.to_owned(), theme::weighted(font_size, theme::MEDIUM), theme::FG)).size().x;
+    let width = ui.fonts_mut(|f| f.layout_no_wrap(crate::i18n::tr(&text).into_owned(), theme::weighted(font_size, theme::MEDIUM), theme::FG())).size().x;
     width + if glyph { 8.0 + 6.0 + 14.0 + 6.0 } else { 24.0 }
 }
 
@@ -324,11 +324,11 @@ fn show_panel(ctx: &egui::Context) {
         let ctx = ui.ctx().clone();
         let rect = ui.max_rect();
         let paused = session.status == Status::Paused;
-        ui.painter().rect_filled(rect, 0.0, theme::PANEL);
+        ui.painter().rect_filled(rect, 0.0, theme::PANEL());
         let progress = elapsed_fraction(&session, now);
         if progress > 0.0 {
             let fill = Rect::from_min_size(rect.min, vec2((rect.width() * progress).round(), rect.height()));
-            ui.painter().rect_filled(fill, 0.0, (if paused { YELLOW } else { theme::GREEN }).gamma_multiply(0.28));
+            ui.painter().rect_filled(fill, 0.0, (if paused { YELLOW } else { theme::GREEN() }).gamma_multiply(0.28));
         }
         let hovered = ui.input(|i| i.pointer.any_down() || i.pointer.hover_pos().is_some_and(|p| rect.contains(p))) || focus::MENU_OPEN.load(std::sync::atomic::Ordering::SeqCst);
         let y = rect.center().y;
@@ -336,10 +336,10 @@ fn show_panel(ctx: &egui::Context) {
             let mut x = rect.left() + 8.0;
             match shown_timer(&session, now) {
                 Some(timer) => {
-                    let width = ui.fonts_mut(|f| f.layout_no_wrap(timer.clone(), theme::mono(12.0), theme::FG_60)).size().x + 24.0;
+                    let width = ui.fonts_mut(|f| f.layout_no_wrap(crate::i18n::tr(&timer).into_owned(), theme::mono(12.0), theme::FG_60())).size().x + 24.0;
                     let pill = Rect::from_min_size(pos2(x, y - 12.0), vec2(width, 24.0));
-                    ui.painter().rect_filled(pill, 6.0, theme::CONTROL);
-                    paint_text(ui, pill.center(), Align2::CENTER_CENTER, &timer, theme::mono(12.0), theme::FG_60, width);
+                    ui.painter().rect_filled(pill, 6.0, theme::CONTROL());
+                    paint_text(ui, pill.center(), Align2::CENTER_CENTER, &timer, theme::mono(12.0), theme::FG_60(), width);
                     x = pill.right() + 8.0;
                 }
                 None => {
@@ -348,7 +348,7 @@ fn show_panel(ctx: &egui::Context) {
                     x = tile.right() + 8.0;
                 }
             }
-            paint_text(ui, pos2(x, y), Align2::LEFT_CENTER, &session.title, theme::font(13.0), theme::FG, rect.right() - 8.0 - x);
+            paint_text(ui, pos2(x, y), Align2::LEFT_CENTER, &session.title, theme::font(13.0), theme::FG(), rect.right() - 8.0 - x);
             return;
         }
         let ppp = ui.ctx().pixels_per_point();
@@ -377,7 +377,7 @@ fn show_panel(ctx: &egui::Context) {
         let grip = Rect::from_min_size(pos2(rect.right() - 8.0 - 20.0, y - 12.0), vec2(20.0, 24.0));
         let drag = ui.interact(grip, egui::Id::unique("focus-grip"), Sense::click_and_drag());
         drag.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Drag Focus Panel"));
-        icons::paint_glyph(ui, "grip-vertical", Rect::from_center_size(grip.center(), vec2(16.0, 16.0)), theme::FG_60);
+        icons::paint_glyph(ui, "grip-vertical", Rect::from_center_size(grip.center(), vec2(16.0, 16.0)), theme::FG_60());
         if drag.double_clicked() {
             reset_panel(&ctx);
         } else if drag.drag_started() {
@@ -420,7 +420,7 @@ fn show_toast(ctx: &egui::Context) {
         }
         let ctx = ui.ctx().clone();
         let rect = ui.max_rect();
-        ui.painter().rect_filled(rect, 0.0, theme::PANEL);
+        ui.painter().rect_filled(rect, 0.0, theme::PANEL());
         let tile = Rect::from_min_size(pos2(rect.left() + 16.0, rect.center().y - 11.0), vec2(22.0, 22.0));
         icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(tile)), &ICON, "Focus", 22.0);
         let mut right = rect.right() - 36.0;
@@ -437,18 +437,18 @@ fn show_toast(ctx: &egui::Context) {
         let left = tile.right() + 12.0;
         let width = right - left;
         if notice.message.is_empty() {
-            paint_text(ui, pos2(left, rect.center().y), Align2::LEFT_CENTER, &notice.title, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, width);
+            paint_text(ui, pos2(left, rect.center().y), Align2::LEFT_CENTER, &notice.title, theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), width);
         } else {
-            paint_text(ui, pos2(left, rect.center().y - 1.0), Align2::LEFT_BOTTOM, &notice.title, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, width);
-            paint_text(ui, pos2(left, rect.center().y + 1.0), Align2::LEFT_TOP, &notice.message, theme::font(12.0), theme::FG_60, width);
+            paint_text(ui, pos2(left, rect.center().y - 1.0), Align2::LEFT_BOTTOM, &notice.title, theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), width);
+            paint_text(ui, pos2(left, rect.center().y + 1.0), Align2::LEFT_TOP, &notice.message, theme::font(12.0), theme::FG_60(), width);
         }
         let close = Rect::from_min_size(pos2(rect.right() - 8.0 - 20.0, rect.top() + 8.0), vec2(20.0, 20.0));
         let response = ui.interact(close, egui::Id::unique("focus-toast-close"), Sense::click());
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Close"));
         if response.hovered() {
-            ui.painter().rect_filled(close, 4.0, theme::CONTROL);
+            ui.painter().rect_filled(close, 4.0, theme::CONTROL());
         }
-        icons::paint_glyph(ui, "x", Rect::from_center_size(close.center(), vec2(14.0, 14.0)), if response.hovered() { theme::FG } else { theme::FG_60 });
+        icons::paint_glyph(ui, "x", Rect::from_center_size(close.center(), vec2(14.0, 14.0)), if response.hovered() { theme::FG() } else { theme::FG_60() });
         if response.clicked() {
             with(|w| w.toast = None);
         }
@@ -496,9 +496,9 @@ fn show_block(ctx: &egui::Context) {
         let center = rect.center();
         let content = 16.0 + 12.0 + 20.0 + if buttons.is_empty() { 0.0 } else { 16.0 + 30.0 } + 20.0 + 14.0;
         let mut y = center.y - content / 2.0;
-        icons::paint_glyph(ui, "target", Rect::from_min_size(pos2(center.x - 8.0, y), vec2(16.0, 16.0)), theme::FG_60);
+        icons::paint_glyph(ui, "target", Rect::from_min_size(pos2(center.x - 8.0, y), vec2(16.0, 16.0)), theme::FG_60());
         y += 16.0 + 12.0;
-        paint_text(ui, pos2(center.x, y), Align2::CENTER_TOP, &format!("{} has been blocked by Openray", block.name), theme::weighted(15.0, theme::SEMIBOLD), theme::FG, rect.width() * 0.8);
+        paint_text(ui, pos2(center.x, y), Align2::CENTER_TOP, &format!("{} has been blocked by Openray", block.name), theme::weighted(15.0, theme::SEMIBOLD), theme::FG(), rect.width() * 0.8);
         y += 20.0;
         if !buttons.is_empty() {
             y += 16.0;
@@ -525,7 +525,7 @@ fn show_block(ctx: &egui::Context) {
         }
         y += 20.0;
         let note = if block.website { "Switching focus to another window will hide this page." } else { "Switching focus to another window will close this app." };
-        paint_text(ui, pos2(center.x, y), Align2::CENTER_TOP, note, theme::font(11.0), theme::FG_60, rect.width() * 0.8);
+        paint_text(ui, pos2(center.x, y), Align2::CENTER_TOP, note, theme::font(11.0), theme::FG_60(), rect.width() * 0.8);
     });
 }
 

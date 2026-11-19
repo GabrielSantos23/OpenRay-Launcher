@@ -47,6 +47,7 @@ mod extensions;
 #[allow(dead_code, unused_imports)]
 mod hotkey;
 mod icons;
+mod i18n;
 mod icu;
 mod launcher;
 mod root;
@@ -158,7 +159,7 @@ impl eframe::App for App {
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        theme::BG.to_normalized_gamma_f32()
+        theme::BG().to_normalized_gamma_f32()
     }
 }
 

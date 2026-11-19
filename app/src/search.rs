@@ -105,6 +105,13 @@ pub struct Section<'a, T> {
     pub items: Vec<&'a T>,
 }
 
+fn translated_score(query: &str, title: &str) -> u32 {
+    match crate::i18n::tr(title) {
+        std::borrow::Cow::Owned(shown) => match_score(query, &crate::extensions::calculator::math::unaccent(&shown), &[shown.clone()]),
+        std::borrow::Cow::Borrowed(_) => 0,
+    }
+}
+
 fn alias_score(query: &str, alias: Option<&String>) -> u32 {
     let q = query.trim().to_lowercase();
     match alias {
@@ -137,7 +144,7 @@ pub fn search<'a, T: Searchable>(commands: &'a [T], query: &str, frecency: &Frec
     }
     let mut scored: Vec<(u32, &T)> = commands
         .iter()
-        .map(|c| (alias_score(query, aliases.get(c.key())).max(match_score(query, c.title(), c.keywords())), c))
+        .map(|c| (alias_score(query, aliases.get(c.key())).max(match_score(query, c.title(), c.keywords())).max(translated_score(query, c.title())), c))
         .filter(|(score, _)| *score > 0)
         .collect();
     scored.sort_by(|(sa, a), (sb, b)| sb.cmp(sa).then_with(|| order(a, b)));

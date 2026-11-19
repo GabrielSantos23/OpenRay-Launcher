@@ -341,8 +341,8 @@ impl View for SearchQuicklinks {
         let info = crate::root::metadata(ui, rect, &rows);
         let area = Rect::from_min_max(rect.min, pos2(rect.right(), info.top())).shrink(16.0);
         let preview = display_link(&q.link, self.values.get(id).unwrap_or(&HashMap::new()));
-        let galley = crate::root::wrapped(ui, &preview, egui::FontId::monospace(13.0), crate::theme::FG, area.width());
-        ui.painter().with_clip_rect(area).galley(area.min, galley, crate::theme::FG);
+        let galley = crate::root::wrapped(ui, &preview, egui::FontId::monospace(13.0), crate::theme::FG(), area.width());
+        ui.painter().with_clip_rect(area).galley(area.min, galley, crate::theme::FG());
     }
 
     fn sections(&mut self) -> Vec<Section> {

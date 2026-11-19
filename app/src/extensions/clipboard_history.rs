@@ -426,25 +426,25 @@ impl View for HistoryView {
                 let swatch = Rect::from_center_size(preview.center(), vec2(128.0, 128.0));
                 let fill = color::parse(text.trim()).map_or(egui::Color32::TRANSPARENT, |c| crate::extensions::calculator::swatch(&c.rgba));
                 ui.painter().rect_filled(swatch, 12.0, fill);
-                ui.painter().rect_stroke(swatch, 12.0, egui::Stroke::new(1.0, theme::KEY_BORDER), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(swatch, 12.0, egui::Stroke::new(1.0, theme::KEY_BORDER()), egui::StrokeKind::Inside);
             }
             (Content::Files { paths }, _) => {
                 let mut y = preview.top();
                 for path in paths {
-                    let galley = root::wrapped(ui, path, egui::FontId::monospace(13.0), theme::FG, preview.width() - 24.0);
+                    let galley = root::wrapped(ui, path, egui::FontId::monospace(13.0), theme::FG(), preview.width() - 24.0);
                     let height = galley.size().y;
                     let icon = Rect::from_min_size(pos2(preview.left(), y + (height - 16.0).max(0.0) / 2.0), vec2(16.0, 16.0));
                     crate::icons::command_icon(&mut ui.new_child(egui::UiBuilder::new().max_rect(icon)), &Icon::File(path.clone()), path, 16.0);
-                    ui.painter().galley(pos2(preview.left() + 24.0, y), galley, theme::FG);
+                    ui.painter().galley(pos2(preview.left() + 24.0, y), galley, theme::FG());
                     y += height + 8.0;
                 }
             }
             (Content::Text { text }, _) => {
                 let mut child = ui.new_child(egui::UiBuilder::new().max_rect(preview));
                 egui::ScrollArea::vertical().id_salt(("clip-preview", &entry.id)).auto_shrink(false).show(&mut child, |ui| {
-                    let galley = root::wrapped(ui, text, egui::FontId::monospace(13.0), theme::FG, preview.width());
+                    let galley = root::wrapped(ui, text, egui::FontId::monospace(13.0), theme::FG(), preview.width());
                     let (rect, _) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
-                    ui.painter().galley(rect.min, galley, theme::FG);
+                    ui.painter().galley(rect.min, galley, theme::FG());
                 });
             }
         }

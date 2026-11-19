@@ -166,16 +166,16 @@ fn paint_detail(ui: &mut Ui, rect: Rect, file: &FileHit, home: &str, preview: &P
     let area = Rect::from_min_max(rect.min, pos2(rect.right(), info.top())).shrink(16.0);
     match loaded {
         Some(Err(_)) => {
-            let galley = root::wrapped(ui, "This file is no longer available.", theme::font(13.0), theme::FG_60, area.width());
-            ui.painter().galley(area.center() - galley.size() / 2.0, galley, theme::FG_60);
+            let galley = root::wrapped(ui, "This file is no longer available.", theme::font(13.0), theme::FG_60(), area.width());
+            ui.painter().galley(area.center() - galley.size() / 2.0, galley, theme::FG_60());
         }
         Some(Ok(data)) if data.1.is_some() => {
             let text = data.1.as_deref().unwrap_or_default();
             let mut child = ui.new_child(egui::UiBuilder::new().max_rect(area));
             egui::ScrollArea::vertical().id_salt(("file-preview", &file.path)).auto_shrink(false).show(&mut child, |ui| {
-                let galley = root::wrapped(ui, text, egui::FontId::monospace(12.0), theme::FG, area.width());
+                let galley = root::wrapped(ui, text, egui::FontId::monospace(12.0), theme::FG(), area.width());
                 let (r, _) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
-                ui.painter().galley(r.min, galley, theme::FG);
+                ui.painter().galley(r.min, galley, theme::FG());
             });
         }
         _ => {

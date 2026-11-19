@@ -354,8 +354,8 @@ impl View for SearchSnippets {
         rows.extend([("Content Type".to_string(), "Text".to_string()), ("Times Copied".into(), s.copy_count.unwrap_or(0).to_string()), ("Last Copied".into(), when(s.copied_at)), ("Modified".into(), when(Some(s.modified_at))), ("Created".into(), when(Some(s.created_at)))]);
         let info = crate::root::metadata(ui, rect, &rows);
         let area = Rect::from_min_max(rect.min, pos2(rect.right(), info.top())).shrink(16.0);
-        let galley = crate::root::wrapped(ui, &s.text, egui::FontId::monospace(13.0), crate::theme::FG, area.width());
-        ui.painter().with_clip_rect(area).galley(area.min, galley, crate::theme::FG);
+        let galley = crate::root::wrapped(ui, &s.text, egui::FontId::monospace(13.0), crate::theme::FG(), area.width());
+        ui.painter().with_clip_rect(area).galley(area.min, galley, crate::theme::FG());
     }
 
     fn sections(&mut self) -> Vec<Section> {

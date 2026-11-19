@@ -514,17 +514,17 @@ impl View for MySchedule {
         let area = Rect::from_min_max(rect.min, pos2(rect.right(), info.top())).shrink(16.0);
         let painter = ui.painter().with_clip_rect(area);
         let title = if event.title.is_empty() { "Untitled event" } else { &event.title };
-        let mut job = egui::text::LayoutJob::single_section(title.to_owned(), egui::TextFormat { font_id: theme::weighted(15.0, theme::SEMIBOLD), color: theme::FG, strikethrough: if event.canceled { egui::Stroke::new(1.0, theme::FG) } else { egui::Stroke::NONE }, ..Default::default() });
+        let mut job = egui::text::LayoutJob::single_section(title.to_owned(), egui::TextFormat { font_id: theme::weighted(15.0, theme::SEMIBOLD), color: theme::FG(), strikethrough: if event.canceled { egui::Stroke::new(1.0, theme::FG()) } else { egui::Stroke::NONE }, ..Default::default() });
         job.wrap.max_width = area.width();
         let galley = ui.ctx().fonts_mut(|f| f.layout_job(job));
         let mut y = area.top() + galley.size().y + 8.0;
-        painter.galley(area.min, galley, theme::FG);
+        painter.galley(area.min, galley, theme::FG());
         if !event.link.is_empty() {
-            let link = crate::root::wrapped(ui, &event.link, theme::font(13.0), theme::FG_60, area.width());
+            let link = crate::root::wrapped(ui, &event.link, theme::font(13.0), theme::FG_60(), area.width());
             y += link.size().y + 8.0;
-            painter.galley(pos2(area.left(), y - link.size().y - 8.0), link, theme::FG_60);
+            painter.galley(pos2(area.left(), y - link.size().y - 8.0), link, theme::FG_60());
         }
-        let (notes, color) = if event.notes.is_empty() { ("No notes", theme::FG_40) } else { (event.notes.as_str(), theme::FG) };
+        let (notes, color) = if event.notes.is_empty() { ("No notes", theme::FG_40()) } else { (event.notes.as_str(), theme::FG()) };
         painter.galley(pos2(area.left(), y), crate::root::wrapped(ui, notes, theme::font(13.0), color, area.width()), color);
     }
 

@@ -1,7 +1,7 @@
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
 use windows::Win32::System::Registry::{
-    RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_BINARY, RRF_RT_REG_SZ,
+    RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_BINARY, RRF_RT_REG_DWORD, RRF_RT_REG_SZ,
 };
 
 const RUN_KEY: PCWSTR = w!(r"Software\Microsoft\Windows\CurrentVersion\Run");
@@ -48,4 +48,12 @@ pub fn accent_color() -> Option<String> {
         )
     };
     (read.is_ok() && size >= 16).then(|| format!("#{:02X}{:02X}{:02X}", palette[12], palette[13], palette[14]))
+}
+
+pub fn read_dword(key: &str, value: &str) -> Option<u32> {
+    let key: Vec<u16> = key.encode_utf16().chain(std::iter::once(0)).collect();
+    let value: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+    let (mut data, mut size) = (0u32, 4u32);
+    let read = unsafe { RegGetValueW(HKEY_CURRENT_USER, PCWSTR(key.as_ptr()), PCWSTR(value.as_ptr()), RRF_RT_REG_DWORD, None, Some(&mut data as *mut u32 as _), Some(&mut size)) };
+    read.is_ok().then_some(data)
 }

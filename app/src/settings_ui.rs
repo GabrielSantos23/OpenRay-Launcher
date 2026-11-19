@@ -1,6 +1,6 @@
 use super::{back_button, paint_text, Launcher};
 use crate::extension::{Icon, Tone};
-use crate::store::{CommandPrefs, EscapeKeyBehavior, Settings, ShowOn};
+use crate::store::{Appearance, CommandPrefs, EscapeKeyBehavior, Language, Settings, ShowOn};
 use crate::{icons, theme};
 use egui::{pos2, vec2, Align2, Color32, Key, Rect, Sense, Stroke, Ui, UiBuilder};
 use crate::flowkey_host::{self as flowkey, Installed};
@@ -16,8 +16,14 @@ const SIDEBAR: f32 = 230.0;
 const ROW: f32 = 47.0;
 const CONTROL: f32 = 24.0;
 const SLOT: usize = 1000;
-const CARD: Color32 = theme::fg(3);
-const SEPARATOR: Color32 = theme::fg(6);
+#[allow(non_snake_case)]
+fn CARD() -> Color32 {
+    theme::fg(3)
+}
+#[allow(non_snake_case)]
+fn SEPARATOR() -> Color32 {
+    theme::fg(6)
+}
 const PAGES: [(&str, &str, &str, &[&str]); 5] = [
     ("general", "General", "settings", &["open at login", "system tray", "hotkey", "start menu"]),
     ("launcher", "Launcher", "rocket", &["show openray on", "screen", "monitor"]),
@@ -207,11 +213,11 @@ pub fn hotkey_labels(hotkey: &str) -> Vec<String> {
 fn keycap_row(ui: &Ui, left: f32, center_y: f32, labels: &[String]) -> f32 {
     let mut x = left;
     for label in labels {
-        let galley = super::text_galley(ui, label, theme::weighted(12.0, theme::MEDIUM), theme::FG, 200.0);
+        let galley = super::text_galley(ui, label, theme::weighted(12.0, theme::MEDIUM), theme::FG(), 200.0);
         let width = (galley.size().x + 12.0).max(CONTROL);
         let rect = Rect::from_min_size(pos2(x, center_y - CONTROL / 2.0), vec2(width, CONTROL));
-        ui.painter().rect_filled(rect, 4.0, theme::CONTROL);
-        ui.painter().galley(rect.center() - galley.size() / 2.0, galley, theme::FG);
+        ui.painter().rect_filled(rect, 4.0, theme::CONTROL());
+        ui.painter().galley(rect.center() - galley.size() / 2.0, galley, theme::FG());
         x = rect.right() + 4.0;
     }
     x
@@ -219,15 +225,15 @@ fn keycap_row(ui: &Ui, left: f32, center_y: f32, labels: &[String]) -> f32 {
 
 fn text_button(ui: &mut Ui, right: f32, center_y: f32, label: &str, id: &str, enabled: bool) -> (Rect, bool) {
     let font = theme::weighted(13.0, theme::MEDIUM);
-    let width = ui.fonts_mut(|f| f.layout_no_wrap(label.to_owned(), font.clone(), theme::FG)).size().x + 20.0;
+    let width = ui.fonts_mut(|f| f.layout_no_wrap(crate::i18n::tr(&label).into_owned(), font.clone(), theme::FG())).size().x + 20.0;
     let rect = Rect::from_min_size(pos2(right - width, center_y - CONTROL / 2.0), vec2(width, CONTROL));
     let response = ui.interact(rect, egui::Id::unique(("settings-button", id)), if enabled { Sense::click() } else { Sense::hover() });
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, label));
-    ui.painter().rect_filled(rect, 5.0, if response.hovered() && enabled { theme::CONTROL_HOVER } else { theme::CONTROL });
+    ui.painter().rect_filled(rect, 5.0, if response.hovered() && enabled { theme::CONTROL_HOVER() } else { theme::CONTROL() });
     if response.has_focus() {
-        ui.painter().rect_stroke(rect.expand(2.0), 7.0, Stroke::new(1.0, theme::ACCENT), egui::StrokeKind::Outside);
+        ui.painter().rect_stroke(rect.expand(2.0), 7.0, Stroke::new(1.0, theme::ACCENT()), egui::StrokeKind::Outside);
     }
-    paint_text(ui, rect.center(), Align2::CENTER_CENTER, label, font, if enabled { theme::FG } else { theme::FG_40 }, width);
+    paint_text(ui, rect.center(), Align2::CENTER_CENTER, label, font, if enabled { theme::FG() } else { theme::FG_40() }, width);
     (rect, enabled && response.clicked())
 }
 
@@ -236,14 +242,14 @@ fn switch(ui: &mut Ui, right: f32, center_y: f32, on: bool, label: &str) -> bool
     let response = ui.interact(rect, egui::Id::unique(("settings-switch", label)), Sense::click());
     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Switch, true, on, label));
     if on {
-        ui.painter().rect_filled(rect, 8.0, theme::ACCENT);
+        ui.painter().rect_filled(rect, 8.0, theme::ACCENT());
         ui.painter().circle_filled(pos2(rect.right() - 8.0, rect.center().y), 5.0, Color32::WHITE);
     } else {
         ui.painter().rect_stroke(rect, 8.0, Stroke::new(1.0, theme::fg(25)), egui::StrokeKind::Inside);
-        ui.painter().circle_filled(pos2(rect.left() + 7.0, rect.center().y), 4.0, theme::FG.gamma_multiply(0.9));
+        ui.painter().circle_filled(pos2(rect.left() + 7.0, rect.center().y), 4.0, theme::FG().gamma_multiply(0.9));
     }
     if response.has_focus() {
-        ui.painter().rect_stroke(rect.expand(2.0), 10.0, Stroke::new(1.0, theme::ACCENT), egui::StrokeKind::Outside);
+        ui.painter().rect_stroke(rect.expand(2.0), 10.0, Stroke::new(1.0, theme::ACCENT()), egui::StrokeKind::Outside);
     }
     response.clicked() || (response.has_focus() && ui.input(|i| i.key_pressed(Key::Space)))
 }
@@ -252,13 +258,13 @@ fn checkbox(ui: &mut Ui, rect: Rect, on: bool, label: &str) -> bool {
     let response = ui.interact(rect.expand(4.0), egui::Id::unique(("settings-check", label)), Sense::click());
     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, on, label));
     if on {
-        ui.painter().rect_filled(rect, 4.0, theme::CONTROL_HOVER);
-        icons::paint_glyph(ui, "check", rect.shrink(2.0), theme::FG);
+        ui.painter().rect_filled(rect, 4.0, theme::CONTROL_HOVER());
+        icons::paint_glyph(ui, "check", rect.shrink(2.0), theme::FG());
     } else {
         ui.painter().rect_stroke(rect, 4.0, Stroke::new(1.0, theme::fg(25)), egui::StrokeKind::Inside);
     }
     if response.has_focus() {
-        ui.painter().rect_stroke(rect.expand(2.0), 6.0, Stroke::new(1.0, theme::ACCENT), egui::StrokeKind::Outside);
+        ui.painter().rect_stroke(rect.expand(2.0), 6.0, Stroke::new(1.0, theme::ACCENT()), egui::StrokeKind::Outside);
     }
     response.clicked() || (response.has_focus() && ui.input(|i| i.key_pressed(Key::Space)))
 }
@@ -273,20 +279,20 @@ struct Card {
 impl Card {
     fn row(&mut self, ui: &Ui, title: &str, description: Option<&str>, reserve: f32) -> Rect {
         let text_width = self.width - 24.0 - reserve - 16.0;
-        let galley = description.map(|text| super::wrapped(ui, text, theme::font(12.0), theme::FG_60, text_width));
+        let galley = description.map(|text| super::wrapped(ui, text, theme::font(12.0), theme::FG_60(), text_width));
         let height = galley.as_ref().map_or(ROW, |g| (16.0 + 16.0 + 4.0 + g.size().y + 14.0).max(ROW));
         let row = Rect::from_min_size(pos2(self.left, self.y), vec2(self.width, height));
         if self.y > self.top {
-            ui.painter().hline(row.x_range(), row.top(), Stroke::new(1.0, SEPARATOR));
+            ui.painter().hline(row.x_range(), row.top(), Stroke::new(1.0, SEPARATOR()));
         }
         match galley {
             Some(galley) => {
                 let top = row.center().y - (16.0 + 4.0 + galley.size().y) / 2.0;
-                paint_text(ui, pos2(row.left() + 12.0, top), Align2::LEFT_TOP, title, theme::weighted(13.0, theme::MEDIUM), theme::FG, text_width);
-                ui.painter().galley(pos2(row.left() + 12.0, top + 20.0), galley, theme::FG_60);
+                paint_text(ui, pos2(row.left() + 12.0, top), Align2::LEFT_TOP, title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), text_width);
+                ui.painter().galley(pos2(row.left() + 12.0, top + 20.0), galley, theme::FG_60());
             }
             None => {
-                paint_text(ui, pos2(row.left() + 12.0, row.center().y), Align2::LEFT_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG, text_width);
+                paint_text(ui, pos2(row.left() + 12.0, row.center().y), Align2::LEFT_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), text_width);
             }
         }
         self.y += height;
@@ -299,7 +305,7 @@ fn card(ui: &mut Ui, y: &mut f32, left: f32, width: f32, body: impl FnOnce(&mut 
     let mut c = Card { left, width, top: *y, y: *y };
     body(ui, &mut c);
     let rect = Rect::from_min_max(pos2(left, c.top), pos2(left + width, c.y));
-    ui.painter().set(background, egui::epaint::RectShape::filled(rect, 8.0, CARD));
+    ui.painter().set(background, egui::epaint::RectShape::filled(rect, 8.0, CARD()));
     *y = rect.bottom() + 16.0;
 }
 
@@ -342,7 +348,7 @@ impl Launcher {
             (window.flowkey, window.flowkey_failures) = flowkey::list();
             window.flowkey_text.clear();
         }
-        let builder = egui::ViewportBuilder::default().with_title("Openray Settings").with_inner_size([1000.0, 680.0]).with_min_inner_size([800.0, 500.0]);
+        let builder = egui::ViewportBuilder::default().with_title(crate::i18n::tr("Openray Settings")).with_inner_size([1000.0, 680.0]).with_min_inner_size([800.0, 500.0]);
         let close = ctx.show_viewport_immediate(egui::ViewportId::from_hash_of("settings"), builder, |ui, _| {
             self.settings_ui(ui, &mut window);
             ui.input(|i| i.viewport().close_requested())
@@ -359,7 +365,7 @@ impl Launcher {
     fn settings_ui(&mut self, ui: &mut Ui, w: &mut SettingsWindow) {
         let ctx = ui.ctx().clone();
         let full = ui.max_rect();
-        ui.painter().rect_filled(full, 0.0, theme::BG);
+        ui.painter().rect_filled(full, 0.0, theme::BG());
         if self.dropdown.as_ref().is_some_and(|d| d.slot >= SLOT) {
             self.dropdown_keys(ui);
         } else if w.recording.is_none() && w.conflict.is_none() && w.ask.is_none() && ui.input(|i| i.key_pressed(Key::Escape)) && self.settings.escape_key_closes_window {
@@ -367,7 +373,7 @@ impl Launcher {
         }
         self.record_hotkey(ui, w);
         let sidebar = Rect::from_min_max(full.min, pos2(full.left() + SIDEBAR, full.bottom()));
-        ui.painter().vline(sidebar.right() - 0.5, sidebar.y_range(), Stroke::new(1.0, theme::SEPARATOR));
+        ui.painter().vline(sidebar.right() - 0.5, sidebar.y_range(), Stroke::new(1.0, theme::SEPARATOR()));
         self.sidebar(ui, sidebar, w);
         let content = Rect::from_min_max(pos2(sidebar.right(), full.top()), full.max);
         let header = Rect::from_min_size(content.min, vec2(content.width(), 44.0));
@@ -377,13 +383,13 @@ impl Launcher {
         }
         let title = self.page_title(w);
         let title_left = if w.history.is_empty() { header.left() + 16.0 } else { back.right() + 12.0 };
-        paint_text(ui, pos2(title_left, header.center().y), Align2::LEFT_CENTER, &title, theme::weighted(15.0, theme::SEMIBOLD), theme::FG, 400.0);
+        paint_text(ui, pos2(title_left, header.center().y), Align2::LEFT_CENTER, &title, theme::weighted(15.0, theme::SEMIBOLD), theme::FG(), 400.0);
         if w.page == "shortcuts" {
             let field = Rect::from_min_size(pos2(header.right() - 16.0 - 220.0, header.center().y - 14.0), vec2(220.0, 28.0));
-            ui.painter().rect(field, 6.0, theme::fg(5), Stroke::new(1.0, theme::KEY_BORDER), egui::StrokeKind::Inside);
-            let hint = egui::RichText::new("Search commands...").color(theme::FG_40).font(theme::font(13.0));
+            ui.painter().rect(field, 6.0, theme::fg(5), Stroke::new(1.0, theme::KEY_BORDER()), egui::StrokeKind::Inside);
+            let hint = egui::RichText::new(crate::i18n::tr("Search commands...")).color(theme::FG_40()).font(theme::font(13.0));
             let inner = field.shrink2(vec2(10.0, 6.0));
-            let response = ui.put(inner, egui::TextEdit::singleline(&mut w.command_filter).id(egui::Id::unique("settings-command-filter")).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).text_color(theme::FG).hint_text(hint).desired_width(inner.width()));
+            let response = ui.put(inner, egui::TextEdit::singleline(&mut w.command_filter).id(egui::Id::unique("settings-command-filter")).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).text_color(theme::FG()).hint_text(hint).desired_width(inner.width()));
             response.widget_info(|| egui::WidgetInfo::text_edit(true, "Search commands", &w.command_filter, ""));
         }
         let body = Rect::from_min_max(pos2(content.left(), header.bottom()), content.max);
@@ -393,9 +399,9 @@ impl Launcher {
             let (left, width) = (origin.x + 16.0, ui.available_width() - 32.0);
             let mut y = origin.y + 4.0;
             if let Some(error) = w.error.clone() {
-                let galley = super::wrapped(ui, &error, theme::font(12.0), theme::RED, width);
+                let galley = super::wrapped(ui, &error, theme::font(12.0), theme::RED(), width);
                 let h = galley.size().y;
-                ui.painter().galley(pos2(left, y), galley, theme::RED);
+                ui.painter().galley(pos2(left, y), galley, theme::RED());
                 y += h + 12.0;
             }
             match w.page.as_str() {
@@ -436,10 +442,10 @@ impl Launcher {
     fn sidebar(&mut self, ui: &mut Ui, rect: Rect, w: &mut SettingsWindow) {
         let field = Rect::from_min_size(pos2(rect.left() + 9.0, rect.top() + 16.0), vec2(rect.width() - 18.0, 32.0));
         ui.painter().rect_filled(field, 6.0, theme::fg(10));
-        icons::paint_glyph(ui, "search", Rect::from_center_size(pos2(field.left() + 18.0, field.center().y), vec2(16.0, 16.0)), theme::FG_60);
+        icons::paint_glyph(ui, "search", Rect::from_center_size(pos2(field.left() + 18.0, field.center().y), vec2(16.0, 16.0)), theme::FG_60());
         let inner = Rect::from_min_max(pos2(field.left() + 32.0, field.top() + 7.0), pos2(field.right() - 8.0, field.bottom() - 7.0));
-        let hint = egui::RichText::new("Search settings...").color(theme::FG_60).font(theme::font(13.0));
-        let response = ui.put(inner, egui::TextEdit::singleline(&mut w.nav_filter).id(egui::Id::unique("settings-nav-filter")).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).text_color(theme::FG).hint_text(hint).desired_width(inner.width()));
+        let hint = egui::RichText::new(crate::i18n::tr("Search settings...")).color(theme::FG_60()).font(theme::font(13.0));
+        let response = ui.put(inner, egui::TextEdit::singleline(&mut w.nav_filter).id(egui::Id::unique("settings-nav-filter")).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).text_color(theme::FG()).hint_text(hint).desired_width(inner.width()));
         response.widget_info(|| egui::WidgetInfo::text_edit(true, "Search settings", &w.nav_filter, ""));
         let q = w.nav_filter.trim().to_lowercase();
         let matches = |title: &str, keywords: &[&str]| q.is_empty() || std::iter::once(title).chain(keywords.iter().copied()).any(|t| t.to_lowercase().contains(&q));
@@ -463,11 +469,11 @@ impl Launcher {
                     ui.painter().rect_filled(row, 6.0, theme::fg(5));
                 }
                 if response.has_focus() {
-                    ui.painter().rect_stroke(row, 6.0, Stroke::new(1.0, theme::ACCENT), egui::StrokeKind::Inside);
+                    ui.painter().rect_stroke(row, 6.0, Stroke::new(1.0, theme::ACCENT()), egui::StrokeKind::Inside);
                 }
                 let icon_rect = Rect::from_min_size(pos2(row.left() + 6.0, row.center().y - 10.0), vec2(20.0, 20.0));
                 icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(icon_rect)), icon, title, 20.0);
-                paint_text(ui, pos2(icon_rect.right() + 8.0, row.center().y), Align2::LEFT_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG, row.width() - 40.0);
+                paint_text(ui, pos2(icon_rect.right() + 8.0, row.center().y), Align2::LEFT_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), row.width() - 40.0);
                 if response.clicked() {
                     picked = Some(id.clone());
                 }
@@ -505,8 +511,8 @@ impl Launcher {
             let enabled = self.settings.hotkey != DEFAULT_HOTKEY;
             let response = ui.interact(reset, egui::Id::unique("settings-reset-hotkey"), if enabled { Sense::click() } else { Sense::hover() });
             response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, "Reset hotkey to Alt+Space"));
-            ui.painter().rect_filled(reset, 5.0, if response.hovered() && enabled { theme::CONTROL_HOVER } else { theme::CONTROL });
-            icons::paint_glyph(ui, "rotate-ccw", reset.shrink(5.0), if enabled { theme::FG } else { theme::FG_40 });
+            ui.painter().rect_filled(reset, 5.0, if response.hovered() && enabled { theme::CONTROL_HOVER() } else { theme::CONTROL() });
+            icons::paint_glyph(ui, "rotate-ccw", reset.shrink(5.0), if enabled { theme::FG() } else { theme::FG_40() });
             if response.clicked() {
                 hotkey_action = Some(DEFAULT_HOTKEY.to_owned());
             }
@@ -520,6 +526,39 @@ impl Launcher {
                 keycap_row(ui, reset.left() - 8.0 - 40.0, row.center().y, &["Win".to_owned()]);
             }
         });
+        let (mut appearance_row, mut language_row) = (Rect::NOTHING, Rect::NOTHING);
+        card(ui, y, left, width, |ui, c| {
+            appearance_row = c.row(ui, "Appearance", None, 240.0);
+            language_row = c.row(ui, "Language", None, 240.0);
+        });
+        let appearance = [("system", "Follow System", "sun-moon"), ("light", "Light", "sun"), ("dark", "Dark", "moon")];
+        let current = match self.settings.appearance {
+            Appearance::System => "system",
+            Appearance::Light => "light",
+            Appearance::Dark => "dark",
+        };
+        if let Some(value) = self.select(ui, appearance_row.right() - 12.0, appearance_row.center().y, 2, "Appearance", &appearance, current) {
+            self.settings.appearance = match value.as_str() {
+                "light" => Appearance::Light,
+                "dark" => Appearance::Dark,
+                _ => Appearance::System,
+            };
+            self.save_settings();
+        }
+        let languages = [("system", "Follow System", "globe"), ("en", "English", "languages"), ("pt", "Português", "languages")];
+        let current = match self.settings.language {
+            Language::System => "system",
+            Language::En => "en",
+            Language::Pt => "pt",
+        };
+        if let Some(value) = self.select(ui, language_row.right() - 12.0, language_row.center().y, 3, "Language", &languages, current) {
+            self.settings.language = match value.as_str() {
+                "en" => Language::En,
+                "pt" => Language::Pt,
+                _ => Language::System,
+            };
+            self.save_settings();
+        }
         let update_state = crate::updater::state();
         let mut update_row = Rect::NOTHING;
         card(ui, y, left, width, |ui, c| update_row = c.row(ui, "Updates", Some(&crate::updater::describe(&update_state)), 180.0));
@@ -596,27 +635,27 @@ impl Launcher {
         let text = if recording { "Press keys…" } else if hotkey.is_empty() { "Record Hotkey" } else { "" };
         let font = theme::weighted(12.0, theme::MEDIUM);
         let content = if text.is_empty() {
-            labels.iter().map(|l| ui.fonts_mut(|f| f.layout_no_wrap(l.clone(), font.clone(), theme::FG)).size().x.max(CONTROL - 12.0) + 16.0).sum::<f32>()
+            labels.iter().map(|l| ui.fonts_mut(|f| f.layout_no_wrap(crate::i18n::tr(&l).into_owned(), font.clone(), theme::FG())).size().x.max(CONTROL - 12.0) + 16.0).sum::<f32>()
         } else {
-            ui.fonts_mut(|f| f.layout_no_wrap(text.to_owned(), font.clone(), theme::FG)).size().x + 16.0
+            ui.fonts_mut(|f| f.layout_no_wrap(crate::i18n::tr(&text).into_owned(), font.clone(), theme::FG())).size().x + 16.0
         };
         let clear_width = if clearable && !hotkey.is_empty() && !recording { CONTROL } else { 0.0 };
         let rect = Rect::from_min_size(pos2(right - content - clear_width - 8.0, center_y - CONTROL / 2.0 - 2.0), vec2(content + clear_width + 8.0, CONTROL + 4.0));
         let response = ui.interact(rect, egui::Id::unique(("hotkey-cell", owner)), Sense::click());
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, format!("Hotkey: {}", if hotkey.is_empty() { "none" } else { hotkey })));
-        let border = if recording { theme::ACCENT } else if response.hovered() || response.has_focus() { theme::FG_40 } else { theme::KEY_BORDER };
+        let border = if recording { theme::ACCENT() } else if response.hovered() || response.has_focus() { theme::FG_40() } else { theme::KEY_BORDER() };
         ui.painter().rect(rect, 6.0, Color32::TRANSPARENT, Stroke::new(1.0, border), egui::StrokeKind::Inside);
         if text.is_empty() {
             keycap_row(ui, rect.left() + 4.0, center_y, &labels);
         } else {
-            paint_text(ui, pos2(rect.left() + 8.0, center_y), Align2::LEFT_CENTER, text, font, if recording { theme::FG } else { theme::FG_40 }, content);
+            paint_text(ui, pos2(rect.left() + 8.0, center_y), Align2::LEFT_CENTER, text, font, if recording { theme::FG() } else { theme::FG_40() }, content);
         }
         let mut cleared = false;
         if clear_width > 0.0 {
             let clear = Rect::from_min_size(pos2(rect.right() - CONTROL - 2.0, center_y - 10.0), vec2(20.0, 20.0));
             let x = ui.interact(clear, egui::Id::unique(("hotkey-clear", owner)), Sense::CLICK);
             x.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Clear hotkey"));
-            icons::paint_glyph(ui, "x", clear.shrink(4.0), if x.hovered() { theme::FG } else { theme::FG_60 });
+            icons::paint_glyph(ui, "x", clear.shrink(4.0), if x.hovered() { theme::FG() } else { theme::FG_60() });
             if x.clicked() {
                 cleared = true;
                 w.recording = Some(format!("clear:{owner}"));
@@ -683,10 +722,10 @@ impl Launcher {
         egui::Area::new(egui::Id::unique("settings-conflict")).order(egui::Order::Foreground).fixed_pos(full.min).show(ui.ctx(), |ui| {
             ui.painter().rect_filled(full, 0.0, Color32::from_black_alpha(102));
             let panel = Rect::from_center_size(full.center(), vec2(320.0, 132.0));
-            ui.painter().rect(panel, 8.0, theme::PANEL, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
-            paint_text(ui, pos2(panel.center().x, panel.top() + 18.0), Align2::CENTER_TOP, "Hotkey in use", theme::weighted(13.0, theme::SEMIBOLD), theme::FG, 290.0);
-            let galley = super::wrapped(ui, &message, theme::font(12.0), theme::FG_60, 288.0);
-            ui.painter().galley(pos2(panel.center().x - galley.size().x / 2.0, panel.top() + 40.0), galley, theme::FG_60);
+            ui.painter().rect(panel, 8.0, theme::PANEL(), Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
+            paint_text(ui, pos2(panel.center().x, panel.top() + 18.0), Align2::CENTER_TOP, "Hotkey in use", theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), 290.0);
+            let galley = super::wrapped(ui, &message, theme::font(12.0), theme::FG_60(), 288.0);
+            ui.painter().galley(pos2(panel.center().x - galley.size().x / 2.0, panel.top() + 40.0), galley, theme::FG_60());
             let right = panel.right() - 16.0;
             let y = panel.bottom() - 30.0;
             if conflict.overwritable {
@@ -729,16 +768,16 @@ impl Launcher {
         if !ui.is_rect_visible(rect) {
             return;
         }
-        ui.painter().rect_filled(rect, 8.0, CARD);
+        ui.painter().rect_filled(rect, 8.0, CARD());
         let header = Rect::from_min_size(rect.min, vec2(width, header_height));
         let icon_rect = Rect::from_min_size(pos2(header.left() + 12.0, header.center().y - 10.0), vec2(20.0, 20.0));
         icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(icon_rect)), &icon, &title, 20.0);
-        let label = paint_text(ui, pos2(icon_rect.right() + 8.0, header.center().y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG, 300.0);
+        let label = paint_text(ui, pos2(icon_rect.right() + 8.0, header.center().y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), 300.0);
         let toggle = Rect::from_min_max(pos2(icon_rect.right() + 4.0, header.top() + 8.0), pos2(label.right() + 22.0, header.bottom() - 8.0));
         let response = ui.interact(toggle, egui::Id::unique(("settings-collapse", &id)), Sense::click());
         response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, !collapsed, &title));
         let chevron = Rect::from_center_size(pos2(label.right() + 12.0, header.center().y), vec2(12.0, 12.0));
-        icons::paint_glyph(ui, if collapsed { "chevron-right" } else { "chevron-down" }, chevron, theme::FG_60);
+        icons::paint_glyph(ui, if collapsed { "chevron-right" } else { "chevron-down" }, chevron, theme::FG_60());
         if response.clicked() {
             if collapsed {
                 w.collapsed.remove(&id);
@@ -757,16 +796,16 @@ impl Launcher {
         }
         let (alias_x, hotkey_right) = (rect.right() - 12.0 - 40.0 - 133.0 - 140.0, rect.right() - 12.0 - 40.0);
         let head_y = header.bottom() + 12.0;
-        ui.painter().hline(rect.x_range(), header.bottom() + 24.0, Stroke::new(1.0, SEPARATOR));
+        ui.painter().hline(rect.x_range(), header.bottom() + 24.0, Stroke::new(1.0, SEPARATOR()));
         let dim = if enabled { 1.0 } else { 0.5 };
         for (text, x) in [("Name", rect.left() + 12.0), ("Alias", alias_x), ("Hotkey", hotkey_right - 133.0)] {
-            paint_text(ui, pos2(x, head_y), Align2::LEFT_CENTER, text, theme::weighted(12.0, theme::SEMIBOLD), theme::FG_60.gamma_multiply(dim), 120.0);
+            paint_text(ui, pos2(x, head_y), Align2::LEFT_CENTER, text, theme::weighted(12.0, theme::SEMIBOLD), theme::FG_60().gamma_multiply(dim), 120.0);
         }
         let mut changes: Vec<(String, CommandPrefs)> = Vec::new();
         for (n, (key, name, command_icon)) in commands.iter().enumerate() {
             let row = Rect::from_min_size(pos2(rect.left(), header.bottom() + 24.0 + n as f32 * 46.0), vec2(width, 46.0));
             if n > 0 {
-                ui.painter().hline(row.x_range(), row.top(), Stroke::new(1.0, SEPARATOR));
+                ui.painter().hline(row.x_range(), row.top(), Stroke::new(1.0, SEPARATOR()));
             }
             if !ui.is_rect_visible(row) {
                 continue;
@@ -774,17 +813,17 @@ impl Launcher {
             let prefs = self.settings.commands.get(key).cloned().unwrap_or_default();
             let icon_rect = Rect::from_min_size(pos2(row.left() + 12.0, row.center().y - 8.0), vec2(16.0, 16.0));
             icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(icon_rect)), command_icon, name, 16.0);
-            paint_text(ui, pos2(icon_rect.right() + 8.0, row.center().y), Align2::LEFT_CENTER, name, theme::weighted(13.0, theme::MEDIUM), theme::FG.gamma_multiply(dim), alias_x - icon_rect.right() - 20.0);
+            paint_text(ui, pos2(icon_rect.right() + 8.0, row.center().y), Align2::LEFT_CENTER, name, theme::weighted(13.0, theme::MEDIUM), theme::FG().gamma_multiply(dim), alias_x - icon_rect.right() - 20.0);
             let alias_id = egui::Id::unique(("settings-alias", key));
             let mut alias: String = ui.data(|d| d.get_temp(alias_id)).unwrap_or_else(|| prefs.alias.clone());
             let field = Rect::from_min_size(pos2(alias_x - 6.0, row.center().y - 12.0), vec2(120.0, 24.0));
             let focused = ui.memory(|m| m.has_focus(alias_id));
             if focused || ui.rect_contains_pointer(field) {
-                ui.painter().rect_filled(field, 5.0, theme::CONTROL);
+                ui.painter().rect_filled(field, 5.0, theme::CONTROL());
             }
-            let hint = egui::RichText::new("Add Alias").color(theme::FG_40).font(theme::weighted(13.0, theme::MEDIUM));
+            let hint = egui::RichText::new(crate::i18n::tr("Add Alias")).color(theme::FG_40()).font(theme::weighted(13.0, theme::MEDIUM));
             let inner = field.shrink2(vec2(6.0, 4.0));
-            let response = ui.put(inner, egui::TextEdit::singleline(&mut alias).id(alias_id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::weighted(13.0, theme::MEDIUM)).text_color(theme::FG).hint_text(hint).desired_width(inner.width()));
+            let response = ui.put(inner, egui::TextEdit::singleline(&mut alias).id(alias_id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::weighted(13.0, theme::MEDIUM)).text_color(theme::FG()).hint_text(hint).desired_width(inner.width()));
             response.widget_info(|| egui::WidgetInfo::text_edit(true, format!("Alias for {name}"), &alias, ""));
             if response.lost_focus() {
                 ui.data_mut(|d| d.remove::<String>(alias_id));
@@ -904,7 +943,7 @@ fn dictionary_settings(launcher: &mut Launcher, ui: &mut Ui, w: &mut SettingsWin
 
 fn status_line(ui: &Ui, w: &SettingsWindow, left: f32, width: f32, y: &mut f32) {
     if let Some((text, error)) = &w.flowkey_status {
-        let color = if *error { theme::RED } else { theme::FG_60 };
+        let color = if *error { theme::RED() } else { theme::FG_60() };
         let galley = super::wrapped(ui, text, theme::font(12.0), color, width);
         let h = galley.size().y;
         ui.painter().galley(pos2(left, *y), galley, color);
@@ -962,11 +1001,11 @@ fn ask_ui(ui: &mut Ui, w: &mut SettingsWindow, full: Rect) {
     let mut answer = None;
     egui::Area::new(egui::Id::unique("settings-ask")).order(egui::Order::Foreground).fixed_pos(full.min).show(ui.ctx(), |ui| {
         ui.painter().rect_filled(full, 0.0, Color32::from_black_alpha(102));
-        let galley = super::wrapped(ui, &ask.message, theme::font(12.0), theme::FG_60, 328.0);
+        let galley = super::wrapped(ui, &ask.message, theme::font(12.0), theme::FG_60(), 328.0);
         let panel = Rect::from_center_size(full.center(), vec2(360.0, 100.0 + galley.size().y));
-        ui.painter().rect(panel, 8.0, theme::PANEL, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
-        paint_text(ui, pos2(panel.center().x, panel.top() + 18.0), Align2::CENTER_TOP, &ask.title, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, 330.0);
-        ui.painter().galley(pos2(panel.left() + 16.0, panel.top() + 42.0), galley, theme::FG_60);
+        ui.painter().rect(panel, 8.0, theme::PANEL(), Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
+        paint_text(ui, pos2(panel.center().x, panel.top() + 18.0), Align2::CENTER_TOP, &ask.title, theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), 330.0);
+        ui.painter().galley(pos2(panel.left() + 16.0, panel.top() + 42.0), galley, theme::FG_60());
         let (right, y) = (panel.right() - 16.0, panel.bottom() - 26.0);
         let (rect, ok) = text_button(ui, right, y, ask.ok, "ask-ok", true);
         if ok {
@@ -1030,7 +1069,7 @@ fn flowkey_settings(launcher: &mut Launcher, ui: &mut Ui, w: &mut SettingsWindow
         }
     });
     let source = if installed { "Installed" } else { "Bundled with Openray" };
-    paint_text(ui, pos2(about.right() - 12.0, about.center().y), Align2::RIGHT_CENTER, source, theme::font(12.0), theme::FG_60, 150.0);
+    paint_text(ui, pos2(about.right() - 12.0, about.center().y), Align2::RIGHT_CENTER, source, theme::font(12.0), theme::FG_60(), 150.0);
     if installed && text_button(ui, remove.right() - 12.0, remove.center().y, "Uninstall…", "flowkey-uninstall", true).1 {
         w.ask = Some(Ask {
             title: format!("Uninstall “{}”?", ext.name()),
@@ -1064,7 +1103,7 @@ fn flowkey_settings(launcher: &mut Launcher, ui: &mut Ui, w: &mut SettingsWindow
                 "checkbox" => {
                     let on = current == Some(Value::Bool(true));
                     if let Some(label) = pref["label"].as_str() {
-                        paint_text(ui, pos2(right - 40.0, cy), Align2::RIGHT_CENTER, label, theme::font(12.0), theme::FG_60, 140.0);
+                        paint_text(ui, pos2(right - 40.0, cy), Align2::RIGHT_CENTER, label, theme::font(12.0), theme::FG_60(), 140.0);
                     }
                     if switch(ui, right, cy, on, &format!("{id}-{name}")) {
                         updates.push((name.to_owned(), Value::Bool(!on)));
@@ -1107,14 +1146,14 @@ fn flowkey_settings(launcher: &mut Launcher, ui: &mut Ui, w: &mut SettingsWindow
                     let buffer = w.flowkey_text.entry(key.clone()).or_insert_with(|| stored.clone());
                     let field = Rect::from_min_size(pos2(field_right - 220.0, cy - CONTROL / 2.0), vec2(220.0, CONTROL));
                     ui.painter().rect_filled(field, 5.0, theme::fg(5));
-                    let hint = egui::RichText::new(pref["placeholder"].as_str().unwrap_or_default()).color(theme::FG_40).font(theme::font(12.0));
+                    let hint = egui::RichText::new(pref["placeholder"].as_str().unwrap_or_default()).color(theme::FG_40()).font(theme::font(12.0));
                     let inner = field.shrink2(vec2(8.0, 4.0));
                     let label = pref["title"].as_str().unwrap_or(name);
-                    let edit = egui::TextEdit::singleline(buffer).id(egui::Id::unique(("flowkey-pref", key.as_str()))).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(12.0)).text_color(theme::FG).hint_text(hint).desired_width(inner.width()).password(kind == "password");
+                    let edit = egui::TextEdit::singleline(buffer).id(egui::Id::unique(("flowkey-pref", key.as_str()))).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(12.0)).text_color(theme::FG()).hint_text(hint).desired_width(inner.width()).password(kind == "password");
                     let response = ui.put(inner, edit);
                     response.widget_info(|| egui::WidgetInfo::text_edit(true, label, "", ""));
                     if response.has_focus() {
-                        ui.painter().rect_stroke(field, 5.0, Stroke::new(1.0, theme::ACCENT), egui::StrokeKind::Inside);
+                        ui.painter().rect_stroke(field, 5.0, Stroke::new(1.0, theme::ACCENT()), egui::StrokeKind::Inside);
                     }
                     if response.lost_focus() && *buffer != stored {
                         updates.push((name.to_owned(), Value::String(buffer.clone())));

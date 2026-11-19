@@ -221,10 +221,10 @@ impl View for OutputView {
             egui::Frame::NONE.inner_margin(egui::Margin::same(16)).show(ui, |ui| {
                 let font = egui::FontId::monospace(13.0);
                 if let Some(code) = code.filter(|c| *c != 0) {
-                    ui.label(egui::RichText::new(format!("Exited with code {code}")).font(font.clone()).color(theme::RED));
+                    ui.label(egui::RichText::new(format!("Exited with code {code}")).font(font.clone()).color(theme::RED()));
                 }
                 let shown = if text.is_empty() { "No output" } else { &text };
-                ui.add(egui::Label::new(egui::RichText::new(shown).font(font).color(theme::FG)).wrap().selectable(true));
+                ui.add(egui::Label::new(egui::RichText::new(shown).font(font).color(theme::FG())).wrap().selectable(true));
             });
         });
     }

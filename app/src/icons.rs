@@ -59,12 +59,12 @@ pub fn command_icon(ui: &mut Ui, icon: &Icon, title: &str, size: f32) {
         Icon::Tile(name, tone) => tile(ui, name, *tone, size),
         Icon::Glyph(name) => {
             let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
-            paint_glyph(ui, name, Rect::from_center_size(rect.center(), vec2(16.0, 16.0)), theme::FG_60);
+            paint_glyph(ui, name, Rect::from_center_size(rect.center(), vec2(16.0, 16.0)), theme::FG_60());
         }
         Icon::Boxed(name) => {
             let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
-            ui.painter().rect_filled(rect, 5.0, theme::KEY_BG);
-            paint_glyph(ui, name, Rect::from_center_size(rect.center(), vec2(14.0, 14.0)), theme::FG_60);
+            ui.painter().rect_filled(rect, 5.0, theme::KEY_BG());
+            paint_glyph(ui, name, Rect::from_center_size(rect.center(), vec2(14.0, 14.0)), theme::FG_60());
         }
         Icon::Dot(color) => {
             let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
@@ -73,24 +73,24 @@ pub fn command_icon(ui: &mut Ui, icon: &Icon, title: &str, size: f32) {
         Icon::Time(color, text, dim) => {
             let (rect, _) = ui.allocate_exact_size(vec2(TIME_WIDTH, size), Sense::hover());
             let alpha = if *dim { 0.5 } else { 1.0 };
-            ui.painter().circle_filled(pos2(rect.left() + 4.0, rect.center().y), 4.0, color.unwrap_or(theme::FG_40).gamma_multiply(alpha));
-            let galley = ui.painter().layout(text.clone(), theme::font(13.0), theme::FG_60.gamma_multiply(alpha), 104.0);
-            ui.painter().with_clip_rect(Rect::from_min_size(pos2(rect.left() + 18.0, rect.top()), vec2(104.0, size))).galley(pos2(rect.left() + 18.0, rect.center().y - galley.size().y / 2.0), galley, theme::FG_60);
+            ui.painter().circle_filled(pos2(rect.left() + 4.0, rect.center().y), 4.0, color.unwrap_or(theme::FG_40()).gamma_multiply(alpha));
+            let galley = ui.painter().layout(text.clone(), theme::font(13.0), theme::FG_60().gamma_multiply(alpha), 104.0);
+            ui.painter().with_clip_rect(Rect::from_min_size(pos2(rect.left() + 18.0, rect.top()), vec2(104.0, size))).galley(pos2(rect.left() + 18.0, rect.center().y - galley.size().y / 2.0), galley, theme::FG_60());
         }
         Icon::Initials(text) => {
             let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
-            ui.painter().circle_filled(rect.center(), size / 2.0, theme::CONTROL);
+            ui.painter().circle_filled(rect.center(), size / 2.0, theme::CONTROL());
             if text.is_empty() {
-                paint_glyph(ui, "user", Rect::from_center_size(rect.center(), vec2(size / 2.0, size / 2.0)), theme::FG_60);
+                paint_glyph(ui, "user", Rect::from_center_size(rect.center(), vec2(size / 2.0, size / 2.0)), theme::FG_60());
             } else {
                 let font = theme::weighted(if size >= 48.0 { size / 3.0 } else { size / 2.4 }, theme::SEMIBOLD);
-                ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, text, font, theme::FG_60);
+                ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, text, font, theme::FG_60());
             }
         }
         Icon::Swatch(color) => {
             let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
             ui.painter().rect_filled(rect, 5.0, *color);
-            ui.painter().rect_stroke(rect, 5.0, egui::Stroke::new(1.0, theme::KEY_BORDER), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(rect, 5.0, egui::Stroke::new(1.0, theme::KEY_BORDER()), egui::StrokeKind::Inside);
         }
         Icon::File(_) | Icon::Thumbnail(_) | Icon::Url(_) | Icon::Image(_) | Icon::Emoji(_) => {
             let uri = match icon {
@@ -121,9 +121,9 @@ pub fn cover_uv(size: egui::Vec2) -> Rect {
 }
 
 fn letter(ui: &Ui, rect: Rect, title: &str) {
-    ui.painter().rect_filled(rect, 5.0, theme::KEY_BG);
+    ui.painter().rect_filled(rect, 5.0, theme::KEY_BG());
     let initial: String = title.trim().chars().next().map(|c| c.to_uppercase().collect()).unwrap_or_default();
-    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, initial, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60);
+    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, initial, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60());
 }
 
 #[derive(Default)]

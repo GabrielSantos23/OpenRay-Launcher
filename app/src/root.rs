@@ -140,13 +140,13 @@ pub struct Launcher {
 }
 
 fn text_galley(ui: &Ui, text: &str, font: FontId, color: Color32, max_width: f32) -> std::sync::Arc<egui::Galley> {
-    let mut job = LayoutJob::single_section(text.to_owned(), TextFormat { font_id: font, color, ..Default::default() });
+    let mut job = LayoutJob::single_section(crate::i18n::tr(text).into_owned(), TextFormat { font_id: font, color, ..Default::default() });
     job.wrap = TextWrapping::truncate_at_width(max_width.max(0.0));
     ui.ctx().fonts_mut(|f| f.layout_job(job))
 }
 
 pub fn wrapped(ui: &Ui, text: &str, font: FontId, color: Color32, max_width: f32) -> std::sync::Arc<egui::Galley> {
-    let mut job = LayoutJob::single_section(text.to_owned(), TextFormat { font_id: font, color, ..Default::default() });
+    let mut job = LayoutJob::single_section(crate::i18n::tr(text).into_owned(), TextFormat { font_id: font, color, ..Default::default() });
     job.wrap.max_width = max_width.max(1.0);
     ui.ctx().fonts_mut(|f| f.layout_job(job))
 }
@@ -155,23 +155,23 @@ pub fn metadata(ui: &Ui, rect: Rect, rows: &[(String, String)]) -> Rect {
     let height = (12.0 + 16.0 + 8.0 + rows.len() as f32 * 33.0 + 8.0).min(148.0);
     let area = Rect::from_min_max(pos2(rect.left(), rect.bottom() - height), rect.max);
     let painter = ui.painter().with_clip_rect(area);
-    painter.hline(area.x_range(), area.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR));
+    painter.hline(area.x_range(), area.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
     let inner = area.shrink2(vec2(16.0, 0.0));
-    paint_text(ui, pos2(inner.left(), area.top() + 12.0), Align2::LEFT_TOP, "Information", theme::weighted(12.0, theme::SEMIBOLD), theme::FG_60, inner.width());
+    paint_text(ui, pos2(inner.left(), area.top() + 12.0), Align2::LEFT_TOP, "Information", theme::weighted(12.0, theme::SEMIBOLD), theme::FG_60(), inner.width());
     let mut y = area.top() + 12.0 + 16.0 + 8.0;
     for (i, (label, value)) in rows.iter().enumerate() {
         if y > area.bottom() {
             break;
         }
         if i > 0 {
-            painter.hline(inner.x_range(), y + 0.5, Stroke::new(1.0, theme::SEPARATOR));
+            painter.hline(inner.x_range(), y + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
         }
         let center = y + 16.5;
-        let label_galley = text_galley(ui, label, theme::font(13.0), theme::FG_60, inner.width() / 2.0);
+        let label_galley = text_galley(ui, label, theme::font(13.0), theme::FG_60(), inner.width() / 2.0);
         let label_width = label_galley.size().x;
-        painter.galley(pos2(inner.left(), center - label_galley.size().y / 2.0), label_galley, theme::FG_60);
-        let value_galley = text_galley(ui, value, theme::weighted(13.0, theme::MEDIUM), theme::FG, inner.width() - label_width - 16.0);
-        painter.galley(pos2(inner.right() - value_galley.size().x, center - value_galley.size().y / 2.0), value_galley, theme::FG);
+        painter.galley(pos2(inner.left(), center - label_galley.size().y / 2.0), label_galley, theme::FG_60());
+        let value_galley = text_galley(ui, value, theme::weighted(13.0, theme::MEDIUM), theme::FG(), inner.width() - label_width - 16.0);
+        painter.galley(pos2(inner.right() - value_galley.size().x, center - value_galley.size().y / 2.0), value_galley, theme::FG());
         y += 33.0;
     }
     area
@@ -187,11 +187,11 @@ fn paint_text(ui: &Ui, anchor: Pos2, align: Align2, text: &str, font: FontId, co
 fn keycaps(ui: &Ui, right: f32, center_y: f32, labels: &[String]) -> f32 {
     let mut x = right;
     for label in labels.iter().rev() {
-        let galley = text_galley(ui, label, theme::font(11.0), theme::FG_60, 200.0);
+        let galley = text_galley(ui, label, theme::font(11.0), theme::FG_60(), 200.0);
         let width = (galley.size().x + 10.0).max(18.0);
         let rect = Rect::from_min_size(pos2(x - width, center_y - 9.0), vec2(width, 18.0));
-        ui.painter().rect_stroke(rect, 4.0, Stroke::new(1.0, theme::KEY_BORDER), egui::StrokeKind::Inside);
-        ui.painter().galley(rect.center() - galley.size() / 2.0, galley, theme::FG_60);
+        ui.painter().rect_stroke(rect, 4.0, Stroke::new(1.0, theme::KEY_BORDER()), egui::StrokeKind::Inside);
+        ui.painter().galley(rect.center() - galley.size() / 2.0, galley, theme::FG_60());
         x = rect.left() - 2.0;
     }
     x + 2.0
@@ -201,12 +201,12 @@ fn accessories(ui: &Ui, right: f32, center_y: f32, parts: &[Accessory]) -> f32 {
     let mut x = right;
     for part in parts.iter().rev() {
         match part {
-            Accessory::Text(text) => x = paint_text(ui, pos2(x, center_y), Align2::RIGHT_CENTER, text, theme::font(12.0), theme::FG_60, 200.0).left(),
+            Accessory::Text(text) => x = paint_text(ui, pos2(x, center_y), Align2::RIGHT_CENTER, text, theme::font(12.0), theme::FG_60(), 200.0).left(),
             Accessory::Tag(text) => {
-                let galley = text_galley(ui, text, theme::weighted(11.0, theme::MEDIUM), theme::ACCENT, 200.0);
+                let galley = text_galley(ui, text, theme::weighted(11.0, theme::MEDIUM), theme::ACCENT(), 200.0);
                 let rect = Rect::from_min_size(pos2(x - galley.size().x - 12.0, center_y - 9.0), vec2(galley.size().x + 12.0, 18.0));
-                ui.painter().rect_filled(rect, 4.0, theme::ACCENT.gamma_multiply(0.15));
-                ui.painter().galley(rect.center() - galley.size() / 2.0, galley, theme::ACCENT);
+                ui.painter().rect_filled(rect, 4.0, theme::ACCENT().gamma_multiply(0.15));
+                ui.painter().galley(rect.center() - galley.size() / 2.0, galley, theme::ACCENT());
                 x = rect.left();
             }
             Accessory::Volume { level, muted, input } => {
@@ -216,12 +216,12 @@ fn accessories(ui: &Ui, right: f32, center_y: f32, parts: &[Accessory]) -> f32 {
                     (true, false) => "mic",
                     (true, true) => "mic-off",
                 };
-                icons::paint_glyph(ui, glyph, Rect::from_min_size(pos2(x - 14.0, center_y - 7.0), vec2(14.0, 14.0)), theme::FG_60);
+                icons::paint_glyph(ui, glyph, Rect::from_min_size(pos2(x - 14.0, center_y - 7.0), vec2(14.0, 14.0)), theme::FG_60());
                 let bar = Rect::from_min_size(pos2(x - 14.0 - 8.0 - 48.0, center_y - 2.0), vec2(48.0, 4.0));
-                ui.painter().rect_filled(bar, 2.0, theme::CONTROL);
-                ui.painter().rect_filled(Rect::from_min_size(bar.min, vec2(48.0 * level.clamp(0.0, 100.0) / 100.0, 4.0)), 2.0, theme::FG_60);
+                ui.painter().rect_filled(bar, 2.0, theme::CONTROL());
+                ui.painter().rect_filled(Rect::from_min_size(bar.min, vec2(48.0 * level.clamp(0.0, 100.0) / 100.0, 4.0)), 2.0, theme::FG_60());
                 let text = format!("{}%", level.round());
-                x = paint_text(ui, pos2(bar.left() - 8.0, center_y), Align2::RIGHT_CENTER, &text, theme::font(12.0), theme::FG_60, 40.0).left();
+                x = paint_text(ui, pos2(bar.left() - 8.0, center_y), Align2::RIGHT_CENTER, &text, theme::font(12.0), theme::FG_60(), 40.0).left();
             }
         }
         x -= 8.0;
@@ -232,15 +232,15 @@ fn accessories(ui: &Ui, right: f32, center_y: f32, parts: &[Accessory]) -> f32 {
 static CONNECTOR: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| regex::Regex::new(r"(?i)\s+(?:in|to|as|para|em|como|=)\s+").expect("connector pattern"));
 
 fn card_side(ui: &Ui, rect: Rect, side: &Side, input: bool) {
-    let chip_text = text_galley(ui, &side.label, theme::weighted(12.0, theme::MEDIUM), theme::FG, rect.width() - 44.0);
+    let chip_text = text_galley(ui, &side.label, theme::weighted(12.0, theme::MEDIUM), theme::FG(), rect.width() - 44.0);
     let chip = Rect::from_min_size(pos2(rect.center().x - chip_text.size().x / 2.0 - 6.0, rect.bottom() - 13.0 - chip_text.size().y - 2.0), chip_text.size() + vec2(12.0, 2.0));
-    ui.painter().rect_filled(chip, 4.0, theme::CONTROL);
-    ui.painter().galley(chip.min + vec2(6.0, 1.0), chip_text, theme::FG);
+    ui.painter().rect_filled(chip, 4.0, theme::CONTROL());
+    ui.painter().galley(chip.min + vec2(6.0, 1.0), chip_text, theme::FG());
     let area = Rect::from_min_max(pos2(rect.left() + 16.0, rect.top() + 4.0), pos2(rect.right() - 16.0, chip.top()));
     if let Some(color) = side.swatch {
         let swatch = Rect::from_center_size(area.center(), vec2(98.0, 72.0));
         ui.painter().rect_filled(swatch, 6.0, color);
-        ui.painter().rect_stroke(swatch, 6.0, Stroke::new(2.0, theme::FG), egui::StrokeKind::Outside);
+        ui.painter().rect_stroke(swatch, 6.0, Stroke::new(2.0, theme::FG()), egui::StrokeKind::Outside);
         return;
     }
     let font = theme::weighted(24.0, theme::SEMIBOLD);
@@ -256,15 +256,15 @@ fn card_side(ui: &Ui, rect: Rect, side: &Side, input: bool) {
             if start < last {
                 continue;
             }
-            job.append(&side.text[last..start], 0.0, format(theme::FG));
-            job.append(&side.text[start..end], 0.0, format(theme::FG_40));
+            job.append(&side.text[last..start], 0.0, format(theme::FG()));
+            job.append(&side.text[start..end], 0.0, format(theme::FG_40()));
             last = end;
         }
     }
-    job.append(&side.text[last..], 0.0, format(theme::FG));
+    job.append(&side.text[last..], 0.0, format(theme::FG()));
     job.wrap = TextWrapping::truncate_at_width(area.width());
     let galley = ui.ctx().fonts_mut(|f| f.layout_job(job));
-    ui.painter().galley(area.center() - galley.size() / 2.0, galley, theme::FG);
+    ui.painter().galley(area.center() - galley.size() / 2.0, galley, theme::FG());
 }
 
 fn emoji(ui: &Ui, text: &str, center: Pos2, size: f32) {
@@ -275,30 +275,30 @@ fn emoji(ui: &Ui, text: &str, center: Pos2, size: f32) {
 fn paint_weather(ui: &Ui, rect: Rect, card: &crate::extension::WeatherCard, week: bool) {
     let left = Rect::from_min_size(rect.min, vec2(rect.width() * 0.255, rect.height()));
     let x = left.left() + 24.0;
-    let temperature = paint_text(ui, pos2(x, left.top() + 22.0), Align2::LEFT_TOP, &card.temperature, theme::weighted(24.0, theme::SEMIBOLD), theme::FG, 90.0);
+    let temperature = paint_text(ui, pos2(x, left.top() + 22.0), Align2::LEFT_TOP, &card.temperature, theme::weighted(24.0, theme::SEMIBOLD), theme::FG(), 90.0);
     emoji(ui, &card.icon, pos2(temperature.right() + 13.0, temperature.center().y + 1.0), 20.0);
     let width = left.right() - x - 4.0;
-    let place = paint_text(ui, pos2(x, temperature.bottom() + 6.0), Align2::LEFT_TOP, &card.place, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, width);
-    let condition = paint_text(ui, pos2(x, place.bottom() + 3.0), Align2::LEFT_TOP, &card.condition, theme::font(11.0), theme::FG_60, width);
-    paint_text(ui, pos2(x, condition.bottom() + 3.0), Align2::LEFT_TOP, &card.range, theme::font(11.0), theme::FG_40, width);
+    let place = paint_text(ui, pos2(x, temperature.bottom() + 6.0), Align2::LEFT_TOP, &card.place, theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), width);
+    let condition = paint_text(ui, pos2(x, place.bottom() + 3.0), Align2::LEFT_TOP, &card.condition, theme::font(11.0), theme::FG_60(), width);
+    paint_text(ui, pos2(x, condition.bottom() + 3.0), Align2::LEFT_TOP, &card.range, theme::font(11.0), theme::FG_40(), width);
     let list = if week { &card.week } else { &card.today };
     let columns = Rect::from_min_max(pos2(left.right() + 8.0, rect.top()), pos2(rect.right() - 8.0, rect.bottom()));
     let step = columns.width() / list.len().max(1) as f32;
     for (i, forecast) in list.iter().enumerate() {
         let cx = columns.left() + step * (i as f32 + 0.5);
-        paint_text(ui, pos2(cx, rect.top() + 34.0), Align2::CENTER_CENTER, &forecast.label, theme::weighted(13.0, if i == 0 { theme::SEMIBOLD } else { theme::MEDIUM }), if i == 0 { theme::FG } else { theme::FG_60 }, step - 4.0);
+        paint_text(ui, pos2(cx, rect.top() + 34.0), Align2::CENTER_CENTER, &forecast.label, theme::weighted(13.0, if i == 0 { theme::SEMIBOLD } else { theme::MEDIUM }), if i == 0 { theme::FG() } else { theme::FG_60() }, step - 4.0);
         emoji(ui, &forecast.icon, pos2(cx, rect.top() + 61.0), 20.0);
         match &forecast.low {
             Some(low) => {
-                let high = text_galley(ui, &forecast.high, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, step);
-                let low = text_galley(ui, low, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, step);
+                let high = text_galley(ui, &forecast.high, theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), step);
+                let low = text_galley(ui, low, theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), step);
                 let total = high.size().x + 4.0 + low.size().x;
                 let y = rect.top() + 89.0 - high.size().y / 2.0;
-                ui.painter().galley(pos2(cx - total / 2.0, y), high.clone(), theme::FG);
-                ui.painter().galley(pos2(cx - total / 2.0 + high.size().x + 4.0, y), low, theme::FG);
+                ui.painter().galley(pos2(cx - total / 2.0, y), high.clone(), theme::FG());
+                ui.painter().galley(pos2(cx - total / 2.0 + high.size().x + 4.0, y), low, theme::FG());
             }
             None => {
-                paint_text(ui, pos2(cx, rect.top() + 89.0), Align2::CENTER_CENTER, &forecast.high, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, step);
+                paint_text(ui, pos2(cx, rect.top() + 89.0), Align2::CENTER_CENTER, &forecast.high, theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), step);
             }
         }
     }
@@ -317,17 +317,17 @@ fn paint_flight(ui: &Ui, rect: Rect, card: &crate::extension::FlightCard) {
     for (i, (name, detail, code)) in [&card.from, &card.to].into_iter().enumerate() {
         let side = Rect::from_min_size(pos2(rect.left() + half * i as f32, rect.top()), vec2(half, rect.height()));
         let width = side.width() - 48.0;
-        paint_text(ui, pos2(side.center().x, side.top() + 41.0), Align2::CENTER_CENTER, name, theme::weighted(24.0, theme::SEMIBOLD), theme::FG, width);
-        paint_text(ui, pos2(side.center().x, side.top() + 66.0), Align2::CENTER_CENTER, detail, theme::font(11.0), theme::FG_60, width);
-        chip(ui, pos2(side.center().x, side.bottom() - 21.0), code, theme::FG, theme::CONTROL);
+        paint_text(ui, pos2(side.center().x, side.top() + 41.0), Align2::CENTER_CENTER, name, theme::weighted(24.0, theme::SEMIBOLD), theme::FG(), width);
+        paint_text(ui, pos2(side.center().x, side.top() + 66.0), Align2::CENTER_CENTER, detail, theme::font(11.0), theme::FG_60(), width);
+        chip(ui, pos2(side.center().x, side.bottom() - 21.0), code, theme::FG(), theme::CONTROL());
     }
     let x = rect.center().x;
     for range in [rect.top()..=rect.center().y - 30.0, rect.center().y + 34.0..=rect.bottom()] {
-        ui.painter().vline(x, range, Stroke::new(1.0, theme::SEPARATOR));
+        ui.painter().vline(x, range, Stroke::new(1.0, theme::SEPARATOR()));
     }
     let plane = Rect::from_center_size(pos2(x, rect.center().y - 15.0), vec2(22.0, 22.0));
-    egui::Image::from_bytes("bytes://flight-plane.svg", PLANE_SVG.as_bytes()).tint(theme::FG).paint_at(ui, plane);
-    let (color, background) = if card.live { (theme::GREEN, Color32::TRANSPARENT) } else { (theme::FG_60, Color32::TRANSPARENT) };
+    egui::Image::from_bytes("bytes://flight-plane.svg", PLANE_SVG.as_bytes()).tint(theme::FG()).paint_at(ui, plane);
+    let (color, background) = if card.live { (theme::GREEN(), Color32::TRANSPARENT) } else { (theme::FG_60(), Color32::TRANSPARENT) };
     let status = chip(ui, pos2(x, rect.center().y + 14.0), &card.status, color, background);
     if let Some(note) = &card.note {
         chip(ui, pos2(status.right() + 8.0 + 30.0, status.center().y), note, Color32::from_rgb(0xFF, 0x9E, 0x4F), Color32::from_rgba_unmultiplied(0xFF, 0x9E, 0x4F, 38));
@@ -361,7 +361,7 @@ fn paint_skeleton(ui: &Ui, rect: Rect) {
 }
 
 fn paint_card(ui: &Ui, rect: Rect, card: &Inline, selected: bool, week: bool) {
-    ui.painter().rect_filled(rect, 8.0, if selected { theme::SELECTION } else { theme::fg(5) });
+    ui.painter().rect_filled(rect, 8.0, if selected { theme::SELECTION() } else { theme::fg(5) });
     match &card.kind {
         CardKind::Weather(weather) => return paint_weather(ui, rect, weather, week),
         CardKind::Flight(flight) => return paint_flight(ui, rect, flight),
@@ -380,11 +380,11 @@ fn paint_card(ui: &Ui, rect: Rect, card: &Inline, selected: bool, week: bool) {
     }
     let x = rect.center().x;
     for range in [rect.top()..=rect.center().y - 12.0, rect.center().y + 12.0..=rect.bottom()] {
-        ui.painter().vline(x, range, Stroke::new(1.0, theme::SEPARATOR));
+        ui.painter().vline(x, range, Stroke::new(1.0, theme::SEPARATOR()));
     }
-    let arrow = paint_text(ui, rect.center(), Align2::CENTER_CENTER, "→", theme::font(15.0), theme::FG, 40.0);
+    let arrow = paint_text(ui, rect.center(), Align2::CENTER_CENTER, "→", theme::font(15.0), theme::FG(), 40.0);
     if let Some(note) = &card.note {
-        paint_text(ui, pos2(x, arrow.bottom() + 4.0), Align2::CENTER_TOP, note, theme::font(11.0), theme::FG_60, half * 0.92);
+        paint_text(ui, pos2(x, arrow.bottom() + 4.0), Align2::CENTER_TOP, note, theme::font(11.0), theme::FG_60(), half * 0.92);
     }
 }
 
@@ -433,7 +433,7 @@ fn grid_move(lines: &[std::ops::Range<usize>], selected: usize, step: isize) -> 
 }
 
 fn placeholder_owned(views: &[OpenView]) -> String {
-    views.last().map_or_else(|| "Search for apps or commands...".to_string(), |v| v.view.placeholder())
+    crate::i18n::tr(&views.last().map_or_else(|| "Search for apps or commands...".to_string(), |v| v.view.placeholder())).into_owned()
 }
 
 #[derive(Clone, Default)]
@@ -506,7 +506,7 @@ fn tokens_field(ui: &mut Ui, origin: Pos2, field: &mut crate::extension::Field, 
     let mut chips = Vec::new();
     for value in &values {
         let (label, icon) = spec.options.iter().find(|(v, _, _)| v == value).map(|(_, l, i)| (l.clone(), i.clone())).unwrap_or_else(|| (spec.describe)(value));
-        let text = text_galley(ui, &label, font.clone(), theme::FG, right - left - 6.0 - 22.0 - 24.0);
+        let text = text_galley(ui, &label, font.clone(), theme::FG(), right - left - 6.0 - 22.0 - 24.0);
         let width = (6.0 + 22.0 + text.size().x + 4.0 + 20.0 + 2.0).min(right - left);
         if x + width > right && x > left {
             x = left;
@@ -521,21 +521,21 @@ fn tokens_field(ui: &mut Ui, origin: Pos2, field: &mut crate::extension::Field, 
     }
     let input = Rect::from_min_max(pos2(x, y), pos2(right, y + CHIP));
     let frame = Rect::from_min_max(origin, pos2(origin.x + WIDTH, (input.bottom() + 4.0).max(origin.y + 34.0)));
-    let border = if focused { theme::FG_40 } else { theme::KEY_BORDER };
+    let border = if focused { theme::FG_40() } else { theme::KEY_BORDER() };
     ui.painter().rect(frame, 8.0, theme::fg(3), Stroke::new(1.0, border), egui::StrokeKind::Inside);
     let mut removed = None;
     for (value, chip, icon, text, label) in chips {
-        ui.painter().rect_filled(chip, 5.0, theme::CONTROL);
+        ui.painter().rect_filled(chip, 5.0, theme::CONTROL());
         let icon_rect = Rect::from_min_size(pos2(chip.left() + 6.0, chip.center().y - 8.0), vec2(16.0, 16.0));
         icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(icon_rect)), &icon, &label, 16.0);
-        ui.painter().galley(pos2(icon_rect.right() + 6.0, chip.center().y - text.size().y / 2.0), text, theme::FG);
+        ui.painter().galley(pos2(icon_rect.right() + 6.0, chip.center().y - text.size().y / 2.0), text, theme::FG());
         let close = Rect::from_min_size(pos2(chip.right() - 22.0, chip.center().y - 10.0), vec2(20.0, 20.0));
         let response = ui.interact(close, id.with(("remove", &value)), Sense::CLICK);
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, format!("Remove {label}")));
         if response.hovered() {
-            ui.painter().rect_filled(close, 4.0, theme::CONTROL_HOVER);
+            ui.painter().rect_filled(close, 4.0, theme::CONTROL_HOVER());
         }
-        icons::paint_glyph(ui, "x", Rect::from_center_size(close.center(), vec2(12.0, 12.0)), if response.hovered() { theme::FG } else { theme::FG_60 });
+        icons::paint_glyph(ui, "x", Rect::from_center_size(close.center(), vec2(12.0, 12.0)), if response.hovered() { theme::FG() } else { theme::FG_60() });
         if response.clicked() {
             removed = Some(value);
         }
@@ -545,10 +545,10 @@ fn tokens_field(ui: &mut Ui, origin: Pos2, field: &mut crate::extension::Field, 
         edited = true;
         ui.memory_mut(|m| m.request_focus(id));
     }
-    let hint = egui::RichText::new(if values.is_empty() { field.placeholder.as_str() } else { "" }).color(theme::FG_40).font(theme::font(13.0));
+    let hint = egui::RichText::new(if values.is_empty() { field.placeholder.as_str() } else { "" }).color(theme::FG_40()).font(theme::font(13.0));
     let inner = input.shrink2(vec2(6.0, 4.0));
     let before = state.query.clone();
-    let response = ui.put(inner, egui::TextEdit::singleline(&mut state.query).id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).text_color(theme::FG).hint_text(hint).desired_width(inner.width()).return_key(None));
+    let response = ui.put(inner, egui::TextEdit::singleline(&mut state.query).id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).text_color(theme::FG()).hint_text(hint).desired_width(inner.width()).return_key(None));
     response.widget_info(|| egui::WidgetInfo::text_edit(true, field.label, &state.query, ""));
     if state.query != before {
         state.active = 0;
@@ -563,7 +563,7 @@ fn tokens_field(ui: &mut Ui, origin: Pos2, field: &mut crate::extension::Field, 
     if (response.has_focus() || pressing_list) && !matches.is_empty() {
         let rows = matches.len().min(5) as f32;
         let list = Rect::from_min_size(pos2(origin.x, frame.bottom() + 4.0), vec2(WIDTH, rows * 32.0 + 8.0));
-        ui.painter().rect(list, 8.0, theme::PANEL, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
+        ui.painter().rect(list, 8.0, theme::PANEL(), Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
         let mut picked = None;
         let mut list_ui = ui.new_child(UiBuilder::new().max_rect(list.shrink(4.0)));
         egui::ScrollArea::vertical().id_salt(id.with("list")).max_height(list.height() - 8.0).auto_shrink([false, true]).show(&mut list_ui, |ui| {
@@ -573,14 +573,14 @@ fn tokens_field(ui: &mut Ui, origin: Pos2, field: &mut crate::extension::Field, 
                     state.active = n;
                 }
                 if n == state.active {
-                    ui.painter().rect_filled(row, 6.0, theme::SELECTION);
+                    ui.painter().rect_filled(row, 6.0, theme::SELECTION());
                     if moved {
                         ui.scroll_to_rect(row, None);
                     }
                 }
                 let icon_rect = Rect::from_min_size(pos2(row.left() + 8.0, row.center().y - 8.0), vec2(16.0, 16.0));
                 icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(icon_rect)), icon, label, 16.0);
-                paint_text(ui, pos2(icon_rect.right() + 8.0, row.center().y), Align2::LEFT_CENTER, label, theme::font(13.0), theme::FG, row.right() - icon_rect.right() - 16.0);
+                paint_text(ui, pos2(icon_rect.right() + 8.0, row.center().y), Align2::LEFT_CENTER, label, theme::font(13.0), theme::FG(), row.right() - icon_rect.right() - 16.0);
                 if row_response.clicked() {
                     picked = Some(value.clone());
                 }
@@ -607,8 +607,8 @@ fn tokens_field(ui: &mut Ui, origin: Pos2, field: &mut crate::extension::Field, 
 fn back_button(ui: &Ui, rect: Rect) -> bool {
     let response = ui.interact(rect, egui::Id::unique("view-back"), Sense::click());
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Back"));
-    ui.painter().rect_filled(rect, 5.0, if response.hovered() { theme::CONTROL_HOVER } else { theme::CONTROL });
-    icons::paint_glyph(ui, "arrow-left", Rect::from_center_size(rect.center(), vec2(14.0, 14.0)), theme::FG);
+    ui.painter().rect_filled(rect, 5.0, if response.hovered() { theme::CONTROL_HOVER() } else { theme::CONTROL() });
+    icons::paint_glyph(ui, "arrow-left", Rect::from_center_size(rect.center(), vec2(14.0, 14.0)), theme::FG());
     response.clicked()
 }
 
@@ -1087,6 +1087,8 @@ impl Launcher {
 
     pub fn ui(&mut self, ui: &mut Ui) {
         let ctx = ui.ctx().clone();
+        theme::sync(&ctx, self.settings.appearance);
+        crate::i18n::sync(self.settings.language);
         self.logic(&ctx);
         if self.views.last_mut().is_some_and(|v| v.view.form().is_some()) {
             self.form_ui(ui);
@@ -1123,7 +1125,7 @@ impl Launcher {
         let current = rows.get(selected).cloned();
         let groups = current.as_ref().map(|r| self.groups(r)).unwrap_or_else(|| self.views.last().map(|v| v.view.empty_actions()).unwrap_or_default());
         let full = ui.max_rect();
-        ui.painter().rect_filled(full, 0.0, theme::BG);
+        ui.painter().rect_filled(full, 0.0, theme::BG());
 
         if self.pending.is_some() {
             self.confirm_keys(ui);
@@ -1148,7 +1150,7 @@ impl Launcher {
         }
         let argument = match (&item_argument, current.as_ref().map(|r| r.source)) {
             (Some((_, (placeholder, _))), _) => Some(placeholder.clone()),
-            (None, Some(Source::Command(i))) if self.views.is_empty() => self.commands[i].argument.as_ref().map(|a| a.placeholder.to_string()),
+            (None, Some(Source::Command(i))) if self.views.is_empty() => self.commands[i].argument.as_ref().map(|a| crate::i18n::tr(&a.placeholder).into_owned()),
             _ => None,
         };
         self.header(ui, header, argument);
@@ -1196,8 +1198,8 @@ impl Launcher {
     fn show_hud(&mut self, ctx: &egui::Context, now: f64) {
         let Some((toast, at)) = &self.hud else { return };
         let (title, color, seconds) = match toast {
-            Toast::Success(title) => (title.clone(), theme::GREEN, HUD_SECONDS),
-            Toast::Failure(title, _) => (title.clone(), theme::RED, HUD_FAILURE_SECONDS),
+            Toast::Success(title) => (title.clone(), theme::GREEN(), HUD_SECONDS),
+            Toast::Failure(title, _) => (title.clone(), theme::RED(), HUD_FAILURE_SECONDS),
         };
         let left = seconds - (now - at);
         if left <= 0.0 {
@@ -1205,7 +1207,7 @@ impl Launcher {
             return;
         }
         ctx.request_repaint_after(std::time::Duration::from_secs_f64(left));
-        let width = ctx.fonts_mut(|f| f.layout_no_wrap(title.clone(), theme::weighted(13.0, theme::MEDIUM), theme::FG)).size().x.ceil() + 48.0;
+        let width = ctx.fonts_mut(|f| f.layout_no_wrap(crate::i18n::tr(&title).into_owned(), theme::weighted(13.0, theme::MEDIUM), theme::FG())).size().x.ceil() + 48.0;
         let size = vec2(width.min(500.0), 46.0);
         let position = launcher::hud_position(size);
         let builder = egui::ViewportBuilder::default()
@@ -1222,11 +1224,11 @@ impl Launcher {
         ctx.show_viewport_immediate(egui::ViewportId::from_hash_of("hud"), builder, |ui, _| {
             let rect = ui.max_rect();
             let painter = ui.painter();
-            painter.rect(rect, 8.0, theme::BG, Stroke::new(1.0, Color32::from_rgb(0x41, 0x41, 0x41)), egui::StrokeKind::Inside);
+            painter.rect(rect, 8.0, theme::BG(), Stroke::new(1.0, theme::CONTROL_HOVER()), egui::StrokeKind::Inside);
             for (radius, alpha) in [(rect.width() * 0.45, 0.10), (rect.width() * 0.25, 0.10)] {
                 painter.circle_filled(pos2(rect.center().x, rect.top() - 8.0), radius.min(40.0), color.gamma_multiply(alpha));
             }
-            paint_text(ui, rect.center() + vec2(0.0, 1.0), Align2::CENTER_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG, rect.width() - 48.0);
+            paint_text(ui, rect.center() + vec2(0.0, 1.0), Align2::CENTER_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), rect.width() - 48.0);
         });
     }
 
@@ -1379,17 +1381,17 @@ impl Launcher {
         let keyboard_open = response.has_focus() && self.dropdown.is_none() && ui.input(|i| i.key_pressed(Key::Enter) || i.key_pressed(Key::Space));
         let current = options.get(selected).map_or("", |o| o.0.as_str());
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, format!("{label}: {current}")));
-        let border = if response.has_focus() { theme::FG_40 } else { theme::KEY_BORDER };
+        let border = if response.has_focus() { theme::FG_40() } else { theme::KEY_BORDER() };
         ui.painter().rect(trigger, 8.0, if response.hovered() { theme::fg(5) } else { Color32::TRANSPARENT }, Stroke::new(1.0, border), egui::StrokeKind::Inside);
         let option_icon = |ui: &mut Ui, icon: &Icon, rect: Rect| match icon {
-            Icon::Glyph(glyph) => icons::paint_glyph(ui, glyph, rect, theme::FG),
+            Icon::Glyph(glyph) => icons::paint_glyph(ui, glyph, rect, theme::FG()),
             other => icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(rect)), other, "", 16.0),
         };
         if let Some((text, icon)) = options.get(selected) {
             option_icon(ui, icon, Rect::from_min_size(pos2(trigger.left() + 12.0, trigger.center().y - 8.0), vec2(16.0, 16.0)));
-            paint_text(ui, pos2(trigger.left() + 36.0, trigger.center().y), Align2::LEFT_CENTER, text, theme::weighted(13.0, theme::MEDIUM), theme::FG, trigger.width() - 64.0);
+            paint_text(ui, pos2(trigger.left() + 36.0, trigger.center().y), Align2::LEFT_CENTER, text, theme::weighted(13.0, theme::MEDIUM), theme::FG(), trigger.width() - 64.0);
         }
-        icons::paint_glyph(ui, "chevron-down", Rect::from_min_size(pos2(trigger.right() - 12.0 - 12.0, trigger.center().y - 6.0), vec2(12.0, 12.0)), theme::FG_60);
+        icons::paint_glyph(ui, "chevron-down", Rect::from_min_size(pos2(trigger.right() - 12.0 - 12.0, trigger.center().y - 6.0), vec2(12.0, 12.0)), theme::FG_60());
         if response.clicked() || keyboard_open {
             self.dropdown = match &self.dropdown {
                 Some(open) if open.slot == slot => None,
@@ -1418,12 +1420,12 @@ impl Launcher {
         let mut query_changed = false;
         egui::Area::new(egui::Id::unique(("dropdown-menu", slot))).order(egui::Order::Foreground).fixed_pos(frame.min).show(&ctx, |ui| {
             ui.painter().add(egui::epaint::RectShape::filled(frame.translate(vec2(0.0, 8.0)).expand(4.0), 10.0, Color32::from_black_alpha(40)));
-            ui.painter().rect(frame, 6.0, theme::PANEL, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
+            ui.painter().rect(frame, 6.0, theme::PANEL(), Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
             let line_y = if below { search.bottom() - 0.5 } else { search.top() + 0.5 };
-            ui.painter().hline(frame.x_range().shrink(1.0), line_y, Stroke::new(1.0, theme::PANEL_LINE));
+            ui.painter().hline(frame.x_range().shrink(1.0), line_y, Stroke::new(1.0, theme::PANEL_LINE()));
             let inner = Rect::from_min_max(pos2(search.left() + 16.0, search.center().y - 9.0), pos2(search.right() - 16.0, search.center().y + 9.0));
-            let hint = egui::RichText::new("Search...").color(theme::FG_40).font(theme::font(13.0));
-            let edit = egui::TextEdit::singleline(&mut open.query).id(search_id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).text_color(theme::FG).hint_text(hint).desired_width(inner.width());
+            let hint = egui::RichText::new(crate::i18n::tr("Search...")).color(theme::FG_40()).font(theme::font(13.0));
+            let edit = egui::TextEdit::singleline(&mut open.query).id(search_id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).text_color(theme::FG()).hint_text(hint).desired_width(inner.width());
             let field = ui.put(inner, edit);
             field.widget_info(|| egui::WidgetInfo::text_edit(true, "Search options", &open.query, ""));
             query_changed = field.changed();
@@ -1434,7 +1436,7 @@ impl Launcher {
                 egui::ScrollArea::vertical().id_salt(("dropdown-list", slot)).max_height(rows.height()).auto_shrink(false).show(ui, |ui| {
                     if visible.is_empty() {
                         let (row, _) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::hover());
-                        paint_text(ui, pos2(row.left() + 8.0, row.center().y), Align2::LEFT_CENTER, "No results", theme::font(13.0), theme::FG_60, row.width());
+                        paint_text(ui, pos2(row.left() + 8.0, row.center().y), Align2::LEFT_CENTER, "No results", theme::font(13.0), theme::FG_60(), row.width());
                     }
                     for (n, &i) in visible.iter().enumerate() {
                         let (text, icon) = &options[i];
@@ -1444,13 +1446,13 @@ impl Launcher {
                             hovered = Some(n);
                         }
                         if n == open.highlight {
-                            ui.painter().rect_filled(row, 6.0, theme::PANEL_LINE);
+                            ui.painter().rect_filled(row, 6.0, theme::PANEL_LINE());
                             if open.scroll {
                                 option.scroll_to_me(None);
                             }
                         }
                         option_icon(ui, icon, Rect::from_min_size(pos2(row.left() + 8.0, row.center().y - 8.0), vec2(16.0, 16.0)));
-                        paint_text(ui, pos2(row.left() + 32.0, row.center().y), Align2::LEFT_CENTER, text, theme::weighted(13.0, theme::MEDIUM), theme::FG, row.width() - 40.0);
+                        paint_text(ui, pos2(row.left() + 32.0, row.center().y), Align2::LEFT_CENTER, text, theme::weighted(13.0, theme::MEDIUM), theme::FG(), row.width() - 40.0);
                         if option.clicked() {
                             chosen = Some(i);
                         }
@@ -1479,7 +1481,7 @@ impl Launcher {
     fn form_ui(&mut self, ui: &mut Ui) {
         let ctx = ui.ctx().clone();
         let full = ui.max_rect();
-        ui.painter().rect_filled(full, 0.0, theme::BG);
+        ui.painter().rect_filled(full, 0.0, theme::BG());
         let (mut submit, mut back) = (false, false);
         if self.pending.is_some() {
             self.confirm_keys(ui);
@@ -1499,14 +1501,14 @@ impl Launcher {
         }
         let header = Rect::from_min_size(full.min, vec2(full.width(), HEADER));
         let footer = Rect::from_min_max(pos2(full.left(), full.bottom() - FOOTER), full.max);
-        ui.painter().hline(header.x_range(), header.bottom() - 0.5, Stroke::new(1.0, theme::SEPARATOR));
-        ui.painter().hline(footer.x_range(), footer.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR));
+        ui.painter().hline(header.x_range(), header.bottom() - 0.5, Stroke::new(1.0, theme::SEPARATOR()));
+        ui.painter().hline(footer.x_range(), footer.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
         let lead = Rect::from_center_size(pos2(header.left() + 16.0 + 11.0, header.center().y), vec2(22.0, 22.0));
         back |= back_button(ui, lead);
         let Some(top) = self.views.last_mut() else { return };
         let Some(form) = top.view.form() else { return };
         let (title, submit_title, icon) = (form.title.clone(), form.submit, form.icon.clone());
-        paint_text(ui, pos2(lead.right() + 12.0, header.center().y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG_60, 400.0);
+        paint_text(ui, pos2(lead.right() + 12.0, header.center().y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG_60(), 400.0);
         let mut changed = Vec::new();
         let mut picks = Vec::new();
         let body = Rect::from_min_max(pos2(full.left(), header.bottom()), pos2(full.right(), footer.top()));
@@ -1520,7 +1522,7 @@ impl Launcher {
             let mut choices = Vec::new();
             let focus = form.focus.take();
             for (i, field) in form.fields.iter_mut().enumerate() {
-                paint_text(ui, pos2(label_right, y + 9.0), Align2::RIGHT_TOP, field.label, theme::font(13.0), theme::FG_60, 170.0);
+                paint_text(ui, pos2(label_right, y + 9.0), Align2::RIGHT_TOP, field.label, theme::font(13.0), theme::FG_60(), 170.0);
                 let height = match field.kind {
                     crate::extension::FieldKind::Area(h) => h,
                     _ => 34.0,
@@ -1551,14 +1553,14 @@ impl Launcher {
                         let response = ui.interact(switch, id, Sense::click());
                         response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Switch, true, on, field.label));
                         if on {
-                            ui.painter().rect_filled(switch, 8.0, theme::ACCENT);
+                            ui.painter().rect_filled(switch, 8.0, theme::ACCENT());
                             ui.painter().circle_filled(pos2(switch.right() - 3.0 - 5.0, switch.center().y), 5.0, Color32::WHITE);
                         } else {
                             ui.painter().rect_stroke(switch, 8.0, Stroke::new(1.0, theme::fg(25)), egui::StrokeKind::Inside);
-                            ui.painter().circle_filled(pos2(switch.left() + 3.0 + 4.0, switch.center().y), 4.0, theme::FG.gamma_multiply(0.9));
+                            ui.painter().circle_filled(pos2(switch.left() + 3.0 + 4.0, switch.center().y), 4.0, theme::FG().gamma_multiply(0.9));
                         }
                         if response.has_focus() {
-                            ui.painter().rect_stroke(switch.expand(2.0), 10.0, Stroke::new(1.0, theme::FG_40), egui::StrokeKind::Outside);
+                            ui.painter().rect_stroke(switch.expand(2.0), 10.0, Stroke::new(1.0, theme::FG_40()), egui::StrokeKind::Outside);
                         }
                         if response.gained_focus() {
                             response.scroll_to_me(None);
@@ -1570,13 +1572,13 @@ impl Launcher {
                     }
                     kind => {
                         let focused = ui.memory(|m| m.has_focus(id));
-                        let border = if field.error.is_some() { theme::RED } else if focused { theme::FG_40 } else { theme::KEY_BORDER };
+                        let border = if field.error.is_some() { theme::RED() } else if focused { theme::FG_40() } else { theme::KEY_BORDER() };
                         ui.painter().rect(rect, 8.0, theme::fg(3), Stroke::new(1.0, border), egui::StrokeKind::Inside);
                         let font = if field.mono { FontId::monospace(13.0) } else { theme::font(13.0) };
-                        let hint = egui::RichText::new(field.placeholder.as_str()).color(theme::FG_40).font(font.clone());
+                        let hint = egui::RichText::new(field.placeholder.as_str()).color(theme::FG_40()).font(font.clone());
                         let inner = rect.shrink2(vec2(12.0, 8.0));
                         let edit = if matches!(kind, crate::extension::FieldKind::Area(_)) { egui::TextEdit::multiline(&mut field.value).desired_rows(1) } else { egui::TextEdit::singleline(&mut field.value) };
-                        let response = ui.put(inner, edit.id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(font).text_color(theme::FG).hint_text(hint).desired_width(inner.width()).password(field.secret));
+                        let response = ui.put(inner, edit.id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(font).text_color(theme::FG()).hint_text(hint).desired_width(inner.width()).password(field.secret));
                         response.widget_info(|| egui::WidgetInfo::text_edit(true, field.label, &field.value, ""));
                         if response.changed() {
                             field.error = None;
@@ -1592,7 +1594,7 @@ impl Launcher {
                 }
                 y = bottom;
                 if let Some(note) = field.error.as_ref().or(field.help.as_ref()) {
-                    let color = if field.error.is_some() { theme::RED } else { theme::FG_60 };
+                    let color = if field.error.is_some() { theme::RED() } else { theme::FG_60() };
                     let galley = wrapped(ui, note, theme::font(12.0), color, 360.0);
                     let h = galley.size().y;
                     ui.painter().galley(pos2(field_left, y + 6.0), galley, color);
@@ -1609,9 +1611,9 @@ impl Launcher {
         });
         let tile = Rect::from_min_size(pos2(footer.left() + 12.0, footer.center().y - 8.0), vec2(16.0, 16.0));
         icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(tile)), &icon, &title, 16.0);
-        paint_text(ui, pos2(tile.right() + 8.0, footer.center().y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG_60, 300.0);
+        paint_text(ui, pos2(tile.right() + 8.0, footer.center().y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG_60(), 300.0);
         let caps_left = keycaps(ui, footer.right() - 12.0, footer.center().y, &["Ctrl".into(), "↵".into()]);
-        let label = paint_text(ui, pos2(caps_left - 8.0, footer.center().y), Align2::RIGHT_CENTER, submit_title, theme::weighted(13.0, theme::MEDIUM), theme::FG, 300.0);
+        let label = paint_text(ui, pos2(caps_left - 8.0, footer.center().y), Align2::RIGHT_CENTER, submit_title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), 300.0);
         let button = ui.interact(Rect::from_min_max(pos2(label.left() - 8.0, footer.center().y - 13.0), pos2(footer.right() - 9.0, footer.center().y + 13.0)), egui::Id::unique("form-submit"), Sense::click());
         button.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, submit_title));
         submit |= button.clicked();
@@ -1709,7 +1711,7 @@ impl Launcher {
     }
 
     fn header(&mut self, ui: &mut Ui, rect: Rect, argument: Option<String>) {
-        ui.painter().hline(rect.x_range(), rect.bottom() - 0.5, Stroke::new(1.0, theme::SEPARATOR));
+        ui.painter().hline(rect.x_range(), rect.bottom() - 0.5, Stroke::new(1.0, theme::SEPARATOR()));
         let lead = Rect::from_center_size(pos2(rect.left() + 16.0 + 11.0, rect.center().y), vec2(22.0, 22.0));
         let placeholder = match self.views.last() {
             Some(view) => {
@@ -1717,11 +1719,11 @@ impl Launcher {
                     self.pop_view();
                     return;
                 }
-                view.view.placeholder()
+                crate::i18n::tr(&view.view.placeholder()).into_owned()
             }
             None => {
-                icons::paint_glyph(ui, "openray", lead, theme::FG_60);
-                "Search for apps or commands...".to_string()
+                icons::paint_glyph(ui, "openray", lead, theme::FG_60());
+                crate::i18n::tr("Search for apps or commands...").into_owned()
             }
         };
         let mut input = Rect::from_min_max(pos2(lead.right() + 12.0, rect.top() + 1.0), pos2(rect.right() - 16.0, rect.bottom() - 1.0));
@@ -1742,20 +1744,20 @@ impl Launcher {
             let current = self.views.last().map_or(self.query.as_str(), |v| v.query.as_str());
             let shown = if current.is_empty() { placeholder_owned(&self.views) } else { current.to_owned() };
             let shown = shown.as_str();
-            let query_width = ui.ctx().fonts_mut(|f| f.layout_no_wrap(shown.to_owned(), theme::font(18.0), theme::FG)).size().x + 12.0;
+            let query_width = ui.ctx().fonts_mut(|f| f.layout_no_wrap(shown.to_owned(), theme::font(18.0), theme::FG())).size().x + 12.0;
             let query_width = query_width.min(input.width() * 0.6);
             let arg_text = if self.argument.is_empty() { placeholder } else { self.argument.as_str() };
-            let arg_width = (ui.ctx().fonts_mut(|f| f.layout_no_wrap(arg_text.to_owned(), theme::font(13.0), theme::FG)).size().x + 20.0).min(200.0);
+            let arg_width = (ui.ctx().fonts_mut(|f| f.layout_no_wrap(arg_text.to_owned(), theme::font(13.0), theme::FG())).size().x + 20.0).min(200.0);
             let field = Rect::from_min_size(pos2(input.left() + query_width + 12.0, rect.center().y - 12.0), vec2(arg_width, 24.0));
             let focused = self.focus == Focus::Argument;
-            ui.painter().rect_filled(field, 5.0, if focused { theme::CONTROL_HOVER } else { theme::CONTROL });
+            ui.painter().rect_filled(field, 5.0, if focused { theme::CONTROL_HOVER() } else { theme::CONTROL() });
             let edit = egui::TextEdit::singleline(&mut self.argument)
                 .id(argument_id)
                 .frame(egui::Frame::NONE)
                 .margin(egui::Margin::ZERO)
                 .font(theme::font(13.0))
-                .text_color(theme::FG)
-                .hint_text(egui::RichText::new(placeholder).color(theme::FG_60).font(theme::font(13.0)))
+                .text_color(theme::FG())
+                .hint_text(egui::RichText::new(placeholder).color(theme::FG_60()).font(theme::font(13.0)))
                 .desired_width(field.width() - 16.0);
             let response = ui.put(Rect::from_center_size(field.center(), vec2(field.width() - 16.0, 18.0)), edit);
             response.widget_info(|| egui::WidgetInfo::text_edit(true, placeholder, &self.argument, ""));
@@ -1781,8 +1783,8 @@ impl Launcher {
             .frame(egui::Frame::NONE)
             .margin(egui::Margin::ZERO)
             .font(theme::font(18.0))
-            .text_color(theme::FG)
-            .hint_text(egui::RichText::new(placeholder.as_str()).color(theme::FG_40).font(theme::font(18.0)))
+            .text_color(theme::FG())
+            .hint_text(egui::RichText::new(placeholder.as_str()).color(theme::FG_40()).font(theme::font(18.0)))
             .desired_width(input.width());
         let response = ui.put(Rect::from_center_size(input.center(), vec2(input.width(), 24.0)), edit);
         let label = placeholder.trim_end_matches(['.', '…']).to_string();
@@ -1807,7 +1809,7 @@ impl Launcher {
         let detail = self.views.last().is_some_and(|v| v.view.has_detail()).then(|| Rect::from_min_max(pos2(rect.left() + DETAIL_LIST, rect.top()), rect.max));
         let rect = if detail.is_some() { Rect::from_min_size(rect.min, vec2(DETAIL_LIST, rect.height())) } else { rect };
         if let Some(pane) = detail {
-            ui.painter().vline(pane.left() - 0.5, pane.y_range(), Stroke::new(1.0, theme::SEPARATOR));
+            ui.painter().vline(pane.left() - 0.5, pane.y_range(), Stroke::new(1.0, theme::SEPARATOR()));
             let selected = (*self.selection()).min(rows.len().saturating_sub(1));
             if let (Some(row), Some(top)) = (rows.get(selected), self.views.last_mut()) {
                 top.view.detail(&mut ui.new_child(UiBuilder::new().max_rect(pane)), pane, &row.id);
@@ -1818,7 +1820,7 @@ impl Launcher {
                 Some(view) if view.view.loading() => {}
                 Some(view) => {
                     let empty = view.view.empty();
-                    let (font, color) = if empty.description.is_some() { (theme::weighted(13.0, theme::MEDIUM), theme::FG) } else { (theme::font(13.0), theme::FG_60) };
+                    let (font, color) = if empty.description.is_some() { (theme::weighted(13.0, theme::MEDIUM), theme::FG()) } else { (theme::font(13.0), theme::FG_60()) };
                     let mut job = LayoutJob::single_section(empty.title.clone(), TextFormat { font_id: font, color, ..Default::default() });
                     job.wrap.max_width = rect.width() - 48.0;
                     job.halign = egui::Align::Center;
@@ -1827,16 +1829,16 @@ impl Launcher {
                     let title = Rect::from_min_size(pos2(rect.center().x - galley.size().x / 2.0, top), galley.size());
                     ui.painter().galley(pos2(rect.center().x, top), galley, color);
                     if let Some(description) = empty.description {
-                        let mut job = LayoutJob::single_section(description, TextFormat { font_id: theme::font(13.0), color: theme::FG_60, ..Default::default() });
+                        let mut job = LayoutJob::single_section(description, TextFormat { font_id: theme::font(13.0), color: theme::FG_60(), ..Default::default() });
                         job.wrap.max_width = 420.0_f32.min(rect.width() - 48.0);
                         job.halign = egui::Align::Center;
                         let galley = ctx.fonts_mut(|f| f.layout_job(job));
-                        ui.painter().galley(pos2(rect.center().x, title.bottom() + 4.0), galley, theme::FG_60);
+                        ui.painter().galley(pos2(rect.center().x, title.bottom() + 4.0), galley, theme::FG_60());
                     }
                 }
                 None => {
                     let text = format!("No results for “{}”", self.query.trim());
-                    paint_text(ui, rect.center(), Align2::CENTER_CENTER, &text, theme::font(13.0), theme::FG_60, rect.width() - 32.0);
+                    paint_text(ui, rect.center(), Align2::CENTER_CENTER, &text, theme::font(13.0), theme::FG_60(), rect.width() - 32.0);
                 }
             }
             return;
@@ -1860,11 +1862,11 @@ impl Launcher {
                             ui.add_space(8.0);
                         } else {
                             let (head, _) = ui.allocate_exact_size(vec2(ui.available_width(), SECTION), Sense::hover());
-                            let title = paint_text(ui, pos2(head.left() + 8.0, head.bottom() - 5.0), Align2::LEFT_BOTTOM, &row.section, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60, head.width());
+                            let title = paint_text(ui, pos2(head.left() + 8.0, head.bottom() - 5.0), Align2::LEFT_BOTTOM, &row.section, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60(), head.width());
                             if row.card.as_ref().is_some_and(|c| matches!(c.kind, CardKind::Weather(_))) {
                                 let mut x = title.right() + 16.0;
                                 for (week, label) in [(false, "Today"), (true, "This Week")] {
-                                    let color = if self.weather_week == week { theme::FG } else { theme::FG_40 };
+                                    let color = if self.weather_week == week { theme::FG() } else { theme::FG_40() };
                                     let tab = paint_text(ui, pos2(x, title.bottom()), Align2::LEFT_BOTTOM, label, theme::weighted(11.0, theme::SEMIBOLD), color, 120.0);
                                     let response = ui.interact(tab.expand(4.0), egui::Id::unique(("weather-tab", week)), Sense::click());
                                     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, self.weather_week == week, label));
@@ -1874,7 +1876,7 @@ impl Launcher {
                                     x = tab.right() + 10.0;
                                 }
                             } else if row.section.starts_with("Use “") {
-                                icons::paint_glyph(ui, "settings", Rect::from_min_size(pos2(title.right() + 6.0, title.center().y - 6.0), vec2(12.0, 12.0)), theme::FG_40);
+                                icons::paint_glyph(ui, "settings", Rect::from_min_size(pos2(title.right() + 6.0, title.center().y - 6.0), vec2(12.0, 12.0)), theme::FG_40());
                             }
                         }
                     }
@@ -1887,7 +1889,7 @@ impl Launcher {
                     };
                     response.widget_info(|| egui::WidgetInfo::selected(egui::Role::ListBoxOption, true, selected, &label));
                     if selected {
-                        ui.painter().rect_filled(rect, 8.0, theme::SELECTION);
+                        ui.painter().rect_filled(rect, 8.0, theme::SELECTION());
                         if scroll {
                             response.scroll_to_me(None);
                         }
@@ -1907,17 +1909,17 @@ impl Launcher {
                     icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(icon_rect)), &row.icon, &row.title, 22.0);
                     let mut right = rect.right() - 8.0;
                     if let Some(kind) = row.kind {
-                        right = paint_text(ui, pos2(right, rect.center().y), Align2::RIGHT_CENTER, kind, theme::font(13.0), theme::FG_60, 200.0).left() - 12.0;
+                        right = paint_text(ui, pos2(right, rect.center().y), Align2::RIGHT_CENTER, kind, theme::font(13.0), theme::FG_60(), 200.0).left() - 12.0;
                     }
                     if !row.accessories.is_empty() {
                         right = accessories(ui, right, rect.center().y, &row.accessories) - 12.0;
                     }
                     let mut x = icon_rect.right() + 12.0;
-                    let title = paint_text(ui, pos2(x, rect.center().y), Align2::LEFT_CENTER, &row.title, theme::weighted(13.0, theme::MEDIUM), theme::FG, right - x);
+                    let title = paint_text(ui, pos2(x, rect.center().y), Align2::LEFT_CENTER, &row.title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), right - x);
                     x = title.right() + 12.0;
                     if let Some(subtitle) = &row.subtitle {
                         if x < right {
-                            paint_text(ui, pos2(x, rect.center().y), Align2::LEFT_CENTER, subtitle, theme::font(13.0), theme::FG_60, right - x);
+                            paint_text(ui, pos2(x, rect.center().y), Align2::LEFT_CENTER, subtitle, theme::font(13.0), theme::FG_60(), right - x);
                         }
                     }
                 }
@@ -1952,8 +1954,8 @@ impl Launcher {
                         ui.add_space(8.0);
                     } else {
                         let (head, _) = ui.allocate_exact_size(vec2(width, SECTION), Sense::hover());
-                        let label = paint_text(ui, pos2(head.left() + 8.0, head.bottom() - 5.0), Align2::LEFT_BOTTOM, title, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60, head.width());
-                        paint_text(ui, pos2(label.right() + 8.0, head.bottom() - 5.0), Align2::LEFT_BOTTOM, &range.len().to_string(), theme::weighted(11.0, theme::MEDIUM), theme::FG_40, 80.0);
+                        let label = paint_text(ui, pos2(head.left() + 8.0, head.bottom() - 5.0), Align2::LEFT_BOTTOM, title, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60(), head.width());
+                        paint_text(ui, pos2(label.right() + 8.0, head.bottom() - 5.0), Align2::LEFT_BOTTOM, &range.len().to_string(), theme::weighted(11.0, theme::MEDIUM), theme::FG_40(), 80.0);
                     }
                     let starts: Vec<usize> = range.clone().step_by(columns.max(1)).collect();
                     for (n, start) in starts.iter().enumerate() {
@@ -1964,9 +1966,9 @@ impl Launcher {
                             let response = ui.interact(r, ui.scope_id().with(("cell", index)), Sense::click());
                             let selected = index == selected_index;
                             response.widget_info(|| egui::WidgetInfo::selected(egui::Role::ListBoxOption, true, selected, &row.title));
-                            ui.painter().rect_filled(r, 8.0, if selected { theme::SELECTION } else { theme::fg(5) });
+                            ui.painter().rect_filled(r, 8.0, if selected { theme::SELECTION() } else { theme::fg(5) });
                             if selected {
-                                ui.painter().rect_stroke(r, 8.0, Stroke::new(2.0, theme::FG_60), egui::StrokeKind::Inside);
+                                ui.painter().rect_stroke(r, 8.0, Stroke::new(2.0, theme::FG_60()), egui::StrokeKind::Inside);
                                 if scroll {
                                     response.scroll_to_me(None);
                                 }
@@ -1982,7 +1984,7 @@ impl Launcher {
                                     let size = cell - 36.0;
                                     let icon = Rect::from_center_size(pos2(r.center().x, r.top() + 8.0 + size / 2.0), vec2(size, size));
                                     icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(icon)), &row.icon, &row.title, size);
-                                    paint_text(ui, pos2(r.center().x, r.bottom() - 7.0), Align2::CENTER_BOTTOM, &row.title, theme::font(11.0), theme::FG_60, cell - 12.0);
+                                    paint_text(ui, pos2(r.center().x, r.bottom() - 7.0), Align2::CENTER_BOTTOM, &row.title, theme::font(11.0), theme::FG_60(), cell - 12.0);
                                 } else {
                                     let icon = Rect::from_center_size(r.center(), vec2(GRID_ICON, GRID_ICON));
                                     icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(icon)), &row.icon, &row.title, GRID_ICON);
@@ -2015,7 +2017,7 @@ impl Launcher {
     fn page_ui(&mut self, ui: &mut Ui, page: Page) {
         let ctx = ui.ctx().clone();
         let full = ui.max_rect();
-        ui.painter().rect_filled(full, 0.0, theme::BG);
+        ui.painter().rect_filled(full, 0.0, theme::BG());
         let title = if page.title.is_empty() { self.views.last().map(|v| v.view.footer().0).unwrap_or_default() } else { page.title.clone() };
         let row = Row { id: "page".into(), section: String::new(), title, subtitle: None, icon: Icon::Glyph("file"), accessories: Vec::new(), kind: None, source: Source::Item, actions: page.actions.clone(), card: None };
         let groups = self.groups(&row);
@@ -2061,8 +2063,8 @@ impl Launcher {
         }
         let lead = Rect::from_center_size(pos2(header.left() + 16.0 + 11.0, header.center().y), vec2(22.0, 22.0));
         if page.dropdowns.is_empty() {
-            ui.painter().hline(header.x_range(), header.bottom() - 0.5, Stroke::new(1.0, theme::SEPARATOR));
-            paint_text(ui, pos2(lead.right() + 12.0, header.center().y), Align2::LEFT_CENTER, &page.title, theme::weighted(13.0, theme::MEDIUM), theme::FG_60, header.width() - 80.0);
+            ui.painter().hline(header.x_range(), header.bottom() - 0.5, Stroke::new(1.0, theme::SEPARATOR()));
+            paint_text(ui, pos2(lead.right() + 12.0, header.center().y), Align2::LEFT_CENTER, &page.title, theme::weighted(13.0, theme::MEDIUM), theme::FG_60(), header.width() - 80.0);
         }
         let mut picks = Vec::new();
         let count = page.dropdowns.len() as f32;
@@ -2094,21 +2096,21 @@ impl Launcher {
     }
 
     fn footer(&mut self, ui: &mut Ui, rect: Rect, current: Option<&Row>, groups: &[Vec<Action>], primary_keys: Option<Vec<String>>) {
-        ui.painter().hline(rect.x_range(), rect.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR));
+        ui.painter().hline(rect.x_range(), rect.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
         let center_y = rect.center().y;
         if let Some((toast, _)) = &self.toast {
             let (color, title, message) = match toast {
-                Toast::Success(title) => (theme::GREEN, title.as_str(), None),
-                Toast::Failure(title, message) => (theme::RED, title.as_str(), Some(message.as_str())),
+                Toast::Success(title) => (theme::GREEN(), title.as_str(), None),
+                Toast::Failure(title, message) => (theme::RED(), title.as_str(), Some(message.as_str())),
             };
             let dot = pos2(rect.left() + 22.0, center_y);
             for (radius, alpha) in [(10.0, 0.06), (6.0, 0.12)] {
                 ui.painter().circle_filled(dot, radius, color.gamma_multiply(alpha));
             }
             ui.painter().circle_filled(dot, 2.5, color);
-            let title_rect = paint_text(ui, pos2(rect.left() + 37.0, center_y), Align2::LEFT_CENTER, title, theme::font(12.0), theme::FG, 360.0);
+            let title_rect = paint_text(ui, pos2(rect.left() + 37.0, center_y), Align2::LEFT_CENTER, title, theme::font(12.0), theme::FG(), 360.0);
             if let Some(message) = message.filter(|m| !m.is_empty()) {
-                paint_text(ui, pos2(title_rect.right() + 7.0, center_y), Align2::LEFT_CENTER, message, theme::font(13.0), theme::FG_60, 300.0);
+                paint_text(ui, pos2(title_rect.right() + 7.0, center_y), Align2::LEFT_CENTER, message, theme::font(13.0), theme::FG_60(), 300.0);
             }
         } else if let Some(view) = self.views.last() {
             let (mut title, icon) = view.view.footer();
@@ -2117,27 +2119,27 @@ impl Launcher {
             }
             let tile = Rect::from_min_size(pos2(rect.left() + 12.0, center_y - 8.0), vec2(16.0, 16.0));
             icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(tile)), &icon, &title, 16.0);
-            paint_text(ui, pos2(tile.right() + 8.0, center_y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG, 300.0);
+            paint_text(ui, pos2(tile.right() + 8.0, center_y), Align2::LEFT_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), 300.0);
         } else if let Some(error) = &self.hotkey_error {
-            paint_text(ui, pos2(rect.left() + 12.0, center_y), Align2::LEFT_CENTER, &format!("Hotkey unavailable: {error}"), theme::font(12.0), theme::RED, 380.0);
+            paint_text(ui, pos2(rect.left() + 12.0, center_y), Align2::LEFT_CENTER, &format!("Hotkey unavailable: {error}"), theme::font(12.0), theme::RED(), 380.0);
         } else {
-            icons::paint_glyph(ui, "openray", Rect::from_center_size(pos2(rect.left() + 12.0 + 11.0, center_y), vec2(22.0, 22.0)), theme::FG_60);
+            icons::paint_glyph(ui, "openray", Rect::from_center_size(pos2(rect.left() + 12.0 + 11.0, center_y), vec2(22.0, 22.0)), theme::FG_60());
         }
         let (Some(row), Some(primary)) = (current, groups.first().and_then(|g| g.first())) else { return };
         let right = rect.right() - 9.0;
         let mut x = right;
         if groups.iter().flatten().count() > 1 {
             let caps_left = keycaps(ui, right - 3.0, center_y, &["Ctrl".into(), "K".into()]);
-            let label = paint_text(ui, pos2(caps_left - 8.0, center_y), Align2::RIGHT_CENTER, "Actions", theme::weighted(13.0, theme::MEDIUM), theme::FG_60, 200.0);
+            let label = paint_text(ui, pos2(caps_left - 8.0, center_y), Align2::RIGHT_CENTER, "Actions", theme::weighted(13.0, theme::MEDIUM), theme::FG_60(), 200.0);
             let button = Rect::from_min_max(pos2(label.left() - 8.0, center_y - 13.0), pos2(right, center_y + 13.0));
             let response = ui.interact(button, egui::Id::unique("actions-button"), Sense::click());
             response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Actions"));
             if self.panel.is_some() {
-                ui.painter().rect_filled(button, 6.0, theme::SELECTION);
+                ui.painter().rect_filled(button, 6.0, theme::SELECTION());
                 keycaps(ui, right - 3.0, center_y, &["Ctrl".into(), "K".into()]);
-                paint_text(ui, pos2(caps_left - 8.0, center_y), Align2::RIGHT_CENTER, "Actions", theme::weighted(13.0, theme::MEDIUM), theme::FG_60, 200.0);
+                paint_text(ui, pos2(caps_left - 8.0, center_y), Align2::RIGHT_CENTER, "Actions", theme::weighted(13.0, theme::MEDIUM), theme::FG_60(), 200.0);
             } else {
-                ui.painter().vline(button.left() - 6.0, (center_y - 5.5)..=(center_y + 5.5), Stroke::new(1.0, theme::FOOTER_DIVIDER));
+                ui.painter().vline(button.left() - 6.0, (center_y - 5.5)..=(center_y + 5.5), Stroke::new(1.0, theme::FOOTER_DIVIDER()));
             }
             if response.clicked() {
                 self.panel = match self.panel {
@@ -2148,7 +2150,7 @@ impl Launcher {
             x = button.left() - 13.0;
         }
         let caps_left = keycaps(ui, x, center_y, &primary_keys.unwrap_or_else(|| vec!["↵".into()]));
-        paint_text(ui, pos2(caps_left - 8.0, center_y), Align2::RIGHT_CENTER, &primary.title, theme::weighted(13.0, theme::MEDIUM), theme::FG, 300.0);
+        paint_text(ui, pos2(caps_left - 8.0, center_y), Align2::RIGHT_CENTER, &primary.title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), 300.0);
     }
 
     fn panel_ui(&mut self, ui: &mut Ui, footer_top: f32) {
@@ -2166,21 +2168,21 @@ impl Launcher {
         egui::Area::new(egui::Id::unique("action-panel")).order(egui::Order::Foreground).fixed_pos(frame.min).show(&ctx, |ui| {
             let painter = ui.painter();
             painter.add(egui::epaint::RectShape::filled(frame.translate(vec2(0.0, 8.0)).expand(4.0), 10.0, Color32::from_black_alpha(40)));
-            painter.rect(frame, 6.0, theme::PANEL, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
+            painter.rect(frame, 6.0, theme::PANEL(), Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
             let list = Rect::from_min_max(frame.min + vec2(1.0, 1.0), pos2(frame.right() - 1.0, frame.top() + 1.0 + list_height));
             ui.scope_builder(UiBuilder::new().max_rect(list), |ui| {
                 egui::ScrollArea::vertical().id_salt("panel-list").scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden).max_height(list_height).show(ui, |ui| {
                     ui.add_space(7.0);
                     let width = ui.available_width();
                     let (title_row, _) = ui.allocate_exact_size(vec2(width, 24.0), Sense::hover());
-                    paint_text(ui, pos2(title_row.left() + 7.0 + 8.0, title_row.center().y), Align2::LEFT_CENTER, &panel.title, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60, width - 30.0);
+                    paint_text(ui, pos2(title_row.left() + 7.0 + 8.0, title_row.center().y), Align2::LEFT_CENTER, &panel.title, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60(), width - 30.0);
                     let mut index = 0;
                     let pointer_moved = ui.input(|i| i.pointer.delta() != egui::Vec2::ZERO);
                     for (g, group) in groups.iter().enumerate() {
                         if g > 0 {
                             ui.add_space(8.0);
                             let (line, _) = ui.allocate_exact_size(vec2(width, 1.0), Sense::hover());
-                            ui.painter().rect_filled(line, 0.0, theme::PANEL_LINE);
+                            ui.painter().rect_filled(line, 0.0, theme::PANEL_LINE());
                             ui.add_space(7.0);
                         }
                         for action in group {
@@ -2189,7 +2191,7 @@ impl Launcher {
                             let is_selected = index == panel.selected;
                             response.widget_info(|| egui::WidgetInfo::selected(egui::Role::ListBoxOption, true, is_selected, &action.title));
                             if is_selected {
-                                ui.painter().rect_filled(row, 6.0, theme::PANEL_LINE);
+                                ui.painter().rect_filled(row, 6.0, theme::PANEL_LINE());
                             }
                             if response.hovered() && pointer_moved {
                                 panel.selected = index;
@@ -2197,13 +2199,13 @@ impl Launcher {
                             if response.clicked() {
                                 run = Some(action.clone());
                             }
-                            let color = if action.destructive { theme::RED } else { theme::FG };
+                            let color = if action.destructive { theme::RED() } else { theme::FG() };
                             if let Some(icon) = action.icon {
                                 icons::paint_glyph(ui, icon, Rect::from_min_size(pos2(row.left() + 8.0, row.center().y - 8.0), vec2(16.0, 16.0)), color);
                             }
                             let mut end = action.shortcut.map(|s| keycaps(ui, row.right() - 8.0, row.center().y, &s.labels())).unwrap_or(row.right() - 8.0);
                             if let Some(accessory) = &action.accessory {
-                                end = paint_text(ui, pos2(end - 8.0, row.center().y), Align2::RIGHT_CENTER, accessory, theme::font(12.0), theme::FG_60, 120.0).left();
+                                end = paint_text(ui, pos2(end - 8.0, row.center().y), Align2::RIGHT_CENTER, accessory, theme::font(12.0), theme::FG_60(), 120.0).left();
                             }
                             paint_text(ui, pos2(row.left() + 32.0, row.center().y), Align2::LEFT_CENTER, &action.title, theme::font(13.0), color, end - row.left() - 40.0);
                             index += 1;
@@ -2213,11 +2215,11 @@ impl Launcher {
                 });
             });
             let search = Rect::from_min_max(pos2(frame.left() + 1.0, frame.bottom() - 39.0), pos2(frame.right() - 1.0, frame.bottom() - 1.0));
-            ui.painter().hline(search.x_range(), search.top() + 0.5, Stroke::new(1.0, theme::PANEL_LINE));
+            ui.painter().hline(search.x_range(), search.top() + 0.5, Stroke::new(1.0, theme::PANEL_LINE()));
             let id = egui::Id::unique("panel-search");
             let before = panel.filter.clone();
             let field = search.shrink2(vec2(15.0, 0.0));
-            let edit = egui::TextEdit::singleline(&mut panel.filter).id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).hint_text(egui::RichText::new("Search for actions...").color(theme::FG_40)).desired_width(field.width());
+            let edit = egui::TextEdit::singleline(&mut panel.filter).id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(theme::font(13.0)).hint_text(egui::RichText::new(crate::i18n::tr("Search for actions...")).color(theme::FG_40())).desired_width(field.width());
             ui.put(Rect::from_center_size(field.center(), vec2(field.width(), 18.0)), edit);
             ui.memory_mut(|m| m.request_focus(id));
             if panel.filter != before {
@@ -2245,24 +2247,24 @@ impl Launcher {
             ui.painter().rect_filled(full, 0.0, Color32::from_black_alpha(102));
             let width = 300.0;
             let message_galley = {
-                let mut job = LayoutJob::single_section(message.clone(), TextFormat { font_id: theme::font(13.0), color: theme::FG_60, ..Default::default() });
+                let mut job = LayoutJob::single_section(message.clone(), TextFormat { font_id: theme::font(13.0), color: theme::FG_60(), ..Default::default() });
                 job.wrap.max_width = width - 32.0;
                 job.halign = egui::Align::Center;
                 ctx.fonts_mut(|f| f.layout_job(job))
             };
             let height = 16.0 + 18.0 + 4.0 + message_galley.size().y + 16.0 + 32.0 + 8.0 + 32.0 + 16.0;
             let panel = Rect::from_center_size(full.center(), vec2(width, height));
-            ui.painter().rect(panel, 6.0, theme::PANEL, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
-            paint_text(ui, pos2(panel.center().x, panel.top() + 16.0), Align2::CENTER_TOP, &title, theme::weighted(13.0, theme::SEMIBOLD), theme::FG, width - 32.0);
-            ui.painter().galley(pos2(panel.center().x, panel.top() + 38.0), message_galley.clone(), theme::FG_60);
+            ui.painter().rect(panel, 6.0, theme::PANEL(), Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
+            paint_text(ui, pos2(panel.center().x, panel.top() + 16.0), Align2::CENTER_TOP, &title, theme::weighted(13.0, theme::SEMIBOLD), theme::FG(), width - 32.0);
+            ui.painter().galley(pos2(panel.center().x, panel.top() + 38.0), message_galley.clone(), theme::FG_60());
             let mut y = panel.top() + 38.0 + message_galley.size().y + 16.0;
-            for (id, label, color, ok) in [("confirm-ok", confirm_title.as_str(), theme::RED, true), ("confirm-cancel", "Cancel", theme::FG, false)] {
+            for (id, label, color, ok) in [("confirm-ok", confirm_title.as_str(), theme::RED(), true), ("confirm-cancel", "Cancel", theme::FG(), false)] {
                 let rect = Rect::from_min_size(pos2(panel.left() + 16.0, y), vec2(width - 32.0, 32.0));
                 let response = ui.interact(rect, egui::Id::unique(id), Sense::click());
                 response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
-                ui.painter().rect_filled(rect, 6.0, if response.hovered() { theme::CONTROL_HOVER } else { theme::CONTROL });
+                ui.painter().rect_filled(rect, 6.0, if response.hovered() { theme::CONTROL_HOVER() } else { theme::CONTROL() });
                 if response.has_focus() {
-                    ui.painter().rect_stroke(rect.expand(2.0), 8.0, Stroke::new(2.0, theme::ACCENT), egui::StrokeKind::Outside);
+                    ui.painter().rect_stroke(rect.expand(2.0), 8.0, Stroke::new(2.0, theme::ACCENT()), egui::StrokeKind::Outside);
                 }
                 paint_text(ui, rect.center(), Align2::CENTER_CENTER, label, theme::weighted(13.0, theme::MEDIUM), color, rect.width());
                 if response.clicked() {

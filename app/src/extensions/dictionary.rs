@@ -412,9 +412,9 @@ impl View for Definition {
                     _ => ("No Definitions Found".to_string(), format!("The dictionary has no entry for \"{}\". Copy the word or try another spelling.", self.word)),
                 };
                 let center = rect.center();
-                let title_rect = ui.painter().text(center - egui::vec2(0.0, 10.0), egui::Align2::CENTER_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG);
-                let galley = crate::root::wrapped(ui, &description, theme::font(13.0), theme::FG_60, 420.0);
-                ui.painter().galley(egui::pos2(center.x - galley.size().x / 2.0, title_rect.bottom() + 4.0), galley, theme::FG_60);
+                let title_rect = ui.painter().text(center - egui::vec2(0.0, 10.0), egui::Align2::CENTER_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG());
+                let galley = crate::root::wrapped(ui, &description, theme::font(13.0), theme::FG_60(), 420.0);
+                ui.painter().galley(egui::pos2(center.x - galley.size().x / 2.0, title_rect.bottom() + 4.0), galley, theme::FG_60());
                 return;
             }
         };
@@ -423,24 +423,24 @@ impl View for Definition {
                 ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
                 for entry in &entries {
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new(&entry.word).font(theme::weighted(24.0, theme::SEMIBOLD)).color(theme::FG));
+                        ui.label(RichText::new(&entry.word).font(theme::weighted(24.0, theme::SEMIBOLD)).color(theme::FG()));
                         if !entry.phonetic.is_empty() {
                             ui.add_space(12.0);
-                            ui.label(RichText::new(&entry.phonetic).font(theme::font(15.0)).color(theme::FG_60));
+                            ui.label(RichText::new(&entry.phonetic).font(theme::font(15.0)).color(theme::FG_60()));
                         }
                     });
                     for meaning in &entry.meanings {
                         ui.add_space(16.0);
-                        ui.label(RichText::new(&meaning.part_of_speech).font(theme::weighted(12.0, theme::SEMIBOLD)).italics().color(theme::FG_60));
+                        ui.label(RichText::new(&meaning.part_of_speech).font(theme::weighted(12.0, theme::SEMIBOLD)).italics().color(theme::FG_60()));
                         for (i, sense) in meaning.senses.iter().enumerate() {
                             ui.add_space(8.0);
                             ui.horizontal_top(|ui| {
-                                ui.add_sized([20.0, 16.0], egui::Label::new(RichText::new(format!("{}.", i + 1)).font(theme::font(13.0)).color(theme::FG_40)));
+                                ui.add_sized([20.0, 16.0], egui::Label::new(RichText::new(format!("{}.", i + 1)).font(theme::font(13.0)).color(theme::FG_40())));
                                 ui.vertical(|ui| {
-                                    ui.add(egui::Label::new(RichText::new(&sense.definition).font(theme::font(13.0)).color(theme::FG)).wrap());
+                                    ui.add(egui::Label::new(RichText::new(&sense.definition).font(theme::font(13.0)).color(theme::FG())).wrap());
                                     if let Some(example) = &sense.example {
                                         ui.add_space(2.0);
-                                        ui.add(egui::Label::new(RichText::new(format!("“{example}”")).font(theme::font(13.0)).italics().color(theme::FG_60)).wrap());
+                                        ui.add(egui::Label::new(RichText::new(format!("“{example}”")).font(theme::font(13.0)).italics().color(theme::FG_60())).wrap());
                                     }
                                 });
                             });
@@ -449,8 +449,8 @@ impl View for Definition {
                             ui.add_space(8.0);
                             let list = meaning.synonyms.iter().take(8).cloned().collect::<Vec<_>>().join(", ");
                             let mut job = egui::text::LayoutJob::default();
-                            job.append("Synonyms: ", 0.0, egui::TextFormat { font_id: theme::weighted(12.0, theme::MEDIUM), color: theme::FG_60, ..Default::default() });
-                            job.append(&list, 0.0, egui::TextFormat { font_id: theme::font(12.0), color: theme::FG_60, ..Default::default() });
+                            job.append("Synonyms: ", 0.0, egui::TextFormat { font_id: theme::weighted(12.0, theme::MEDIUM), color: theme::FG_60(), ..Default::default() });
+                            job.append(&list, 0.0, egui::TextFormat { font_id: theme::font(12.0), color: theme::FG_60(), ..Default::default() });
                             ui.add(egui::Label::new(job).wrap());
                         }
                     }

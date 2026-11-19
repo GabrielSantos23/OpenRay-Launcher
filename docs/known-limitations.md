@@ -6,15 +6,15 @@
 
 The Tauri app was removed on 2026-11-13 (last present at commit 2925cc8). These features existed there and are not in the egui app:
 
-- **Portuguese UI.** The egui app is English only; there is no Language setting. (Portuguese search keywords and the Portuguese dictionary still work.)
-- **Light theme and appearance settings.** Dark theme only; the Windows accent color is not followed.
+- **Portuguese UI.** Restored in egui (`i18n.rs`): translation happens where text is drawn, so strings missing from `assets/i18n/pt.json` stay English, and user text that matches a UI string or template is shown translated. Accessibility labels stay English.
+- **Themes.** Raycast Dark and Raycast Light only, with Follow System; the other bundled themes (Sky, Sunset, Midnight, Dawn, Overcast, Noon) and the Windows accent color are not supported. The light greys for borders are derived, not measured.
 - **Moving from the Tauri app.** Installs of the Tauri app (NSIS, 0.1.36 and earlier) won't update to the egui app by themselves: the new `latest.json` has a different shape. Download the zip once by hand.
 - **Installer.** No NSIS installer or Start Menu entry; the release is a portable zip. The executable has no embedded icon.
 - **FlowKey web commands** (`ui: "web"`): they need a WebView, so they are hidden.
 - **FlowKey interval commands** are not scheduled.
 - **Tests of the web layer** (Vitest) went away with it; the logic that was ported has Rust tests in `app/`.
 
-- The egui app in `app/` covers the launcher shell, Applications, Notes (editor plus a basic window), System Actions, Window Management, Web Searches, URL, System Settings pages, Switch Windows, Search Menu Items, Volume Mixer and sound devices, Calculator and its history, Games, Clipboard History, File Search and Quick Look, Quicklinks, Snippets, Run, Emoji & Symbols, Dictionary, Translator, Contacts, Calendar, Script Commands, Focus, Screenshots and Settings (without theme, language, update and FlowKey rows). FlowKey extensions run on QuickJS; see the FlowKey item below.
+- The egui app in `app/` covers the launcher shell, Applications, Notes (editor plus a basic window), System Actions, Window Management, Web Searches, URL, System Settings pages, Switch Windows, Search Menu Items, Volume Mixer and sound devices, Calculator and its history, Games, Clipboard History, File Search and Quick Look, Quicklinks, Snippets, Run, Emoji & Symbols, Dictionary, Translator, Contacts, Calendar, Script Commands, Focus, Screenshots and Settings (General with Appearance, Language and Updates; FlowKey pages). FlowKey extensions run on QuickJS; see the FlowKey item below.
 - **Calculator data sources.** Weather (Open-Meteo), places (Open-Meteo geocoding), routes (routing.openstreetmap.de) and flights (adsbdb, adsb.lol) are free community services without keys; when they are slow or down, the card doesn't appear. Flight cards have no schedule, delay or departure time, and the arrival time is estimated from the live position. Current location needs Windows location services; reverse geocoding uses BigDataCloud's free client endpoint.
 - The egui calculator is English only: no Portuguese number words, money always formatted as en-US. Dates and currency names follow the Windows display language through ICU, like WebView2 did. Free-text target dates (“Dec 25”) are not parsed; ISO and d/m[/y] are.
 - Calculator history day groups and Clipboard History day titles use today's UTC offset for every entry, so entries near midnight can land in the neighbouring day across a DST change.

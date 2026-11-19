@@ -437,18 +437,18 @@ impl View for Translate {
         let left = Rect::from_min_max(area.min, pos2(mid, area.bottom()));
         let right = Rect::from_min_max(pos2(mid, area.top()), area.max);
         ui.painter().rect_filled(left, 2.0, theme::fg(5));
-        ui.painter().circle_filled(pos2(mid, area.center().y), 22.0, theme::BG);
+        ui.painter().circle_filled(pos2(mid, area.center().y), 22.0, theme::BG());
         let input = Rect::from_min_max(pos2(left.left() + 8.0 + 24.0, left.top() + 40.0 + 8.0), pos2(left.right() - 8.0 - 46.0, left.bottom() - 8.0 - 28.0 - 16.0));
         let font = theme::font(24.0);
         let id = egui::Id::unique("translate-input");
-        let hint = egui::RichText::new("Speak now").color(theme::FG_40).font(font.clone());
+        let hint = egui::RichText::new(crate::i18n::tr("Speak now")).color(theme::FG_40()).font(font.clone());
         let before = self.text.clone();
         let mut child = ui.new_child(UiBuilder::new().max_rect(input));
         let response = egui::ScrollArea::vertical()
             .id_salt("translate-input-scroll")
             .max_height(input.height())
             .auto_shrink(false)
-            .show(&mut child, |ui| ui.add(egui::TextEdit::multiline(&mut self.text).id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(font.clone()).text_color(theme::FG).hint_text(hint).desired_width(input.width()).desired_rows(1)))
+            .show(&mut child, |ui| ui.add(egui::TextEdit::multiline(&mut self.text).id(id).frame(egui::Frame::NONE).margin(egui::Margin::ZERO).font(font.clone()).text_color(theme::FG()).hint_text(hint).desired_width(input.width()).desired_rows(1)))
             .inner;
         response.widget_info(|| egui::WidgetInfo::text_edit(true, "Text to translate", &self.text, ""));
         if self.focus.replace(false) || !ui.memory(|m| m.focused().is_some()) {
@@ -459,15 +459,15 @@ impl View for Translate {
             self.error = None;
         }
         if !self.text.is_empty() {
-            ui.painter().text(pos2(left.right() - 8.0 - 14.0, left.bottom() - 8.0 - 14.0), Align2::RIGHT_CENTER, count_label(&self.text), theme::font(12.0), theme::FG_40);
+            ui.painter().text(pos2(left.right() - 8.0 - 14.0, left.bottom() - 8.0 - 14.0), Align2::RIGHT_CENTER, count_label(&self.text), theme::font(12.0), theme::FG_40());
         }
         let output = Rect::from_min_max(pos2(right.left() + 8.0 + 38.0, right.top() + 40.0 + 8.0), pos2(right.right() - 8.0 - 22.0, right.bottom() - 8.0 - 28.0 - 16.0));
         let translation = self.translation();
         let pending = self.pending();
         let (text, color) = match &self.error {
-            Some(e) => (format!("Translation failed: {e}"), theme::RED),
-            None if translation.is_empty() && !pending => ("Translation".to_owned(), theme::FG_40),
-            None => (format!("{translation}{}", if pending { "…" } else { "" }), theme::FG),
+            Some(e) => (format!("Translation failed: {e}"), theme::RED()),
+            None if translation.is_empty() && !pending => ("Translation".to_owned(), theme::FG_40()),
+            None => (format!("{translation}{}", if pending { "…" } else { "" }), theme::FG()),
         };
         let mut out = ui.new_child(UiBuilder::new().max_rect(output));
         egui::ScrollArea::vertical().id_salt("translate-output").auto_shrink(false).show(&mut out, |ui| {
@@ -478,9 +478,9 @@ impl View for Translate {
         let enabled = self.swapped().is_some();
         let swap = ui.interact(button, egui::Id::unique("translate-swap"), if enabled { Sense::click() } else { Sense::hover() });
         swap.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, "Swap languages"));
-        let fill = if enabled && swap.hovered() { theme::CONTROL } else { theme::fg(5) };
+        let fill = if enabled && swap.hovered() { theme::CONTROL() } else { theme::fg(5) };
         ui.painter().circle_filled(button.center(), 18.0, fill);
-        crate::icons::paint_glyph(ui, "arrow-right-left", Rect::from_center_size(button.center(), vec2(16.0, 16.0)), if enabled { theme::FG } else { theme::FG_40 });
+        crate::icons::paint_glyph(ui, "arrow-right-left", Rect::from_center_size(button.center(), vec2(16.0, 16.0)), if enabled { theme::FG() } else { theme::FG_40() });
         if swap.clicked() {
             self.do_swap();
         }

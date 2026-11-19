@@ -398,20 +398,20 @@ fn markdown(ui: &mut Ui, source: &str) {
             Event::End(TagEnd::Strong) => strong = false,
             Event::Start(Tag::List(_)) => list += 1,
             Event::End(TagEnd::List(_)) => list = list.saturating_sub(1),
-            Event::Start(Tag::Item) => job.append(&format!("{}• ", "   ".repeat(list.saturating_sub(1))), 0.0, egui::TextFormat { font_id: theme::font(13.0), color: theme::FG_60, ..Default::default() }),
+            Event::Start(Tag::Item) => job.append(&format!("{}• ", "   ".repeat(list.saturating_sub(1))), 0.0, egui::TextFormat { font_id: theme::font(13.0), color: theme::FG_60(), ..Default::default() }),
             Event::End(TagEnd::CodeBlock) => {
                 code = false;
                 flush(ui, &mut job);
             }
             Event::End(TagEnd::Item | TagEnd::Paragraph | TagEnd::BlockQuote(_)) => flush(ui, &mut job),
             Event::Start(Tag::CodeBlock(_)) => code = true,
-            Event::Code(text) => job.append(&text, 0.0, egui::TextFormat { font_id: theme::mono(12.0), color: theme::FG, background: theme::KEY_BG, ..Default::default() }),
+            Event::Code(text) => job.append(&text, 0.0, egui::TextFormat { font_id: theme::mono(12.0), color: theme::FG(), background: theme::KEY_BG(), ..Default::default() }),
             Event::Text(text) => {
                 let font = if code { theme::mono(12.0) } else if strong { theme::weighted(size, theme::SEMIBOLD) } else { theme::font(size) };
-                job.append(&text, 0.0, egui::TextFormat { font_id: font, color: theme::FG, ..Default::default() });
+                job.append(&text, 0.0, egui::TextFormat { font_id: font, color: theme::FG(), ..Default::default() });
             }
-            Event::SoftBreak => job.append(" ", 0.0, egui::TextFormat { font_id: theme::font(size), color: theme::FG, ..Default::default() }),
-            Event::HardBreak => job.append("\n", 0.0, egui::TextFormat { font_id: theme::font(size), color: theme::FG, ..Default::default() }),
+            Event::SoftBreak => job.append(" ", 0.0, egui::TextFormat { font_id: theme::font(size), color: theme::FG(), ..Default::default() }),
+            Event::HardBreak => job.append("\n", 0.0, egui::TextFormat { font_id: theme::font(size), color: theme::FG(), ..Default::default() }),
             Event::Rule => {
                 flush(ui, &mut job);
                 ui.separator();
@@ -447,9 +447,9 @@ fn image(ui: &mut Ui, ext: &Installed, uri: Option<&str>, max_height: f32) {
 
 fn centered_message(ui: &Ui, rect: Rect, title: &str, description: &str) {
     let center = rect.center();
-    let title_rect = ui.painter().text(center - vec2(0.0, 10.0), egui::Align2::CENTER_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG);
-    let galley = crate::root::wrapped(ui, description, theme::font(13.0), theme::FG_60, 460.0);
-    ui.painter().galley(pos2(center.x - galley.size().x / 2.0, title_rect.bottom() + 4.0), galley, theme::FG_60);
+    let title_rect = ui.painter().text(center - vec2(0.0, 10.0), egui::Align2::CENTER_CENTER, title, theme::weighted(13.0, theme::MEDIUM), theme::FG());
+    let galley = crate::root::wrapped(ui, description, theme::font(13.0), theme::FG_60(), 460.0);
+    ui.painter().galley(pos2(center.x - galley.size().x / 2.0, title_rect.bottom() + 4.0), galley, theme::FG_60());
 }
 
 impl View for TreeView {
@@ -557,13 +557,13 @@ impl View for TreeView {
     fn page_ui(&mut self, ui: &mut Ui, rect: Rect) {
         if let Stage::Consent(grants, _) = &self.stage {
             let mut child = ui.new_child(UiBuilder::new().max_rect(rect.shrink2(vec2(24.0, 16.0))));
-            child.label(RichText::new("This extension was installed outside Openray and needs your permission to use:").font(theme::font(13.0)).color(theme::FG_60));
+            child.label(RichText::new(crate::i18n::tr("This extension was installed outside Openray and needs your permission to use:")).font(theme::font(13.0)).color(theme::FG_60()));
             child.add_space(8.0);
             for line in grants.describe() {
-                child.label(RichText::new(format!("•  {line}")).font(theme::font(13.0)).color(theme::FG));
+                child.label(RichText::new(format!("•  {line}")).font(theme::font(13.0)).color(theme::FG()));
             }
             child.add_space(12.0);
-            child.label(RichText::new("Press Enter to allow, or Esc to cancel.").font(theme::font(12.0)).color(theme::FG_40));
+            child.label(RichText::new(crate::i18n::tr("Press Enter to allow, or Esc to cancel.")).font(theme::font(12.0)).color(theme::FG_40()));
             return;
         }
         let Some(tree) = self.tree() else {
@@ -575,7 +575,7 @@ impl View for TreeView {
         let mut child = ui.new_child(UiBuilder::new().max_rect(body.shrink2(vec2(24.0, 16.0))));
         egui::ScrollArea::vertical().id_salt("flowkey-detail").auto_shrink(false).show(&mut child, |ui| {
             if let Some(subtitle) = tree["subtitle"].as_str() {
-                ui.label(RichText::new(subtitle).font(theme::font(13.0)).color(theme::FG_60));
+                ui.label(RichText::new(subtitle).font(theme::font(13.0)).color(theme::FG_60()));
                 ui.add_space(8.0);
             }
             image(ui, &self.ext, tree["imageUri"].as_str(), 200.0);
@@ -584,12 +584,12 @@ impl View for TreeView {
             }
         });
         if let Some(side) = side {
-            ui.painter().vline(side.left(), side.y_range(), egui::Stroke::new(1.0, theme::SEPARATOR));
+            ui.painter().vline(side.left(), side.y_range(), egui::Stroke::new(1.0, theme::SEPARATOR()));
             let mut column = ui.new_child(UiBuilder::new().max_rect(side.shrink2(vec2(16.0, 12.0))));
             egui::ScrollArea::vertical().id_salt("flowkey-fields").auto_shrink(false).show(&mut column, |ui| {
                 for (label, value) in rows {
-                    ui.label(RichText::new(label).font(theme::font(12.0)).color(theme::FG_60));
-                    ui.add(egui::Label::new(RichText::new(value).font(theme::weighted(13.0, theme::MEDIUM)).color(theme::FG)).wrap());
+                    ui.label(RichText::new(label).font(theme::font(12.0)).color(theme::FG_60()));
+                    ui.add(egui::Label::new(RichText::new(value).font(theme::weighted(13.0, theme::MEDIUM)).color(theme::FG())).wrap());
                     ui.add_space(8.0);
                 }
             });

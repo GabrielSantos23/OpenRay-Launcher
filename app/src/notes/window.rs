@@ -61,7 +61,7 @@ impl NotesWindow {
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         let time = ui.input(|i| i.time);
-        let frame = egui::Frame::NONE.fill(theme::BG).inner_margin(egui::Margin { left: 16, right: 16, top: 44, bottom: 16 });
+        let frame = egui::Frame::NONE.fill(theme::BG()).inner_margin(egui::Margin { left: 16, right: 16, top: 44, bottom: 16 });
         egui::CentralPanel::default().frame(frame).show(ui, |ui| {
             egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
                 if self.editor.show(ui) {

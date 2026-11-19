@@ -31,6 +31,11 @@ fn launcher() -> HWND {
     HWND(LAUNCHER.load(Ordering::SeqCst) as _)
 }
 
+pub fn window() -> Option<HWND> {
+    let hwnd = launcher();
+    (!hwnd.is_invalid()).then_some(hwnd)
+}
+
 pub fn set_dwm<T>(hwnd: HWND, attribute: DWMWINDOWATTRIBUTE, value: T) {
     unsafe {
         let _ = DwmSetWindowAttribute(hwnd, attribute, &value as *const T as _, std::mem::size_of::<T>() as u32);
@@ -52,7 +57,7 @@ fn set_hidden_styles(hwnd: HWND, hidden: bool) {
 pub fn init(hwnd: HWND) {
     LAUNCHER.store(hwnd.0 as isize, Ordering::SeqCst);
     set_dwm(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND);
-    set_dwm(hwnd, DWMWA_BORDER_COLOR, crate::theme::WINDOW_BORDER);
+    set_dwm(hwnd, DWMWA_BORDER_COLOR, crate::theme::WINDOW_BORDER());
     set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
     set_hidden_styles(hwnd, true);
 }

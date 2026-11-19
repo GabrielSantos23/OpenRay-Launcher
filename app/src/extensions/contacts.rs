@@ -183,9 +183,9 @@ impl View for SearchContacts {
         let block = 96.0 + 12.0 + 20.0 + if subtitle.is_some() { 20.0 } else { 0.0 };
         let avatar = Rect::from_center_size(pos2(area.center().x, area.center().y - block / 2.0 + 48.0), vec2(96.0, 96.0));
         crate::icons::command_icon(&mut ui.new_child(UiBuilder::new().max_rect(avatar)), &Icon::Initials(initials(person)), &name, 96.0);
-        let title = ui.painter().text(pos2(area.center().x, avatar.bottom() + 12.0), egui::Align2::CENTER_TOP, &name, theme::weighted(15.0, theme::SEMIBOLD), theme::FG);
+        let title = ui.painter().text(pos2(area.center().x, avatar.bottom() + 12.0), egui::Align2::CENTER_TOP, &name, theme::weighted(15.0, theme::SEMIBOLD), theme::FG());
         if let Some(org) = subtitle {
-            ui.painter().text(pos2(area.center().x, title.bottom() + 2.0), egui::Align2::CENTER_TOP, org, theme::font(13.0), theme::FG_60);
+            ui.painter().text(pos2(area.center().x, title.bottom() + 2.0), egui::Align2::CENTER_TOP, org, theme::font(13.0), theme::FG_60());
         }
     }
 

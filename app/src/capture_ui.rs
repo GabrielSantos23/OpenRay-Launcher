@@ -386,7 +386,7 @@ fn paint_overlay(ui: &Ui, overlay: &Overlay, ppp: f32) {
             ] {
                 painter.rect_filled(dim, 0.0, DIM);
             }
-            painter.rect_stroke(area, 0.0, Stroke::new(1.0, theme::ACCENT), egui::StrokeKind::Inside);
+            painter.rect_stroke(area, 0.0, Stroke::new(1.0, theme::ACCENT()), egui::StrokeKind::Inside);
         }
         None => {
             painter.rect_filled(full, 0.0, DIM);
@@ -394,7 +394,7 @@ fn paint_overlay(ui: &Ui, overlay: &Overlay, ppp: f32) {
     }
     let (cx, cy) = (css(overlay.cursor.0), css(overlay.cursor.1));
     if mode != "color" && overlay.anchor.is_none() {
-        let line = Stroke::new(1.0, theme::ACCENT.gamma_multiply(0.5));
+        let line = Stroke::new(1.0, theme::ACCENT().gamma_multiply(0.5));
         painter.vline(cx, full.y_range(), line);
         painter.hline(full.x_range(), cy, line);
     }
@@ -402,22 +402,22 @@ fn paint_overlay(ui: &Ui, overlay: &Overlay, ppp: f32) {
         let label = if mode == "ruler" { measure(r) } else { format!("{} × {}", r.w, r.h) };
         let area = to_rect(r);
         let font = theme::weighted(12.0, theme::MEDIUM);
-        let width = ui.fonts_mut(|f| f.layout_no_wrap(label.clone(), font.clone(), theme::FG)).size().x + 12.0;
+        let width = ui.fonts_mut(|f| f.layout_no_wrap(crate::i18n::tr(&label).into_owned(), font.clone(), theme::FG())).size().x + 12.0;
         let top = if area.top() > 28.0 { area.top() - 26.0 } else { area.bottom() + 6.0 };
         let pill = egui::Rect::from_min_size(pos2(area.left(), top), vec2(width, 20.0));
-        painter.rect_filled(pill, 5.0, theme::PANEL);
-        paint_text(ui, pill.center(), Align2::CENTER_CENTER, &label, font, theme::FG, width);
+        painter.rect_filled(pill, 5.0, theme::PANEL());
+        paint_text(ui, pill.center(), Align2::CENTER_CENTER, &label, font, theme::FG(), width);
     }
     paint_loupe(ui, overlay, full, cx, cy);
     let monitor = target_at(overlay.cursor, &[], &overlay.monitors).map(to_rect).unwrap_or(full);
     let extra = if mode == "ruler" { "Enter to copy · Esc to close" } else { "Esc to cancel" };
     let text = hint(mode);
-    let (first, second) = ui.fonts_mut(|f| (f.layout_no_wrap(text.to_owned(), theme::font(13.0), theme::FG).size().x, f.layout_no_wrap(extra.to_owned(), theme::font(13.0), theme::FG).size().x));
+    let (first, second) = ui.fonts_mut(|f| (f.layout_no_wrap(crate::i18n::tr(&text).into_owned(), theme::font(13.0), theme::FG()).size().x, f.layout_no_wrap(crate::i18n::tr(&extra).into_owned(), theme::font(13.0), theme::FG()).size().x));
     let box_size = vec2(first + 8.0 + second + 24.0, 30.0);
     let bar = egui::Rect::from_min_size(pos2(monitor.center().x - box_size.x / 2.0, monitor.top() + 16.0), box_size);
-    painter.rect(bar, 8.0, theme::PANEL, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
-    paint_text(ui, pos2(bar.left() + 12.0, bar.center().y), Align2::LEFT_CENTER, text, theme::font(13.0), theme::FG, first + 1.0);
-    paint_text(ui, pos2(bar.left() + 12.0 + first + 8.0, bar.center().y), Align2::LEFT_CENTER, extra, theme::font(13.0), theme::FG_60, second + 1.0);
+    painter.rect(bar, 8.0, theme::PANEL(), Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
+    paint_text(ui, pos2(bar.left() + 12.0, bar.center().y), Align2::LEFT_CENTER, text, theme::font(13.0), theme::FG(), first + 1.0);
+    paint_text(ui, pos2(bar.left() + 12.0 + first + 8.0, bar.center().y), Align2::LEFT_CENTER, extra, theme::font(13.0), theme::FG_60(), second + 1.0);
 }
 
 fn paint_loupe(ui: &Ui, overlay: &Overlay, full: egui::Rect, cx: f32, cy: f32) {
@@ -425,7 +425,7 @@ fn paint_loupe(ui: &Ui, overlay: &Overlay, full: egui::Rect, cx: f32, cy: f32) {
     let left = if cx + 20.0 + LOUPE > full.right() { cx - 20.0 - LOUPE } else { cx + 20.0 };
     let top = if cy + 20.0 + LOUPE + 44.0 > full.bottom() { cy - 20.0 - LOUPE - 44.0 } else { cy + 20.0 };
     let outer = egui::Rect::from_min_size(pos2(left, top), vec2(LOUPE, LOUPE + 40.0));
-    painter.rect(outer, 8.0, theme::PANEL, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
+    painter.rect(outer, 8.0, theme::PANEL(), Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
     let zoom = egui::Rect::from_min_size(outer.min, vec2(LOUPE, LOUPE)).shrink(1.0);
     let (w, h) = (overlay.screen.w as f32, overlay.screen.h as f32);
     let start = pos2((overlay.cursor.0 - ZOOM_PIXELS / 2) as f32 / w, (overlay.cursor.1 - ZOOM_PIXELS / 2) as f32 / h);
@@ -433,13 +433,13 @@ fn paint_loupe(ui: &Ui, overlay: &Overlay, full: egui::Rect, cx: f32, cy: f32) {
     painter.image(overlay.texture.id(), zoom, uv, Color32::WHITE);
     let cell = zoom.width() / ZOOM_PIXELS as f32;
     let center = egui::Rect::from_min_size(zoom.min + vec2(cell, cell) * (ZOOM_PIXELS / 2) as f32, vec2(cell, cell));
-    painter.rect_stroke(center, 0.0, Stroke::new(1.0, theme::FG), egui::StrokeKind::Inside);
+    painter.rect_stroke(center, 0.0, Stroke::new(1.0, theme::FG()), egui::StrokeKind::Inside);
     let y = outer.bottom() - 12.0;
-    paint_text(ui, pos2(outer.left() + 8.0, y - 16.0), Align2::LEFT_CENTER, &format!("{}, {}", overlay.cursor.0, overlay.cursor.1), theme::font(11.0), theme::FG_60, LOUPE - 16.0);
+    paint_text(ui, pos2(outer.left() + 8.0, y - 16.0), Align2::LEFT_CENTER, &format!("{}, {}", overlay.cursor.0, overlay.cursor.1), theme::font(11.0), theme::FG_60(), LOUPE - 16.0);
     if let Some((hex, color)) = pixel(overlay.cursor) {
-        paint_text(ui, pos2(outer.left() + 22.0, y), Align2::LEFT_CENTER, &hex, theme::weighted(11.0, theme::MEDIUM), theme::FG, LOUPE - 30.0);
+        paint_text(ui, pos2(outer.left() + 22.0, y), Align2::LEFT_CENTER, &hex, theme::weighted(11.0, theme::MEDIUM), theme::FG(), LOUPE - 30.0);
         let swatch = egui::Rect::from_center_size(pos2(outer.left() + 13.0, y), vec2(10.0, 10.0));
-        painter.rect(swatch, 2.0, color, Stroke::new(1.0, theme::PANEL_BORDER), egui::StrokeKind::Inside);
+        painter.rect(swatch, 2.0, color, Stroke::new(1.0, theme::PANEL_BORDER()), egui::StrokeKind::Inside);
     }
 }
 
