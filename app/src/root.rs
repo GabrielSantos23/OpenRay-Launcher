@@ -1520,7 +1520,7 @@ impl Launcher {
             for (key, modifiers) in key_presses(ui) {
                 if key == Key::Enter && modifiers.ctrl && !modifiers.alt && !modifiers.shift {
                     submit = true;
-                } else if key == Key::Escape && plain(modifiers) && !token_query_open(ui) {
+                } else if key == Key::Escape && plain(modifiers) && !token_query_open(ui) && !crate::date_picker::is_open(ui) {
                     back = true;
                 } else {
                     continue;
@@ -1565,6 +1565,12 @@ impl Launcher {
                         let (used, edited) = tokens_field(ui, rect.min, field, &spec, id);
                         bottom = used;
                         if edited {
+                            changed.push(i);
+                        }
+                    }
+                    crate::extension::FieldKind::Date { time } => {
+                        let time = *time;
+                        if crate::date_picker::field(ui, rect, field, id, time) {
                             changed.push(i);
                         }
                     }

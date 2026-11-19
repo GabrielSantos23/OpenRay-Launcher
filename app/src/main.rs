@@ -41,6 +41,7 @@ mod registry;
 #[allow(dead_code, unused_imports)]
 mod focus;
 mod focus_ui;
+mod date_picker;
 mod extension;
 mod http;
 mod extensions;

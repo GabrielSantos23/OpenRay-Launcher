@@ -138,31 +138,11 @@ pub fn default_start(now: i64) -> i64 {
 
 pub fn to_input(ms: i64, all_day: bool) -> String {
     let local = ms + offset(ms);
-    let (y, m, d) = civil(local.div_euclid(DAY));
-    let minutes = local.rem_euclid(DAY) / 60_000;
-    if all_day {
-        format!("{y:04}-{m:02}-{d:02}")
-    } else {
-        format!("{y:04}-{m:02}-{d:02} {:02}:{:02}", minutes / 60, minutes % 60)
-    }
+    crate::date_picker::format(local.div_euclid(DAY), local.rem_euclid(DAY) / 60_000, !all_day)
 }
 
 pub fn from_input(text: &str) -> Option<i64> {
-    let text = text.trim();
-    let (date, time) = text.split_once([' ', 'T']).map_or((text, None), |(d, t)| (d, Some(t.trim())));
-    let mut parts = date.split('-').map(|p| p.parse::<i64>().ok());
-    let (y, m, d) = (parts.next()??, parts.next()??, parts.next()??);
-    if parts.next().is_some() || !(1..=12).contains(&m) || !(1..=31).contains(&d) {
-        return None;
-    }
-    let (h, min) = match time {
-        Some(t) => {
-            let (h, min) = t.split_once(':')?;
-            (h.parse::<i64>().ok().filter(|h| (0..24).contains(h))?, min.parse::<i64>().ok().filter(|m| (0..60).contains(m))?)
-        }
-        None => (0, 0),
-    };
-    Some(from_local(super::calculator::history::days_from_civil(y, m, d) * DAY + h * HOUR + min * 60_000))
+    crate::date_picker::parse(text).map(|(day, minutes)| from_local(day * DAY + minutes * 60_000))
 }
 
 pub struct Draft {
@@ -209,8 +189,8 @@ impl CreateEvent {
             let fields = vec![
                 Field::new("Title", FieldKind::Text, "").placeholder("Event title"),
                 Field::new("Calendar", FieldKind::Choice(options), ""),
-                Field::new("Start", FieldKind::Text, to_input(start, false)).placeholder(to_input(start, false)),
-                Field::new("End", FieldKind::Text, to_input(start + HOUR, false)).placeholder(to_input(start + HOUR, false)),
+                Field::new("Start", FieldKind::Date { time: true }, to_input(start, false)).placeholder(to_input(start, false)),
+                Field::new("End", FieldKind::Date { time: true }, to_input(start + HOUR, false)).placeholder(to_input(start + HOUR, false)),
                 Field::new("All Day", FieldKind::Toggle, "false"),
                 Field::new("Location", FieldKind::Text, "").placeholder("Add location"),
                 Field::new("Notes", FieldKind::Area(80.0), "").placeholder("Add notes"),
@@ -234,11 +214,13 @@ impl CreateEvent {
         if let Some(f) = self.field("Start") {
             f.value = to_input(start, all_day);
             f.placeholder = to_input(start, all_day);
+            f.kind = FieldKind::Date { time: !all_day };
             f.error = None;
         }
         if let Some(f) = self.field("End") {
             f.value = to_input(end, all_day);
             f.placeholder = to_input(end, all_day);
+            f.kind = FieldKind::Date { time: !all_day };
             f.error = None;
         }
         let duration = end - start;
@@ -650,6 +632,7 @@ mod tests {
         assert_eq!(from_input("2026-10-21"), Some(at(2026, 10, 21, 0, 0)));
         assert_eq!(from_input(""), None);
         assert_eq!(from_input("2026-13-01"), None);
+        assert_eq!(from_input("2026-02-30 10:00"), None);
     }
 
     #[test]
