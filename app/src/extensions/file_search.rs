@@ -29,6 +29,14 @@ static TEXT_PREVIEW: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\.(txt|
 static VERSION: AtomicU64 = AtomicU64::new(0);
 static SHOW_DETAILS: AtomicBool = AtomicBool::new(true);
 
+fn prefs_path() -> std::path::PathBuf {
+    crate::data_dir().join("file-search.json")
+}
+
+fn show_details(prefs: &serde_json::Value) -> bool {
+    prefs["showDetails"].as_bool().unwrap_or(true)
+}
+
 pub fn parent_folder(path: &str) -> &str {
     match path.rfind('\\') {
         Some(at) if at > 0 => &path[..at],
@@ -66,8 +74,8 @@ fn file_actions(file: &FileHit, dirty: Rc<Cell<bool>>, with_details: bool) -> Ve
     if with_details {
         first.push(
             Action::new("toggle-details", "Toggle Info Panel", |_| {
-                SHOW_DETAILS.fetch_xor(true, Ordering::SeqCst);
-                Ok(())
+                let show = !SHOW_DETAILS.fetch_xor(true, Ordering::SeqCst);
+                crate::store::write_json(&prefs_path(), &serde_json::json!({ "showDetails": show })).map_err(|e| e.to_string())
             })
             .icon("panel-right")
             .shortcut(Shortcut::key(Key::I).ctrl().shift())
@@ -199,6 +207,7 @@ struct SearchFiles {
 
 impl SearchFiles {
     fn new(ctx: &egui::Context) -> Self {
+        SHOW_DETAILS.store(show_details(&crate::store::read_json(&prefs_path())), Ordering::SeqCst);
         Self { ctx: ctx.clone(), query: String::new(), kind: 0, key: None, results: None, last: None, dirty: Rc::new(Cell::new(false)), preview: None }
     }
 
@@ -246,7 +255,7 @@ impl View for SearchFiles {
     }
 
     fn loading(&self) -> bool {
-        self.last.as_ref().is_none_or(|r| r.building)
+        self.last.as_ref().is_none_or(|r| r.building) || self.results.as_ref().is_some_and(|r| r.get().is_none())
     }
 
     fn empty(&self) -> Empty {
@@ -395,5 +404,12 @@ mod tests {
         assert_eq!(short_location(r"C:\Users\ana\plan.md", r"C:\Users\Ana"), "~");
         assert_eq!(short_location(r"C:\Users\anabel\plan.md", r"C:\Users\ana"), r"C:\Users\anabel");
         assert_eq!(short_location(r"D:\work\plan.md", r"C:\Users\ana"), r"D:\work");
+    }
+
+    #[test]
+    fn info_panel_defaults_to_shown() {
+        assert!(show_details(&serde_json::Value::Null));
+        assert!(!show_details(&serde_json::json!({ "showDetails": false })));
+        assert!(show_details(&serde_json::json!({ "showDetails": true })));
     }
 }

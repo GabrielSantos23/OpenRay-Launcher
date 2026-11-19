@@ -48,6 +48,9 @@ const MENU_SEARCH: f32 = 40.0;
 const MENU_LIST_MAX: f32 = 240.0;
 
 const HEADER_SLOT: usize = usize::MAX;
+const LOADER_DELAY: f64 = 0.3;
+const LOADER_FADE: f64 = 0.3;
+const LOADER_SWEEP: f64 = 1.5;
 
 pub enum Signal {
     Hotkey(String),
@@ -137,6 +140,31 @@ pub struct Launcher {
     dropdown: Option<Open>,
     argument_for: String,
     weather_week: bool,
+    loading_since: Option<f64>,
+}
+
+fn loader_frame(elapsed: f64) -> Option<(f32, f32)> {
+    let shown = elapsed - LOADER_DELAY;
+    if shown < 0.0 {
+        return None;
+    }
+    let cycle = (shown % (2.0 * LOADER_SWEEP)) / LOADER_SWEEP;
+    let t = if cycle > 1.0 { 2.0 - cycle } else { cycle };
+    let eased = t * t * (3.0 - 2.0 * t);
+    Some(((eased as f32 - 0.5) * 0.7, (shown / LOADER_FADE).min(1.0) as f32))
+}
+
+fn paint_loader(ui: &Ui, line: Rect, offset: f32, alpha: f32) {
+    let (left, width) = (line.left() + offset * line.width(), line.width());
+    let mut mesh = egui::Mesh::default();
+    for (stop, color) in [(0.25, Color32::TRANSPARENT), (0.5, theme::FG().gamma_multiply(alpha)), (0.75, Color32::TRANSPARENT)] {
+        mesh.colored_vertex(pos2(left + stop * width, line.top()), color);
+        mesh.colored_vertex(pos2(left + stop * width, line.bottom()), color);
+    }
+    for i in 0..4 {
+        mesh.add_triangle(i, i + 1, i + 2);
+    }
+    ui.painter().with_clip_rect(line).add(mesh);
 }
 
 fn text_galley(ui: &Ui, text: &str, font: FontId, color: Color32, max_width: f32) -> std::sync::Arc<egui::Galley> {
@@ -151,29 +179,29 @@ pub fn wrapped(ui: &Ui, text: &str, font: FontId, color: Color32, max_width: f32
     ui.ctx().fonts_mut(|f| f.layout_job(job))
 }
 
-pub fn metadata(ui: &Ui, rect: Rect, rows: &[(String, String)]) -> Rect {
+pub fn metadata(ui: &mut Ui, rect: Rect, rows: &[(String, String)]) -> Rect {
     let height = (12.0 + 16.0 + 8.0 + rows.len() as f32 * 33.0 + 8.0).min(148.0);
     let area = Rect::from_min_max(pos2(rect.left(), rect.bottom() - height), rect.max);
-    let painter = ui.painter().with_clip_rect(area);
-    painter.hline(area.x_range(), area.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
+    ui.painter().hline(area.x_range(), area.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
     let inner = area.shrink2(vec2(16.0, 0.0));
     paint_text(ui, pos2(inner.left(), area.top() + 12.0), Align2::LEFT_TOP, "Information", theme::weighted(12.0, theme::SEMIBOLD), theme::FG_60(), inner.width());
-    let mut y = area.top() + 12.0 + 16.0 + 8.0;
-    for (i, (label, value)) in rows.iter().enumerate() {
-        if y > area.bottom() {
-            break;
+    let list = Rect::from_min_max(pos2(area.left(), area.top() + 12.0 + 16.0 + 8.0), pos2(area.right(), area.bottom() - 8.0));
+    let mut child = ui.new_child(UiBuilder::new().max_rect(list));
+    child.spacing_mut().item_spacing = vec2(0.0, 0.0);
+    egui::ScrollArea::vertical().id_salt("information").auto_shrink(false).show(&mut child, |ui| {
+        for (i, (label, value)) in rows.iter().enumerate() {
+            let (row, _) = ui.allocate_exact_size(vec2(ui.available_width(), 33.0), Sense::hover());
+            let row = row.shrink2(vec2(16.0, 0.0));
+            if i > 0 {
+                ui.painter().hline(row.x_range(), row.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
+            }
+            let label_galley = text_galley(ui, label, theme::font(13.0), theme::FG_60(), row.width() / 2.0);
+            let label_width = label_galley.size().x;
+            ui.painter().galley(pos2(row.left(), row.center().y - label_galley.size().y / 2.0), label_galley, theme::FG_60());
+            let value_galley = text_galley(ui, value, theme::weighted(13.0, theme::MEDIUM), theme::FG(), row.width() - label_width - 16.0);
+            ui.painter().galley(pos2(row.right() - value_galley.size().x, row.center().y - value_galley.size().y / 2.0), value_galley, theme::FG());
         }
-        if i > 0 {
-            painter.hline(inner.x_range(), y + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
-        }
-        let center = y + 16.5;
-        let label_galley = text_galley(ui, label, theme::font(13.0), theme::FG_60(), inner.width() / 2.0);
-        let label_width = label_galley.size().x;
-        painter.galley(pos2(inner.left(), center - label_galley.size().y / 2.0), label_galley, theme::FG_60());
-        let value_galley = text_galley(ui, value, theme::weighted(13.0, theme::MEDIUM), theme::FG(), inner.width() - label_width - 16.0);
-        painter.galley(pos2(inner.right() - value_galley.size().x, center - value_galley.size().y / 2.0), value_galley, theme::FG());
-        y += 33.0;
-    }
+    });
     area
 }
 
@@ -651,6 +679,7 @@ impl Launcher {
             hotkey_error,
             inline: None,
             weather_week: false,
+            loading_since: None,
             cursor_to_end: false,
             dropdown: None,
             argument_for: String::new(),
@@ -1712,7 +1741,15 @@ impl Launcher {
 
     fn header(&mut self, ui: &mut Ui, rect: Rect, argument: Option<String>) {
         ui.painter().hline(rect.x_range(), rect.bottom() - 0.5, Stroke::new(1.0, theme::SEPARATOR()));
-        let lead = Rect::from_center_size(pos2(rect.left() + 16.0 + 11.0, rect.center().y), vec2(22.0, 22.0));
+        let now = ui.input(|i| i.time);
+        self.loading_since = self.views.last().is_some_and(|v| v.view.loading()).then(|| self.loading_since.unwrap_or(now));
+        if let Some(since) = self.loading_since {
+            if let Some((offset, alpha)) = loader_frame(now - since) {
+                paint_loader(ui, Rect::from_min_max(pos2(rect.left(), rect.bottom() - 1.0), rect.max), offset, alpha);
+            }
+            ui.ctx().request_repaint();
+        }
+        let lead =Rect::from_center_size(pos2(rect.left() + 16.0 + 11.0, rect.center().y), vec2(22.0, 22.0));
         let placeholder = match self.views.last() {
             Some(view) => {
                 if back_button(ui, lead) {
@@ -2283,5 +2320,22 @@ impl Launcher {
             Some(false) => self.pending = None,
             None => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loader_waits_fades_in_and_sweeps_back_and_forth() {
+        assert_eq!(loader_frame(0.2), None);
+        let (start, faint) = loader_frame(LOADER_DELAY).unwrap();
+        assert!((start + 0.35).abs() < 1e-6 && faint == 0.0);
+        let (middle, full) = loader_frame(LOADER_DELAY + LOADER_SWEEP / 2.0).unwrap();
+        assert!(middle.abs() < 1e-6 && full == 1.0);
+        assert!((loader_frame(LOADER_DELAY + LOADER_SWEEP).unwrap().0 - 0.35).abs() < 1e-6);
+        assert!((loader_frame(LOADER_DELAY + 2.0 * LOADER_SWEEP).unwrap().0 + 0.35).abs() < 1e-6);
+        assert!((loader_frame(LOADER_DELAY + LOADER_FADE / 2.0).unwrap().1 - 0.5).abs() < 1e-6);
     }
 }
