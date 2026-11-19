@@ -70,9 +70,9 @@ const MONTHS: [(&str, &str, &str); 12] = [
     ("dec", "december", "dezembro"),
 ];
 
-fn month_of(name: &str) -> Option<i64> {
+pub fn month_of(name: &str) -> Option<i64> {
     let name = math::unaccent(name);
-    MONTHS.iter().position(|(a, b, c)| name == *a || name == *b || name == *c || (name.len() >= 3 && b.starts_with(&name))).map(|i| i as i64 + 1)
+    MONTHS.iter().position(|(a, b, c)| name == *a || name == *b || name == *c || (name.len() >= 3 && (b.starts_with(&name) || c.starts_with(&name)))).map(|i| i as i64 + 1)
 }
 
 static WEEK: LazyLock<Regex> = LazyLock::new(|| re(r"^(?:week|semana|wk|kw)\s*(\d{1,2})(?:\s*(?:of|de|,)?\s*(\d{4}))?$"));

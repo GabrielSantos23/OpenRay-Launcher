@@ -416,9 +416,29 @@ pub fn reading_at(forecast: &Value, hours: i64, now_s: f64) -> Option<Reading> {
     Some(Reading { temperature: h["temperature_2m"][i].as_f64()?, feels_like: h["apparent_temperature"][i].as_f64()?, code: h["weather_code"][i].as_i64()?, day: h["is_day"][i].as_i64() != Some(0) })
 }
 
+const NOT_PLACES: [&str; 96] = [
+    "a", "an", "the", "my", "your", "our", "his", "her", "their", "its", "this", "that", "what", "which", "any", "some", "every", "each", "no", "one", "same", "next", "last", "first", "second", "third", "final", "extra", "more", "less", "much", "enough",
+    "screen", "run", "running", "part", "full", "half", "over", "prime", "real", "show", "bed", "bath", "lunch", "dinner", "breakfast", "tea", "coffee", "break", "game", "play", "free", "spare", "quality", "face", "day", "night", "meal", "nap", "story", "family", "good", "bad",
+    "great", "hard", "fun", "peak", "down", "up", "lead", "reaction", "response", "load", "loading", "compile", "build", "boot", "wait", "waiting", "travel", "flight", "drive", "work", "school", "study", "sleep", "summer", "winter", "standard", "local", "closing", "opening", "lap", "race", "cpu",
+];
+
+pub fn likely_place(name: &str) -> bool {
+    !name.chars().any(|c| c.is_ascii_digit()) && !name.split_whitespace().any(|w| NOT_PLACES.contains(&w))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tells_places_from_ordinary_time_phrases() {
+        for name in ["barcelona", "rio de janeiro", "guaruja"] {
+            assert!(likely_place(name), "{name}");
+        }
+        for name in ["screen", "my", "the first", "lunch", "run 2", "quality"] {
+            assert!(!likely_place(name), "{name}");
+        }
+    }
 
     #[test]
     fn parses_weather_queries() {
