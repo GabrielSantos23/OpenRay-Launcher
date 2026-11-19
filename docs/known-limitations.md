@@ -8,8 +8,8 @@ The Tauri app was removed on 2026-11-13 (last present at commit 2925cc8). These 
 
 - **Portuguese UI.** Restored in egui (`i18n.rs`): translation happens where text is drawn, so strings missing from `assets/i18n/pt.json` stay English, and user text that matches a UI string or template is shown translated. Accessibility labels stay English.
 - **Themes.** Raycast Dark and Raycast Light only, with Follow System; the other bundled themes (Sky, Sunset, Midnight, Dawn, Overcast, Noon) and the Windows accent color are not supported. The light greys for borders are derived, not measured.
-- **Moving from the Tauri app.** Installs of the Tauri app (NSIS, 0.1.36 and earlier) won't update to the egui app by themselves: the new `latest.json` has a different shape. Download the zip once by hand.
-- **Installer.** No NSIS installer or Start Menu entry; the release is a portable zip. The executable has no embedded icon.
+- **Moving from the Tauri app.** `latest.json` carries both shapes: top-level `version`/`url`/`signature` (the zip, read by the egui updater) and `platforms.windows-x86_64` (the signed setup exe, which `tauri-plugin-updater` 2.14.0 prefers over the top-level fields). A Tauri install runs the setup with `/P /UPDATE /R`; the setup runs silently, closes Openray, runs the Tauri uninstaller with `/S /UPDATE` (which keeps `%APPDATA%\dev.openray.app`), replaces its Start Menu shortcut, recreates a desktop shortcut only if one existed, repoints the Open at Login value, installs into `%LOCALAPPDATA%\Programs\Openray` and starts it. Not run end to end: it needs a signed release, and the Tauri uninstaller's flags come from its 2.12.3 NSIS template, not from a live run. Users who turned off the Tauri updater still have to install by hand.
+- **Installer.** The NSIS setup has no directory page or language choice and doesn't offer a desktop shortcut. Later self-updates replace files but not the uninstall entry, so Settings › Apps keeps showing the installed version. Uninstalling keeps `%APPDATA%\dev.openray.app`. The setup is not code-signed, so SmartScreen may warn. The exe has the app icon but no version resource.
 - **FlowKey web commands** (`ui: "web"`): they need a WebView, so they are hidden.
 - **FlowKey interval commands** are not scheduled.
 - **Tests of the web layer** (Vitest) went away with it; the logic that was ported has Rust tests in `app/`.
@@ -195,8 +195,8 @@ The Tauri app was removed on 2026-11-13 (last present at commit 2925cc8). These 
 ## Updates
 
 - Updates need a GitHub release built by `.github/workflows/release.yml` with the repository secret `TAURI_SIGNING_PRIVATE_KEY` (and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` when the key has one). Without a release, every check fails, the failure goes only to the console, and the launcher shows no row.
-- The release workflow builds only the Windows x64 NSIS installer.
-- Installing shows no download progress. The app exits while the passive NSIS installer runs.
+- The release workflow builds only Windows x64: the portable zip and the NSIS setup.
+- Installing shows no download progress.
 
 ## Windows on demand
 

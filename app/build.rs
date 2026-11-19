@@ -1,6 +1,8 @@
 use std::fmt::Write;
 
 fn main() {
+    println!("cargo:rerun-if-changed=assets/app-icons/icon.ico");
+    embed_resource::compile("openray.rc", embed_resource::NONE).manifest_optional().unwrap();
     println!("cargo:rerun-if-changed=assets/icons");
     let mut names: Vec<String> = std::fs::read_dir("assets/icons")
         .expect("assets/icons")

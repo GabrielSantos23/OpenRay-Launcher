@@ -149,8 +149,9 @@ Known gaps and differences in the features that do exist are listed in [`docs/kn
 ## Install
 
 1. Open the [latest release](https://github.com/GabrielSantos23/OpenRay-Launcher/releases/latest).
-2. Download `openray-windows-x64.zip` and unzip it to a folder of your choice, for example `%LOCALAPPDATA%\Programs\Openray`. Keep the `extensions` folder next to `openray.exe`.
-3. Run `openray.exe` and press **Alt+Space**. Turn on **Open at Login** in Settings to start it with Windows.
+2. Download `openray-windows-x64-setup.exe` and run it. It installs for your user only (no administrator prompt) into `%LOCALAPPDATA%\Programs\Openray`, adds Openray to the Start Menu, and registers an uninstaller in Settings › Apps. If you used the older Tauri-based Openray (0.1.36 or earlier), the installer removes it and keeps your data.
+   - Portable instead: download `openray-windows-x64.zip` and unzip it to any folder you can write to. Keep the `extensions` folder next to `openray.exe`.
+3. Press **Alt+Space**. Turn on **Open at Login** in Settings to start it with Windows.
 
 Openray updates itself: release builds check GitHub for a new version and offer **Restart to Update** (also in Settings › General › Updates). Your data stays in `%APPDATA%\dev.openray.app`. Keep Openray in a folder you can write to, so it can replace its own files.
 
@@ -290,9 +291,9 @@ Releases are built by GitHub Actions ([`.github/workflows/release.yml`](.github/
 
 1. Bump the version in `app/Cargo.toml`.
 2. Push a tag named `vX.Y.Z`.
-3. The workflow checks that the tag matches the version, runs the tests, builds the release executable, signs `openray-windows-x64.zip` (the executable, bundled extensions and license), and publishes it with its signature and `latest.json`.
+3. The workflow checks that the tag matches the version, runs the tests, builds the release executable, packs `openray-windows-x64.zip` (the executable, bundled extensions and license), builds `openray-windows-x64-setup.exe` from the same files with NSIS (`installer/openray.nsi`), signs both, and publishes them with their signatures and `latest.json`.
 
-Installed copies read `latest.json`, download the zip and install it only if its signature matches the public key built into Openray. Signing needs the repository secret `TAURI_SIGNING_PRIVATE_KEY`, and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key has a password.
+Installed copies read `latest.json`, download the zip and install it only if its signature matches the public key built into Openray. `latest.json` also has a `platforms.windows-x86_64` entry pointing at the signed installer: that is the shape the Tauri updater of Openray 0.1.36 and earlier reads, so those installs update to the installer, which replaces them. Signing needs the repository secret `TAURI_SIGNING_PRIVATE_KEY`, and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key has a password.
 
 ---
 
