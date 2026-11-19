@@ -293,6 +293,7 @@ pub enum FieldKind {
     Choice(Vec<(String, String, Icon)>),
     Toggle,
     Tokens(Tokens),
+    Date { time: bool },
 }
 
 #[derive(Clone)]
