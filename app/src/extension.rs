@@ -266,6 +266,7 @@ pub enum CardKind {
     Weather(WeatherCard),
     Flight(FlightCard),
     Loading,
+    LoadingPair,
 }
 
 #[derive(Clone)]

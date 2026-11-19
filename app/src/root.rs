@@ -336,10 +336,14 @@ fn paint_flight(ui: &Ui, rect: Rect, card: &crate::extension::FlightCard) {
 
 const PLANE_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" transform="rotate(90 12 12)"/></svg>"#;
 
-fn paint_skeleton(ui: &Ui, rect: Rect) {
+fn pulse(ui: &Ui) -> Color32 {
     let t = ui.input(|i| i.time) as f32;
-    let alpha = 10.0 + 8.0 * (0.5 + 0.5 * (t * std::f32::consts::TAU / 1.4).sin());
-    let fill = theme::fg(alpha.round() as u8);
+    ui.ctx().request_repaint();
+    theme::fg((10.0 + 8.0 * (0.5 + 0.5 * (t * std::f32::consts::TAU / 1.4).sin())).round() as u8)
+}
+
+fn paint_skeleton(ui: &Ui, rect: Rect) {
+    let fill = pulse(ui);
     let bar = |x: f32, y: f32, w: f32, h: f32| ui.painter().rect_filled(Rect::from_min_size(pos2(x, y), vec2(w, h)), 2.0, fill);
     let x = rect.left() + 24.0;
     bar(x, rect.top() + 26.0, 64.0, 16.0);
@@ -354,7 +358,6 @@ fn paint_skeleton(ui: &Ui, rect: Rect) {
         bar(cx - 8.0, rect.top() + 53.0, 16.0, 16.0);
         bar(cx - 12.0, rect.top() + 85.0, 24.0, 8.0);
     }
-    ui.ctx().request_repaint();
 }
 
 fn paint_card(ui: &Ui, rect: Rect, card: &Inline, selected: bool, week: bool) {
@@ -363,11 +366,18 @@ fn paint_card(ui: &Ui, rect: Rect, card: &Inline, selected: bool, week: bool) {
         CardKind::Weather(weather) => return paint_weather(ui, rect, weather, week),
         CardKind::Flight(flight) => return paint_flight(ui, rect, flight),
         CardKind::Loading => return paint_skeleton(ui, rect),
-        CardKind::Pair => {}
+        CardKind::Pair | CardKind::LoadingPair => {}
     }
     let half = rect.width() / 2.0;
     card_side(ui, Rect::from_min_size(rect.min, vec2(half, rect.height())), &card.input, true);
-    card_side(ui, Rect::from_min_size(pos2(rect.left() + half, rect.top()), vec2(half, rect.height())), &card.output, false);
+    let output = Rect::from_min_size(pos2(rect.left() + half, rect.top()), vec2(half, rect.height()));
+    if card.kind == CardKind::LoadingPair {
+        let fill = pulse(ui);
+        ui.painter().rect_filled(Rect::from_center_size(output.center(), vec2(120.0, 20.0)), 3.0, fill);
+        ui.painter().rect_filled(Rect::from_center_size(pos2(output.center().x, output.bottom() - 21.0), vec2(64.0, 14.0)), 3.0, fill);
+    } else {
+        card_side(ui, output, &card.output, false);
+    }
     let x = rect.center().x;
     for range in [rect.top()..=rect.center().y - 12.0, rect.center().y + 12.0..=rect.bottom()] {
         ui.painter().vline(x, range, Stroke::new(1.0, theme::SEPARATOR));

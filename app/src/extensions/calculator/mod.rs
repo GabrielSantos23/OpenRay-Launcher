@@ -135,6 +135,16 @@ enum Computed {
     Weather { card: WeatherCard, open: String, copy: String },
     Flight { card: FlightCard, open: String, copy: String },
     Loading { section: &'static str, open_title: &'static str, open: String, fallback: Option<String> },
+    PairLoading,
+}
+
+macro_rules! ready {
+    ($lookup:expr) => {
+        match $lookup {
+            Some(result) => result.ok()?,
+            None => return Some(Computed::PairLoading),
+        }
+    };
 }
 
 static CURRENCY_HINT: LazyLock<[Regex; 3]> = LazyLock::new(|| [r"(?i)[a-z$€£¥₹₩₽₺₿]", r"\d", r"(?i)\s(?:in|to|as|para|em|como|pra|pro|=)\s"].map(|p| Regex::new(p).unwrap()));
@@ -269,7 +279,7 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
         return Some(Computed::Flight { card, open: format!("https://www.flightradar24.com/data/flights/{}", flight.number.to_lowercase()), copy });
     }
     if let Some(weather) = places::parse_weather(text) {
-        let loading = || matches!(weather.kind, places::WeatherKind::Card).then(|| Computed::Loading { section: "Weather Forecast", open_title: "Open in Weather", open: "msnweather://forecast".into(), fallback: Some("https://www.msn.com/en-us/weather/forecast".into()) });
+        let loading = || Some(if !matches!(weather.kind, places::WeatherKind::Card) { Computed::PairLoading } else { Computed::Loading { section: "Weather Forecast", open_title: "Open in Weather", open: "msnweather://forecast".into(), fallback: Some("https://www.msn.com/en-us/weather/forecast".into()) } });
         let Some(geo) = places::place(ctx, weather.place.as_deref()) else { return loading() };
         let geo = geo.ok()?;
         let Some(forecast) = places::forecast(ctx, &geo) else { return loading() };
@@ -305,9 +315,9 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
             _ => (caps[1].to_owned(), None, caps[2].to_owned()),
         };
         let (profile, label) = profile_of(&word);
-        let origin = places::place(ctx, from.as_deref())?.ok()?;
-        let target = places::geocode(ctx, &to)?.ok()?;
-        let (seconds, meters) = places::route(ctx, &origin, &target, profile)?.ok()?;
+        let origin = ready!(places::place(ctx, from.as_deref()));
+        let target = ready!(places::geocode(ctx, &to));
+        let (seconds, meters) = ready!(places::route(ctx, &origin, &target, profile));
         let duration = units::format_duration((seconds / 60.0).round() * 60.0);
         let distance = format!("{} km", math::group(meters / 1000.0, 1));
         return dimmed(Kind::DateTime, duration.clone(), format!("{}", (seconds / 60.0).round()), label.into(), Some(distance), extra::dim_words(text, &["time", "to", "by", "between", "from", "and", "walking", "driving", "cycling", "biking", "travel"]));
@@ -315,8 +325,8 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
     if let Some(caps) = DISTANCE.iter().find_map(|r| r.captures(&folded)) {
         let two = caps.get(2).is_some_and(|m| !["km", "kilometers", "kilometres", "miles", "mi", "nautical miles", "nmi"].contains(&m.as_str()));
         let (from, to, unit) = if two { (Some(caps[1].to_owned()), caps[2].to_owned(), caps.get(3)) } else { (None, caps[1].to_owned(), caps.get(2)) };
-        let a = places::place(ctx, from.as_deref())?.ok()?;
-        let b = places::geocode(ctx, &to)?.ok()?;
+        let a = ready!(places::place(ctx, from.as_deref()));
+        let b = ready!(places::geocode(ctx, &to));
         let km = extra::haversine_km((a.lat, a.lon), (b.lat, b.lon));
         let unit = unit.map_or("km", |m| match m.as_str() {
             "miles" | "mi" => "mi",
@@ -404,7 +414,9 @@ fn compute(ctx: &egui::Context, query: &str) -> Option<Computed> {
         let name = caps[1].trim().to_owned();
         let zone = match find_zone(&name) {
             Some(place) => place.zone,
-            None if caps.get(0).is_some_and(|_| name.split_whitespace().count() <= 5) => places::geocode(ctx, &name)?.ok()?.zone,
+            None if TIME_AT[0].is_match(&folded) && name.split_whitespace().count() <= 5 => ready!(places::geocode(ctx, &name)).zone,
+            // "X time" also matches phrases like "screen time", so it waits silently instead of flashing a skeleton
+            None if name.split_whitespace().count() <= 5 => places::geocode(ctx, &name)?.ok()?.zone,
             None => return None,
         };
         let shift = caps.get(3).and_then(|n| n.as_str().parse::<f64>().ok()).map_or(0.0, |h| if &caps[2] == "-" { -h } else { h });
@@ -546,6 +558,14 @@ impl Extension for Calculator {
                 note: None,
                 actions: vec![vec![Action::new("open", open_title, move |_| crate::apps::open_url(&open, None).or_else(|e| fallback.as_deref().map_or(Err(e), |url| crate::apps::open_url(url, None)))).icon("external-link")]],
                 kind: CardKind::Loading,
+            }),
+            Computed::PairLoading => Some(Inline {
+                section: "Calculator".into(),
+                input: side(query.trim().into(), "Expression".into()),
+                output: side(String::new(), String::new()),
+                note: None,
+                actions: Vec::new(),
+                kind: CardKind::LoadingPair,
             }),
             Computed::Flight { card, open, copy } => Some(Inline {
                 section: "Flight Tracker".into(),

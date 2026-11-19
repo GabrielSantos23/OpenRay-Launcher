@@ -47,6 +47,9 @@ fn cached(ctx: &egui::Context, key: String, ttl: Duration, work: impl FnOnce() -
         let still_wanted = *lock(&QUERY) == query;
         if !still_wanted {
             lock(&CACHE).remove(&key);
+            // the current query may share this key and is waiting on it, so make it ask again
+            super::RATES_VERSION.fetch_add(1, Ordering::SeqCst);
+            ctx.request_repaint();
             return;
         }
         let result = work();
