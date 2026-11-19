@@ -551,14 +551,15 @@ mod tests {
     fn decorations(markdown: &str) -> (Vec<Decoration>, Vec<f32>, f32) {
         let ctx = egui::Context::default();
         theme::install(&ctx);
-        let _ = ctx.run_ui(Default::default(), |_| {});
+        ctx.run_ui(Default::default(), |_| {}).textures_delta.clear();
         let mut result = None;
-        let _ = ctx.run_ui(Default::default(), |ui| {
+        let mut output = ctx.run_ui(Default::default(), |ui| {
             let doc = Doc::from_markdown(markdown);
             let galley = layout(ui, &doc, 400.0);
             let baselines = galley.rows.iter().map(|r| r.pos.y + r.row.glyphs.first().map_or(0.0, |g| g.pos.y)).collect();
             result = Some((mark_decorations(&galley, egui::Pos2::ZERO, &doc), baselines, galley.rows[0].rect().height()));
         });
+        output.textures_delta.clear();
         result.expect("ran one pass")
     }
 
