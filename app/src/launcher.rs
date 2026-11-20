@@ -96,6 +96,32 @@ fn place(hwnd: HWND, previous: HWND, show_on: ShowOn) {
     }
 }
 
+pub type DragOrigin = (POINT, POINT);
+
+pub fn drag_origin(hwnd: HWND) -> Option<DragOrigin> {
+    let mut rect = RECT::default();
+    unsafe { GetWindowRect(hwnd, &mut rect) }.ok()?;
+    Some((cursor(), POINT { x: rect.left, y: rect.top }))
+}
+
+pub fn drag_to(hwnd: HWND, (start, origin): DragOrigin) {
+    let now = cursor();
+    unsafe {
+        let _ = SetWindowPos(hwnd, None, origin.x + now.x - start.x, origin.y + now.y - start.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
+pub fn follow_drag(response: &egui::Response, hwnd: Option<HWND>, origin: &mut Option<DragOrigin>) {
+    let Some(hwnd) = hwnd else { return };
+    if response.drag_started() {
+        *origin = drag_origin(hwnd);
+    }
+    match *origin {
+        Some(o) if response.dragged() => drag_to(hwnd, o),
+        _ => *origin = None,
+    }
+}
+
 pub fn force_foreground(hwnd: HWND) {
     unsafe {
         let current = GetCurrentThreadId();

@@ -24,7 +24,7 @@ The Tauri app was removed on 2026-11-13 (last present at commit 2925cc8). These 
 - **FlowKey.** Extensions run in QuickJS (`rquickjs`) with the same consent, data folder and gate as the Tauri app. Missing there: web commands (`ui: "web"`, they need a WebView and are hidden). Interval background commands run on a timer from launch like the Tauri app: the first run is one interval after Openray starts, there is no catch-up after sleep, a run is skipped while consent or required preferences are missing, and disabling the command in Settings does not stop the timer. The file picker field opens the Windows dialog modally from the launcher; date fields use the shared Create Event picker (`YYYY-MM-DD`, date only). Aborting a native call cancels its task, but work already handed to a blocking OS call (a file dialog, a clipboard read) still runs to the end. Accessory tooltips are not shown. Pagination shows a Load More row. The JS host is prebuilt into `app/assets/flowkey-host.js` from `app/js` with `npm run build:host`. A script that runs one JS turn for more than 10 s is interrupted.
 - Notes editor: the underline offset (2 px under the baseline) and the inline code chip padding (1 px) are estimates, and neither has been compared side by side with the reference. Quotes hold paragraphs with inline formatting but no lists, headings or code blocks (the reference's blockquote takes any block), so `> - item` loses the quote. A nested numbered list that starts at a number other than 1 is saved as `3. ` under its parent item, which CommonMark reads back as plain text of the parent (the reference's markdown output has the same problem). Code blocks have no syntax highlighting, language picker or copy button, and Shift+Tab does not outdent inside them. Emoji in notes text still render as missing glyphs (see the emoji item above).
 - The emoji font is not loaded (it costs about 29 MB), so emoji in app names render as missing glyphs.
-- eframe's default features (wgpu) used 344 MB on the dev GPU, so `app/Cargo.toml` turns them off and uses glow.
+- The renderer is wgpu on DX12 only (ADR-002): 178 MB private after start-up and one launcher show on the dev machine, against 113 MB for the glow build in the same test. The difference is the D3D12 runtime and shader compiler. glow was dropped because re-binding its shared OpenGL context to each window cost 17-31 ms per switch on an AMD RX 6500 XT.
 
 ## Reference version
 
@@ -200,7 +200,7 @@ The Tauri app was removed on 2026-11-13 (last present at commit 2925cc8). These 
 
 ## Windows on demand
 
-- Settings and Notes are created each time they open, so they open slower than a window kept alive. Notes keeps its last position and size only until Openray quits.
+- Settings is created each time it opens, so it opens slower than a window kept alive. Notes is created on first open and reused while open; it keeps its last position and size only until Openray quits.
 
 ## Platform
 

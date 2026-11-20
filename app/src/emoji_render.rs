@@ -47,14 +47,34 @@ fn draw(f: &Factories, text: &str, px: u32) -> Result<ColorImage> {
     }
 }
 
-fn decode_with(f: &Factories, bytes: &[u8]) -> Result<ColorImage> {
-    use windows::Win32::Graphics::Imaging::{GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, WICBitmapPaletteTypeCustom, WICDecodeMetadataCacheOnDemand};
+pub fn fit_size((w, h): (u32, u32), max: u32) -> (u32, u32) {
+    if w.max(h) <= max {
+        return (w, h);
+    }
+    let scale = f64::from(max) / f64::from(w.max(h));
+    (((f64::from(w) * scale).round() as u32).max(1), ((f64::from(h) * scale).round() as u32).max(1))
+}
+
+fn decode_with(f: &Factories, bytes: &[u8], max: u32) -> Result<ColorImage> {
+    use windows::core::Interface;
+    use windows::Win32::Graphics::Imaging::{IWICBitmapSource, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, WICBitmapInterpolationModeFant, WICBitmapPaletteTypeCustom, WICDecodeMetadataCacheOnDemand};
     unsafe {
         let stream = f.wic.CreateStream()?;
         stream.InitializeFromMemory(bytes)?;
         let decoder = f.wic.CreateDecoderFromStream(&stream, std::ptr::null(), WICDecodeMetadataCacheOnDemand)?;
+        let frame = decoder.GetFrame(0)?;
+        let (mut fw, mut fh) = (0, 0);
+        frame.GetSize(&mut fw, &mut fh)?;
+        let source: IWICBitmapSource = match fit_size((fw, fh), max) {
+            size if size == (fw, fh) => frame.cast()?,
+            (sw, sh) => {
+                let scaler = f.wic.CreateBitmapScaler()?;
+                scaler.Initialize(&frame, sw, sh, WICBitmapInterpolationModeFant)?;
+                scaler.cast()?
+            }
+        };
         let converter = f.wic.CreateFormatConverter()?;
-        converter.Initialize(&decoder.GetFrame(0)?, &GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, None, 0.0, WICBitmapPaletteTypeCustom)?;
+        converter.Initialize(&source, &GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, None, 0.0, WICBitmapPaletteTypeCustom)?;
         let (mut w, mut h) = (0, 0);
         converter.GetSize(&mut w, &mut h)?;
         let mut pixels = vec![0u8; (w * h * 4) as usize];
@@ -64,8 +84,12 @@ fn decode_with(f: &Factories, bytes: &[u8]) -> Result<ColorImage> {
 }
 
 pub fn decode(bytes: &[u8]) -> std::result::Result<ColorImage, String> {
+    decode_fit(bytes, u32::MAX)
+}
+
+pub fn decode_fit(bytes: &[u8], max: u32) -> std::result::Result<ColorImage, String> {
     FACTORIES.with(|cell| match cell.get_or_init(factories) {
-        Some(f) => decode_with(f, bytes).map_err(|e| e.message()),
+        Some(f) => decode_with(f, bytes, max).map_err(|e| e.message()),
         None => Err("Windows Imaging is unavailable".into()),
     })
 }
@@ -79,6 +103,20 @@ pub fn render(text: &str, px: u32) -> std::result::Result<ColorImage, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn large_images_are_scaled_to_fit() {
+        assert_eq!(super::fit_size((1920, 1080), 1024), (1024, 576));
+        assert_eq!(super::fit_size((300, 2000), 1024), (154, 1024));
+        assert_eq!(super::fit_size((640, 480), 1024), (640, 480));
+        let mut png = Vec::new();
+        let mut encoder = png::Encoder::new(&mut png, 2000, 1000);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.write_header().unwrap().write_image_data(&vec![200u8; 2000 * 1000 * 4]).unwrap();
+        assert_eq!(super::decode_fit(&png, 1024).unwrap().size, [1024, 512]);
+        assert_eq!(super::decode(&png).unwrap().size, [2000, 1000]);
+    }
+
     #[test]
     fn renders_color_emoji() {
         let image = super::render("😀", 32).unwrap();

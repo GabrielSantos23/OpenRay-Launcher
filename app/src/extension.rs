@@ -215,6 +215,7 @@ pub struct Item {
     pub actions: Vec<Vec<Action>>,
 }
 
+#[derive(Clone)]
 pub struct Section {
     pub title: String,
     pub items: Vec<Item>,

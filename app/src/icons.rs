@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 const APP_ICON: &str = "appicon://";
 const CLIP_IMAGE: &str = "clipimg://";
 const EMOJI: &str = "emoji://";
+const CLIP_IMAGE_MAX: u32 = 1024;
 pub const TIME_WIDTH: f32 = 122.0;
 
 include!(concat!(env!("OUT_DIR"), "/icons.rs"));
@@ -126,9 +127,24 @@ fn letter(ui: &Ui, rect: Rect, title: &str) {
     ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, initial, theme::weighted(11.0, theme::SEMIBOLD), theme::FG_60());
 }
 
+type ImageCache = Arc<Mutex<HashMap<String, Option<Result<Arc<ColorImage>, String>>>>>;
+type EmojiJob = (String, String, u32, ImageCache, egui::Context);
+
+static EMOJI_JOBS: std::sync::LazyLock<Mutex<std::sync::mpsc::Sender<EmojiJob>>> = std::sync::LazyLock::new(|| {
+    let (jobs, queue) = std::sync::mpsc::channel::<EmojiJob>();
+    std::thread::spawn(move || {
+        for (uri, text, size, cache, ctx) in queue {
+            let result = crate::emoji_render::render(&text, size).map(Arc::new);
+            cache.lock().unwrap_or_else(|e| e.into_inner()).insert(uri, Some(result));
+            ctx.request_repaint();
+        }
+    });
+    Mutex::new(jobs)
+});
+
 #[derive(Default)]
 pub struct AppIconLoader {
-    cache: Arc<Mutex<HashMap<String, Option<Result<Arc<ColorImage>, String>>>>>,
+    cache: ImageCache,
 }
 
 fn decode(png_bytes: &[u8]) -> Result<ColorImage, String> {
@@ -175,12 +191,12 @@ impl ImageLoader for AppIconLoader {
             Some(None) => return Ok(ImagePoll::Pending { size: None }),
             None => {}
         }
-        if let Some((size, text)) = uri.strip_prefix(EMOJI).and_then(|rest| rest.split_once('/')) {
-            let result = crate::emoji_render::render(text, size.parse().unwrap_or(32)).map(Arc::new);
-            cache.insert(uri.to_owned(), Some(result.clone()));
-            return result.map(|image| ImagePoll::Ready { image }).map_err(LoadError::Loading);
-        }
         cache.insert(uri.to_owned(), None);
+        if let Some((size, text)) = uri.strip_prefix(EMOJI).and_then(|rest| rest.split_once('/')) {
+            let job: EmojiJob = (uri.to_owned(), text.to_owned(), size.parse().unwrap_or(32), self.cache.clone(), ctx.clone());
+            let _ = EMOJI_JOBS.lock().unwrap_or_else(|e| e.into_inner()).send(job);
+            return Ok(ImagePoll::Pending { size: None });
+        }
         let (cache, uri, ctx) = (self.cache.clone(), uri.to_owned(), ctx.clone());
         std::thread::spawn(move || {
             let bytes = match uri.strip_prefix(APP_ICON).and_then(|rest| rest.split_once('/')) {
@@ -194,7 +210,8 @@ impl ImageLoader for AppIconLoader {
                     },
                 },
             };
-            let result = bytes.and_then(|data| decode(&data).or_else(|_| crate::emoji_render::decode(&data))).map(Arc::new);
+            let fit = uri.starts_with(CLIP_IMAGE);
+            let result = bytes.and_then(|data| if fit { crate::emoji_render::decode_fit(&data, CLIP_IMAGE_MAX) } else { decode(&data).or_else(|_| crate::emoji_render::decode(&data)) }).map(Arc::new);
             cache.lock().unwrap_or_else(|e| e.into_inner()).insert(uri, Some(result));
             ctx.request_repaint();
         });

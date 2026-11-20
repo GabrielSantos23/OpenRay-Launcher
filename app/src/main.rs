@@ -137,6 +137,16 @@ fn listen_for_second_instance(ctx: egui::Context, signals: Sender<Signal>) {
     });
 }
 
+fn wgpu_options() -> eframe::WgpuConfiguration {
+    use eframe::egui_wgpu::{WgpuSetup, WgpuSetupCreateNew};
+    use eframe::wgpu;
+    let mut setup = WgpuSetupCreateNew::without_display_handle();
+    setup.instance_descriptor.backends = wgpu::Backends::DX12;
+    let base = setup.device_descriptor.clone();
+    setup.device_descriptor = std::sync::Arc::new(move |adapter| wgpu::DeviceDescriptor { memory_hints: wgpu::MemoryHints::MemoryUsage, ..base(adapter) });
+    eframe::WgpuConfiguration { wgpu_setup: WgpuSetup::CreateNew(setup), ..Default::default() }
+}
+
 struct App {
     launcher: Launcher,
     _tray: Option<tray_icon::TrayIcon>,
@@ -196,6 +206,7 @@ fn main() -> eframe::Result {
             .with_decorations(false)
             .with_resizable(false)
             .with_taskbar(false),
+        wgpu_options: wgpu_options(),
         ..Default::default()
     };
     eframe::run_native(

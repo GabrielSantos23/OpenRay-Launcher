@@ -249,7 +249,7 @@ openray/
 
 ## How it works
 
-Openray is a single native Rust executable. The UI is drawn with **egui** (eframe, OpenGL through glow); there is no WebView, browser engine, Node.js process or .NET runtime.
+Openray is a single native Rust executable. The UI is drawn with **egui** (eframe, Direct3D 12 through wgpu); there is no WebView, browser engine, Node.js process or .NET runtime.
 
 - **Windows integration:** the keyboard hook, window styling and focus, the app and file indexes, the clipboard, audio (Core Audio), UI Automation (to read browser URLs for Focus), OCR, and simulated keystrokes all go through the Windows APIs directly.
 - **Built-in features:** each one implements the `Extension` trait in `app/src/extension.rs` and returns commands that run immediately, open a view (list, grid, form, page or detail), or add inline results to the root search.

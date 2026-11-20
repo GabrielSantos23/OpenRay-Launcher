@@ -45,7 +45,7 @@ A native UI was rejected because parity would have to be rebuilt by hand in a di
 ## ADR-002: Native UI with egui, no WebView
 
 - **Status:** Accepted, 2026-11-04. Supersedes ADR-001. Implemented; the Tauri app and the web frontend were removed on 2026-11-13.
-- **Decision:** **Rust + egui (eframe, glow renderer), no WebView2 and no TypeScript in the main app.** Third-party extensions stay TypeScript and run in an embedded JS engine (QuickJS through `rquickjs`, implemented in `app/src/flowkey_js.rs`), rendering through the existing FlowKey `UiTree` protocol drawn natively by egui.
+- **Decision:** **Rust + egui (eframe, wgpu renderer; glow until 2026-11-19), no WebView2 and no TypeScript in the main app.** Third-party extensions stay TypeScript and run in an embedded JS engine (QuickJS through `rquickjs`, implemented in `app/src/flowkey_js.rs`), rendering through the existing FlowKey `UiTree` protocol drawn natively by egui.
 
 ### Context
 
@@ -55,7 +55,7 @@ The owner asked for a WebView-free app. Measured on the dev machine with the lau
 
 - The new app lives in `app/` (crate `openray-native`, binary `openray`). The Windows backends that the Tauri app shared through `#[path]` now live in `app/src`.
 - `app/` pins Rust 1.97 (`app/rust-toolchain.toml`) because egui 0.37 needs 1.95+.
-- Renderer: glow. It measured 92-121 MB against 344 MB for eframe's default wgpu backend on the dev GPU (GTX 970).
+- Renderer: wgpu (DirectX 12) since 2026-11-19; glow before. glow measured 92-121 MB against 344 MB for wgpu on the old dev GPU (GTX 970), but every secondary window (Notes, Settings, capture overlay, pins, HUD) is an egui immediate viewport, and glow shares one OpenGL context that eframe re-binds (`wglMakeCurrent`) to each window it paints. On the current dev GPU (AMD RX 6500 XT, driver 32.0.21045) each re-bind took 17-31 ms, so a Notes keystroke or a capture-overlay mouse move cost 30-90 ms and the overlay took 500-750 ms to open. With wgpu each window has its own swapchain: Notes and overlay frames take 1-3 ms and the overlay opens in about 40 ms. The owner accepted the memory cost on 2026-11-19. eframe's default wgpu setup enumerates Vulkan, DX12 and GL, which loaded the AMD Vulkan and OpenGL drivers next to D3D12 (334 MB private after start-up and one launcher show); `main.rs` limits wgpu to DX12 with `MemoryHints::MemoryUsage`, which measured 178 MB in the same test, against 113 MB for the glow build.
 - Visual parity is now hand-tuned: tokens from the former `src/styles.css` are ported to `app/src/theme.rs`, Inter is embedded as static TTF weights converted from the OFL package, and Lucide glyphs are embedded as SVG (`scripts/lucide_svg.py`).
 - Notes uses an egui block editor (`app/src/notes`) instead of Tiptap and keeps `notes.json` in the same markdown format.
 - Built-ins implement the Rust `Extension` trait (`app/src/extension.rs`).

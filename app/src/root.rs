@@ -131,6 +131,7 @@ pub struct Launcher {
     hidden_at: f64,
     was_shown: bool,
     notes: Option<crate::notes::window::NotesWindow>,
+    footer_drag: Option<launcher::DragOrigin>,
     settings_window: Option<settings_ui::SettingsWindow>,
     data_dir: std::path::PathBuf,
     signals: Receiver<Signal>,
@@ -205,14 +206,14 @@ pub fn metadata(ui: &mut Ui, rect: Rect, rows: &[(String, String)]) -> Rect {
     area
 }
 
-fn paint_text(ui: &Ui, anchor: Pos2, align: Align2, text: &str, font: FontId, color: Color32, max_width: f32) -> Rect {
+pub(crate) fn paint_text(ui: &Ui, anchor: Pos2, align: Align2, text: &str, font: FontId, color: Color32, max_width: f32) -> Rect {
     let galley = text_galley(ui, text, font, color, max_width);
     let rect = align.anchor_size(anchor, galley.size());
     ui.painter().galley(rect.min, galley, color);
     rect
 }
 
-fn keycaps(ui: &Ui, right: f32, center_y: f32, labels: &[String]) -> f32 {
+pub(crate) fn keycaps(ui: &Ui, right: f32, center_y: f32, labels: &[String]) -> f32 {
     let mut x = right;
     for label in labels.iter().rev() {
         let galley = text_galley(ui, label, theme::font(11.0), theme::FG_60(), 200.0);
@@ -417,7 +418,7 @@ fn paint_card(ui: &Ui, rect: Rect, card: &Inline, selected: bool, week: bool) {
     }
 }
 
-fn key_presses(ui: &Ui) -> Vec<(Key, Modifiers)> {
+pub(crate) fn key_presses(ui: &Ui) -> Vec<(Key, Modifiers)> {
     ui.input(|i| {
         i.events
             .iter()
@@ -429,11 +430,11 @@ fn key_presses(ui: &Ui) -> Vec<(Key, Modifiers)> {
     })
 }
 
-fn consume(ui: &Ui, key: Key, modifiers: Modifiers) {
+pub(crate) fn consume(ui: &Ui, key: Key, modifiers: Modifiers) {
     ui.input_mut(|i| i.events.retain(|e| !matches!(e, egui::Event::Key { key: k, pressed: true, modifiers: m, .. } if *k == key && *m == modifiers)));
 }
 
-fn plain(modifiers: Modifiers) -> bool {
+pub(crate) fn plain(modifiers: Modifiers) -> bool {
     !modifiers.ctrl && !modifiers.alt && !modifiers.shift
 }
 
@@ -674,6 +675,7 @@ impl Launcher {
             hidden_at: f64::NEG_INFINITY,
             was_shown: false,
             notes: None,
+            footer_drag: None,
             settings_window: None,
             data_dir,
             signals,
@@ -784,7 +786,7 @@ impl Launcher {
                 .collect();
         }
         let aliases = self.aliases();
-        let searchable: Vec<Command> = self.commands.iter().filter(|c| c.query.is_none()).cloned().collect();
+        let searchable: Vec<&Command> = self.commands.iter().filter(|c| c.query.is_none()).collect();
         let index_of = |key: &str| self.commands.iter().position(|c| c.key == key).unwrap_or(0);
         let mut rows: Vec<Row> = search(&searchable, &self.query, &self.frecency, &self.favorites, &aliases)
             .into_iter()
@@ -978,11 +980,11 @@ impl Launcher {
             Request::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
             Request::OpenSettings => self.open_settings(ctx),
             Request::OpenNotes { create } => {
-                let mut notes = crate::notes::window::NotesWindow::open(self.data_dir.clone());
+                let notes = self.notes.get_or_insert_with(|| crate::notes::window::NotesWindow::open(self.data_dir.clone()));
                 if create {
                     notes.create(ctx);
                 }
-                self.notes = Some(notes);
+                notes.request_focus();
             }
             Request::SetFavorites(keys) => {
                 self.keep_selected = command.map(str::to_owned);
@@ -1103,10 +1105,11 @@ impl Launcher {
         }
         crate::flowkey_host::init(ctx);
         self.reload();
-        if launcher::is_shown() && ctx.input(|i| i.viewport().focused) == Some(false) && !launcher::owns_foreground() && self.was_shown {
+        let owns = launcher::owns_foreground();
+        if launcher::is_shown() && !owns && self.was_shown {
             self.hide(ctx, false);
         }
-        self.was_shown = launcher::is_shown() && ctx.input(|i| i.viewport().focused) == Some(true);
+        self.was_shown = launcher::is_shown() && (owns || ctx.input(|i| i.viewport().focused) == Some(true));
     }
 
     fn selection(&mut self) -> &mut usize {
@@ -1228,9 +1231,9 @@ impl Launcher {
 
     fn show_hud(&mut self, ctx: &egui::Context, now: f64) {
         let Some((toast, at)) = &self.hud else { return };
-        let (title, color, seconds) = match toast {
-            Toast::Success(title) => (title.clone(), theme::GREEN(), HUD_SECONDS),
-            Toast::Failure(title, _) => (title.clone(), theme::RED(), HUD_FAILURE_SECONDS),
+        let (title, seconds) = match toast {
+            Toast::Success(title) => (title.clone(), HUD_SECONDS),
+            Toast::Failure(title, _) => (title.clone(), HUD_FAILURE_SECONDS),
         };
         let left = seconds - (now - at);
         if left <= 0.0 {
@@ -1256,9 +1259,6 @@ impl Launcher {
             let rect = ui.max_rect();
             let painter = ui.painter();
             painter.rect(rect, 8.0, theme::BG(), Stroke::new(1.0, theme::CONTROL_HOVER()), egui::StrokeKind::Inside);
-            for (radius, alpha) in [(rect.width() * 0.45, 0.10), (rect.width() * 0.25, 0.10)] {
-                painter.circle_filled(pos2(rect.center().x, rect.top() - 8.0), radius.min(40.0), color.gamma_multiply(alpha));
-            }
             paint_text(ui, rect.center() + vec2(0.0, 1.0), Align2::CENTER_CENTER, &title, theme::weighted(13.0, theme::MEDIUM), theme::FG(), rect.width() - 48.0);
         });
     }
@@ -1273,12 +1273,19 @@ impl Launcher {
     }
 
     fn show_notes(&mut self, ctx: &egui::Context) {
+        let escape_closes = self.settings.escape_key_closes_window;
         let Some(notes) = &mut self.notes else { return };
-        let builder = egui::ViewportBuilder::default().with_title("Notes").with_inner_size([440.0, 762.0]).with_min_inner_size([300.0, 200.0]).with_always_on_top();
-        let close = ctx.show_viewport_immediate(egui::ViewportId::from_hash_of("notes"), builder, |ui, _| {
-            notes.ui(ui);
-            ui.input(|i| i.viewport().close_requested())
-        });
+        let builder = egui::ViewportBuilder::default()
+            .with_title(crate::notes::window::TITLE)
+            .with_inner_size([440.0, 762.0])
+            .with_min_inner_size([300.0, 200.0])
+            .with_decorations(false)
+            .with_resizable(true)
+            .with_maximize_button(false)
+            .with_minimize_button(false)
+            .with_taskbar(false)
+            .with_always_on_top();
+        let close = ctx.show_viewport_immediate(egui::ViewportId::from_hash_of("notes"), builder, |ui, _| notes.ui(ui, escape_closes));
         if close {
             self.notes = None;
         }
@@ -2022,6 +2029,9 @@ impl Launcher {
                     if response.clicked() {
                         clicked = Some(index);
                     }
+                    if !ui.is_rect_visible(rect) {
+                        continue;
+                    }
                     if let Some(card) = &row.card {
                         paint_card(ui, rect, card, selected, self.weather_week);
                         continue;
@@ -2219,6 +2229,8 @@ impl Launcher {
 
     fn footer(&mut self, ui: &mut Ui, rect: Rect, current: Option<&Row>, groups: &[Vec<Action>], primary_keys: Option<Vec<String>>) {
         ui.painter().hline(rect.x_range(), rect.top() + 0.5, Stroke::new(1.0, theme::SEPARATOR()));
+        let drag = ui.interact(rect, egui::Id::unique("footer-drag"), Sense::drag());
+        launcher::follow_drag(&drag, launcher::window(), &mut self.footer_drag);
         let center_y = rect.center().y;
         if let Some((toast, _)) = &self.toast {
             let (color, title, message) = match toast {

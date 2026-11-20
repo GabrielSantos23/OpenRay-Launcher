@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use windows::Win32::Foundation::HWND;
-use windows::Win32::Graphics::Dwm::DWMWA_TRANSITIONS_FORCEDISABLED;
+use windows::Win32::Graphics::Dwm::{DWMWA_CLOAK, DWMWA_TRANSITIONS_FORCEDISABLED};
 use windows::Win32::UI::WindowsAndMessaging::{SetForegroundWindow, SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW};
 
 pub static VERSION: AtomicU64 = AtomicU64::new(0);
@@ -34,7 +34,7 @@ struct Overlay {
     anchor: Option<(i32, i32)>,
     ruler: Option<Rect>,
     texture: egui::TextureHandle,
-    placed: bool,
+    stage: u8,
 }
 
 struct Pin {
@@ -43,7 +43,7 @@ struct Pin {
     png: Vec<u8>,
     texture: egui::TextureHandle,
     zoom: f32,
-    placed: bool,
+    stage: u8,
     drag_from: (i32, i32),
 }
 
@@ -140,7 +140,7 @@ pub fn start(ctx: &egui::Context, mode: &'static str) {
             anchor: None,
             ruler: None,
             texture,
-            placed: false,
+            stage: 0,
         });
         ctx.request_repaint();
     });
@@ -243,7 +243,7 @@ fn complete(ctx: &egui::Context, overlay: &Overlay, rect: Rect) -> Result<(), St
 fn pin(ctx: &egui::Context, png: Vec<u8>, size: [usize; 2], rgba: &[u8], rect: Rect) {
     let id = NEXT_PIN.fetch_add(1, Ordering::Relaxed);
     let texture = ctx.load_texture(format!("pin-{id}"), egui::ColorImage::from_rgba_unmultiplied(size, rgba), egui::TextureOptions::LINEAR);
-    PINS.lock().unwrap_or_else(|e| e.into_inner()).push(Pin { id, rect, png, texture, zoom: 1.0, placed: false, drag_from: (0, 0) });
+    PINS.lock().unwrap_or_else(|e| e.into_inner()).push(Pin { id, rect, png, texture, zoom: 1.0, stage: 0, drag_from: (0, 0) });
     ctx.request_repaint();
 }
 
@@ -292,7 +292,7 @@ pub fn show(ctx: &egui::Context) {
 fn show_overlay(ctx: &egui::Context) {
     let Some(mut overlay) = OVERLAY.lock().unwrap_or_else(|e| e.into_inner()).take() else { return };
     let scale = cursor_area().1;
-    let builder = popup(OVERLAY_TITLE, vec2(overlay.screen.w as f32, overlay.screen.h as f32) / scale, pos2(overlay.screen.x as f32, overlay.screen.y as f32) / scale, true);
+    let builder = popup(OVERLAY_TITLE, vec2(overlay.screen.w as f32, overlay.screen.h as f32) / scale, pos2(overlay.screen.x as f32, overlay.screen.y as f32) / scale, true).with_visible(false);
     let outcome = ctx.show_viewport_immediate(egui::ViewportId::from_hash_of("capture-overlay"), builder, |ui, _| overlay_ui(ui, &mut overlay));
     match outcome {
         Outcome::Keep => *OVERLAY.lock().unwrap_or_else(|e| e.into_inner()) = Some(overlay),
@@ -301,21 +301,32 @@ fn show_overlay(ctx: &egui::Context) {
     }
 }
 
-fn overlay_ui(ui: &mut Ui, overlay: &mut Overlay) -> Outcome {
-    if !overlay.placed {
-        match own_window(OVERLAY_TITLE) {
-            Some(hwnd) => {
-                launcher::set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
-                let s = overlay.screen;
-                unsafe {
-                    let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), s.x, s.y, s.w, s.h, SWP_SHOWWINDOW);
-                }
-                launcher::force_foreground(hwnd);
-                overlay.placed = true;
-            }
-            None => ui.ctx().request_repaint(),
-        }
+fn reveal(ctx: &egui::Context, title: &str, stage: &mut u8, r: Rect) {
+    if *stage >= 3 {
+        return;
     }
+    if let Some(hwnd) = own_window(title) {
+        match *stage {
+            0 => {
+                launcher::set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
+                launcher::set_dwm(hwnd, DWMWA_CLOAK, 1i32);
+                unsafe {
+                    let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), r.x, r.y, r.w, r.h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                }
+            }
+            2 => {
+                launcher::set_dwm(hwnd, DWMWA_CLOAK, 0i32);
+                launcher::force_foreground(hwnd);
+            }
+            _ => {}
+        }
+        *stage += 1;
+    }
+    ctx.request_repaint();
+}
+
+fn overlay_ui(ui: &mut Ui, overlay: &mut Overlay) -> Outcome {
+    reveal(ui.ctx(), OVERLAY_TITLE, &mut overlay.stage, overlay.screen);
     let ctx = ui.ctx().clone();
     let ppp = ctx.pixels_per_point();
     let full = ui.max_rect();
@@ -461,7 +472,7 @@ fn show_pins(ctx: &egui::Context) {
     pins.retain_mut(|pin| {
         let title = format!("Pinned Screenshot {}", pin.id);
         let scale = cursor_area().1;
-        let builder = popup(&title, vec2(pin.rect.w.max(24) as f32, pin.rect.h.max(24) as f32) / scale, pos2(pin.rect.x as f32, pin.rect.y as f32) / scale, true);
+        let builder = popup(&title, vec2(pin.rect.w.max(24) as f32, pin.rect.h.max(24) as f32) / scale, pos2(pin.rect.x as f32, pin.rect.y as f32) / scale, true).with_visible(false);
         ctx.show_viewport_immediate(egui::ViewportId::from_hash_of(("capture-pin", pin.id)), builder, |ui, _| pin_ui(ui, pin, &title))
     });
     let mut shared = PINS.lock().unwrap_or_else(|e| e.into_inner());
@@ -472,19 +483,7 @@ fn show_pins(ctx: &egui::Context) {
 fn pin_ui(ui: &mut Ui, pin: &mut Pin, title: &str) -> bool {
     let ctx = ui.ctx().clone();
     let hwnd = own_window(title);
-    if !pin.placed {
-        match hwnd {
-            Some(hwnd) => {
-                let r = pin.rect;
-                unsafe {
-                    let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), r.x, r.y, r.w.max(24), r.h.max(24), SWP_SHOWWINDOW);
-                }
-                launcher::force_foreground(hwnd);
-                pin.placed = true;
-            }
-            None => ctx.request_repaint(),
-        }
-    }
+    reveal(&ctx, title, &mut pin.stage, Rect { w: pin.rect.w.max(24), h: pin.rect.h.max(24), ..pin.rect });
     let full = ui.max_rect();
     ui.painter().image(pin.texture.id(), full, egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
     let response = ui.interact(full, egui::Id::unique(("pin-surface", pin.id)), Sense::click_and_drag());

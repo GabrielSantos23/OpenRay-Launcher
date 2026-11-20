@@ -24,7 +24,7 @@ pub enum Format {
     Block(Kind),
 }
 
-pub const FORMAT_SHORTCUTS: [(Format, KeyboardShortcut); 13] = [
+pub const FORMAT_SHORTCUTS: [(Format, KeyboardShortcut); 14] = [
     (Format::Mark(BOLD), KeyboardShortcut::new(Modifiers::COMMAND, Key::B)),
     (Format::Mark(ITALIC), KeyboardShortcut::new(Modifiers::COMMAND, Key::I)),
     (Format::Mark(UNDERLINE), KeyboardShortcut::new(Modifiers::COMMAND, Key::U)),
@@ -38,6 +38,7 @@ pub const FORMAT_SHORTCUTS: [(Format, KeyboardShortcut); 13] = [
     (Format::Block(Kind::Ordered), KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::Num7)),
     (Format::Block(Kind::Task(false)), KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::Num9)),
     (Format::Block(Kind::Quote), KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::B)),
+    (Format::Block(Kind::Code), KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::ALT), Key::C)),
 ];
 
 pub struct NoteEditor {
@@ -266,6 +267,66 @@ impl NoteEditor {
 
     pub fn focus(&self, ctx: &egui::Context) {
         ctx.memory_mut(|m| m.request_focus(self.id));
+    }
+
+    pub fn focus_end(&self, ctx: &egui::Context) {
+        let len = self.doc.styles.len();
+        self.set_cursor(ctx, len, len);
+        self.focus(ctx);
+    }
+
+    pub fn state_at_cursor(&self, ctx: &egui::Context) -> (Kind, Style) {
+        let (start, _) = self.selection(ctx);
+        let kind = self.doc.blocks[self.doc.line_of(start)].kind;
+        let before = start.checked_sub(1).filter(|&i| self.doc.text.chars().nth(i) != Some('\n'));
+        let style = self.pending.clone().or_else(|| before.or((start < self.doc.styles.len()).then_some(start)).map(|i| self.doc.styles[i].clone())).unwrap_or_default();
+        (kind, style)
+    }
+
+    fn link_range(&self, at: usize) -> Option<(usize, usize)> {
+        let link = self.doc.styles.get(at).and_then(|s| s.link.clone()).or_else(|| at.checked_sub(1).and_then(|i| self.doc.styles[i].link.clone()))?;
+        let has = |i: usize| self.doc.styles.get(i).is_some_and(|s| s.link.as_ref() == Some(&link));
+        let mut start = if has(at) { at } else { at - 1 };
+        while start > 0 && has(start - 1) {
+            start -= 1;
+        }
+        let mut end = start;
+        while has(end) {
+            end += 1;
+        }
+        Some((start, end))
+    }
+
+    pub fn set_link(&mut self, ctx: &egui::Context, url: Option<&str>) {
+        let (mut start, mut end) = self.selection(ctx);
+        if start == end {
+            if let Some((s, e)) = self.link_range(start) {
+                (start, end) = (s, e);
+            }
+        }
+        self.push_undo(start);
+        self.last_push = f64::NEG_INFINITY;
+        match url {
+            Some(url) if start == end => {
+                self.doc.replace(start, end, url, Some(Style { marks: 0, link: Some(url.into()) }));
+                let at = start + url.chars().count();
+                self.set_cursor(ctx, at, at);
+            }
+            _ => self.doc.set_link(start, end, url),
+        }
+        self.focus(ctx);
+    }
+
+    pub fn selection_doc(&self, ctx: &egui::Context) -> Option<Doc> {
+        let (start, end) = self.selection(ctx);
+        (start < end).then(|| {
+            let mut doc = self.doc.clone();
+            let first = doc.blocks[doc.line_of(start)];
+            doc.replace(end, doc.styles.len(), "", None);
+            doc.replace(0, start, "", None);
+            doc.blocks[0] = first;
+            doc
+        })
     }
 
     fn selection(&self, ctx: &egui::Context) -> (usize, usize) {

@@ -11,7 +11,7 @@ pub trait Searchable {
     fn kind(&self) -> &str;
 }
 
-impl Searchable for crate::extension::Command {
+impl Searchable for &crate::extension::Command {
     fn key(&self) -> &str {
         &self.key
     }

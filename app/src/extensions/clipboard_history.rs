@@ -334,11 +334,12 @@ struct HistoryView {
     version: u64,
     filter: usize,
     app: Option<String>,
+    cache: Option<((u64, usize, i64), Vec<Section>)>,
 }
 
 impl HistoryView {
     fn new(_ctx: &egui::Context) -> Self {
-        Self { entries: Vec::new(), version: u64::MAX, filter: 0, app: frontmost_app() }
+        Self { entries: Vec::new(), version: u64::MAX, filter: 0, app: frontmost_app(), cache: None }
     }
 
     fn reload(&mut self) {
@@ -454,8 +455,14 @@ impl View for HistoryView {
         self.reload();
         let now = crate::store::now_ms();
         let offset = icu::local_offset_minutes(now as f64) as i64 * 60_000;
+        let key = (self.version, self.filter, local_day(now, offset));
+        if let Some((cached, sections)) = &self.cache {
+            if *cached == key {
+                return sections.clone();
+            }
+        }
         let entries: Vec<Entry> = self.entries.iter().filter(|e| matches(e, self.filter)).cloned().collect();
-        group(entries, |ms| day_title(ms, now, offset))
+        let sections: Vec<Section> = group(entries, |ms| day_title(ms, now, offset))
             .into_iter()
             .map(|(heading, entries)| Section {
                 title: heading,
@@ -476,7 +483,9 @@ impl View for HistoryView {
                     })
                     .collect(),
             })
-            .collect()
+            .collect();
+        self.cache = Some((key, sections.clone()));
+        sections
     }
 }
 
@@ -509,6 +518,17 @@ mod tests {
         assert_eq!(title(&Entry { content: Content::Files { paths: vec!["a".into(), "b".into()] }, ..text("") }), "2 Files");
         assert_eq!(word_count(" and other  things "), 3);
         assert_eq!(format_bytes(1536), "1.5 KB");
+    }
+
+    #[test]
+    fn sections_are_rebuilt_only_when_their_inputs_change() {
+        let mut view = HistoryView { entries: vec![text("a")], version: VERSION.load(Ordering::SeqCst), filter: 0, app: None, cache: None };
+        let ids = |view: &mut HistoryView| view.sections().into_iter().flat_map(|s| s.items).map(|i| i.id).collect::<Vec<_>>();
+        assert_eq!(ids(&mut view), ["1"]);
+        view.entries.push(Entry { id: "2".into(), ..text("b") });
+        assert_eq!(ids(&mut view), ["1"]);
+        view.filter = 1;
+        assert_eq!(ids(&mut view), ["1", "2"]);
     }
 
     #[test]

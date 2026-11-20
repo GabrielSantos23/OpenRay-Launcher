@@ -85,6 +85,7 @@ struct SearchEmoji {
     usage: HashMap<String, Usage>,
     version: u64,
     app: Option<String>,
+    cache: Option<((String, usize, u64), Vec<Section>)>,
 }
 
 impl SearchEmoji {
@@ -159,6 +160,18 @@ impl View for SearchEmoji {
             self.version = version;
             self.usage = load();
         }
+        let key = (self.query.clone(), self.filter, self.version);
+        if let Some((_, sections)) = self.cache.as_ref().filter(|(cached, _)| *cached == key) {
+            return sections.clone();
+        }
+        let sections = self.build();
+        self.cache = Some((key, sections.clone()));
+        sections
+    }
+}
+
+impl SearchEmoji {
+    fn build(&self) -> Vec<Section> {
         let category = self.category();
         if !self.query.trim().is_empty() {
             let mut scored: Vec<(u32, &Emoji)> = CATALOG.iter().filter(|e| category.is_none_or(|c| c == e.category)).map(|e| (match_score(&self.query, e.name, &[]), e)).filter(|m| m.0 > 0).collect();
@@ -193,7 +206,7 @@ impl Extension for EmojiPicker {
         let mut search = command(self.id(), "searchEmoji", "Search Emoji & Symbols", ICON, "Command", "Open Command", |_| Ok(()));
         search.subtitle = Some("Emoji & Symbols".into());
         search.keywords = ["emoji", "symbols", "smiley", "emojis", "símbolos"].map(String::from).to_vec();
-        search.view = Some(Rc::new(|_| Box::new(SearchEmoji { query: String::new(), filter: 0, usage: HashMap::new(), version: u64::MAX, app: frontmost_app() })));
+        search.view = Some(Rc::new(|_| Box::new(SearchEmoji { query: String::new(), filter: 0, usage: HashMap::new(), version: u64::MAX, app: frontmost_app(), cache: None })));
         vec![search]
     }
 }
