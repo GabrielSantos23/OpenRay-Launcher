@@ -6,9 +6,10 @@ use egui::{pos2, vec2, Align2, Color32, Pos2, Sense, Stroke, Ui};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
-use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Dwm::{DWMWA_CLOAK, DWMWA_TRANSITIONS_FORCEDISABLED};
-use windows::Win32::UI::WindowsAndMessaging::{SetForegroundWindow, SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+use windows::Win32::UI::WindowsAndMessaging::{SetForegroundWindow, SetWindowPos, HTCLIENT, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, WM_NCHITTEST};
 
 pub static VERSION: AtomicU64 = AtomicU64::new(0);
 const HIDE_DELAY: Duration = Duration::from_millis(180);
@@ -311,6 +312,7 @@ fn reveal(ctx: &egui::Context, title: &str, stage: &mut u8, r: Rect) {
                 launcher::set_dwm(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, 1i32);
                 launcher::set_dwm(hwnd, DWMWA_CLOAK, 1i32);
                 unsafe {
+                    let _ = SetWindowSubclass(hwnd, Some(client_everywhere), 1, 0);
                     let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), r.x, r.y, r.w, r.h, SWP_NOACTIVATE | SWP_SHOWWINDOW);
                 }
             }
@@ -323,6 +325,13 @@ fn reveal(ctx: &egui::Context, title: &str, stage: &mut u8, r: Rect) {
         *stage += 1;
     }
     ctx.request_repaint();
+}
+
+unsafe extern "system" fn client_everywhere(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM, _: usize, _: usize) -> LRESULT {
+    if msg == WM_NCHITTEST {
+        return LRESULT(HTCLIENT as isize);
+    }
+    unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }
 
 fn overlay_ui(ui: &mut Ui, overlay: &mut Overlay) -> Outcome {

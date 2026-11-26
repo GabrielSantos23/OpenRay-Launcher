@@ -179,7 +179,7 @@ impl Extension for Core {
         check.keywords = ["update", "upgrade", "version", "atualizar", "atualização", "versão"].map(String::from).to_vec();
         let mut list = vec![settings, check, quit];
         if let crate::updater::State::Ready(version) = crate::updater::state() {
-            let mut update = command(self.id(), "restart-to-update", &format!("Restart to Update to {version}"), Icon::Tile("download", Tone::Green), "Command", "Restart to Update", |host| {
+            let mut update = command(self.id(), "restart-to-update", &format!("Restart to Update to {version}"), Icon::Tile("download", Tone::Green), "Command", "Install Update", |host| {
                 crate::updater::apply()?;
                 host.requests.push(Request::Quit);
                 Ok(())

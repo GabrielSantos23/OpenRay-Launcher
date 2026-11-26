@@ -795,6 +795,15 @@ impl Launcher {
             .collect();
         let text = self.query.trim().to_owned();
         if text.is_empty() {
+            if let Some(i) = self.commands.iter().position(|c| c.key == "openray-core/restart-to-update") {
+                let mut update = self.command_row("", i, Source::Command(i), None);
+                update.id = "update-banner".into();
+                update.title = "New Update Available".into();
+                update.subtitle = None;
+                update.kind = None;
+                update.icon = Icon::Tile("refresh-cw", crate::extension::Tone::Red);
+                rows.insert(0, update);
+            }
             return rows;
         }
         let matched: Vec<Row> = self.commands.iter().enumerate().filter(|(_, c)| c.query.as_ref().is_some_and(|q| (q.matches)(&text))).map(|(i, _)| self.command_row("Results", i, Source::Query(i), Some(text.clone()))).collect();
@@ -2257,7 +2266,13 @@ impl Launcher {
         } else if let Some(error) = &self.hotkey_error {
             paint_text(ui, pos2(rect.left() + 12.0, center_y), Align2::LEFT_CENTER, &format!("Hotkey unavailable: {error}"), theme::font(12.0), theme::RED(), 380.0);
         } else {
-            icons::paint_glyph(ui, "openray", Rect::from_center_size(pos2(rect.left() + 12.0 + 11.0, center_y), vec2(22.0, 22.0)), theme::FG_60());
+            let gear = Rect::from_center_size(pos2(rect.left() + 12.0 + 11.0, center_y), vec2(22.0, 22.0));
+            let settings = ui.interact(gear.expand(3.0), egui::Id::unique("footer-settings"), Sense::click()).on_hover_text(crate::i18n::tr("Settings"));
+            settings.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, crate::i18n::tr("Settings")));
+            icons::paint_glyph(ui, "settings-bold", gear.shrink(2.0), if settings.hovered() { theme::FG() } else { theme::FG_60() });
+            if settings.clicked() {
+                self.open_settings(ui.ctx());
+            }
         }
         let (Some(row), Some(primary)) = (current, groups.first().and_then(|g| g.first())) else { return };
         let right = rect.right() - 9.0;
