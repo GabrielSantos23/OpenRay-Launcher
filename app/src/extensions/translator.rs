@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 const ICON: Icon = Icon::Tile("languages", Tone::Blue);
 const ENDPOINT: &str = "https://translate.googleapis.com/translate_a/single";
+const FALLBACK: &str = "https://clients5.google.com/translate_a/t";
 const AUTO: &str = "auto";
 const DEFAULT_TARGET: &str = "en";
 const DEBOUNCE: Duration = Duration::from_millis(1000);
@@ -215,10 +216,27 @@ pub fn parse(body: &Value) -> Result<Translation, String> {
     Ok(Translation { text, detected: body.get(2).and_then(Value::as_str).map(str::to_owned) })
 }
 
+pub fn parse_fallback(body: &Value) -> Result<Translation, String> {
+    let first = body.get(0).ok_or("No translation received")?;
+    let (text, detected) = match first {
+        Value::Array(pair) => (pair.first().and_then(Value::as_str), pair.get(1).and_then(Value::as_str)),
+        other => (other.as_str(), None),
+    };
+    match text {
+        Some(text) if !text.is_empty() => Ok(Translation { text: text.to_owned(), detected: detected.map(str::to_owned) }),
+        _ => Err("No translation received".into()),
+    }
+}
+
 fn translate(text: &str, pair: &Pair) -> Result<Translation, String> {
     let url = format!("{ENDPOINT}?client=gtx&sl={}&tl={}&dt=t", pair.source, pair.target);
+    let fallback = || crate::http::post_form(&format!("{FALLBACK}?client=dict-chrome-ex&sl={}&tl={}", pair.source, pair.target), &[("q", text)]);
     match crate::http::post_form(&url, &[("q", text)]) {
         Ok(body) => parse(&body),
+        Err(Failure::Status(429)) => match fallback() {
+            Ok(body) => parse_fallback(&body),
+            Err(_) => Err("Google is limiting translations right now. Wait a few seconds and try again.".into()),
+        },
         Err(Failure::Status(status)) => Err(format!("Translation service returned {status}")),
         Err(Failure::Offline) => Err("The translation service didn't respond. Check your connection and try again.".into()),
         Err(Failure::Body(e)) => Err(e),
@@ -558,6 +576,13 @@ mod tests {
         assert_eq!(parse(&json!([[["Hola", "Hello"], [null, null, "Ola"]], null, "en"])).unwrap().text, "Hola");
         assert!(parse(&json!([null, null, "en"])).is_err() && parse(&json!([[], null, "en"])).is_err() && parse(&json!({ "error": "bad" })).is_err());
         assert_eq!(parse(&json!([[["Hallo", "Hello"]]])).unwrap().detected, None);
+    }
+
+    #[test]
+    fn parses_fallback_bodies() {
+        assert_eq!(parse_fallback(&json!([["Hello world", "pt"]])), Ok(Translation { text: "Hello world".into(), detected: Some("pt".into()) }));
+        assert_eq!(parse_fallback(&json!(["hello world"])), Ok(Translation { text: "hello world".into(), detected: None }));
+        assert!(parse_fallback(&json!([])).is_err() && parse_fallback(&json!([""])).is_err() && parse_fallback(&json!({ "error": "bad" })).is_err());
     }
 
     #[test]
